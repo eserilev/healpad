@@ -32,9 +32,9 @@ local function report()
   for _, b in ipairs(ns.binds or {}) do
     local states = {}
     for _, s in ipairs(ns.BAR_STATES) do if b.states[s] then table.insert(states, s) end end
-    ns.log(string.format("REPORT bind %s = %s -> %s%s heal=%s states=%s%s", b.key, b.command,
+    ns.log(string.format("REPORT bind %s = %s -> %s%s heal=%s states=%s%s", b.key, b.kb and ("KeyBars " .. b.layer) or b.command,
       ns.spellLabel(b.spell), "", tostring(b.heal), table.concat(states, ","),
-      db.aim[b.key] and (" AIM tap=" .. tostring(db.aim[b.key].tap)) or ""))
+      ns.aimConf(b) and (" AIM tap=" .. tostring(ns.aimConf(b).tap)) or ""))
   end
   for i, h in ipairs(ns.heals) do
     local key = h:GetAttribute("hp-key")
@@ -92,6 +92,9 @@ local function steps()
   add(function()
     local heal
     for _, h in ipairs(ns.heals) do if h:GetAttribute("hp-key") and not heal then heal = h end end
+    for _, b in ipairs(ns.binds or {}) do
+      if not heal and b.kb and ns.aimConf(b) then heal = _G[b.button] end
+    end
     if not heal then
       check("a Hold to Aim heal is set up", false, "set one in /hp, then run /hp test again")
       return

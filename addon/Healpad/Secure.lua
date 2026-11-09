@@ -80,6 +80,85 @@ ns.HEAL_SNIPPET = [[
   owner:SetAttribute("castn", (owner:GetAttribute("castn") or 0) + 1)
 ]]
 
+-- The same hold, aim and release, inside a KeyBars button. KeyBars keeps its
+-- keys and layers; when the spell the button holds now is a Hold to Aim heal,
+-- the press opens the diamond instead of casting, and the release casts it
+-- on the aimed person. Any other spell casts as it always did.
+ns.KB_PRE = [[
+  local name = self:GetName()
+  local gen = owner:GetAttribute("gen") or 0
+  if down then
+    local spell = self:GetAttribute("spell")
+    local tap = spell and owner:GetAttribute("aimspell-" .. spell)
+    if not tap then return end
+    self:SetAttribute("hp-lock", spell)
+    self:SetAttribute("hp-gen", gen)
+    self:SetAttribute("hp-tap", tap)
+    local held = owner:GetAttribute("held")
+    if held and held ~= name then
+      return false
+    end
+    owner:SetAttribute("held", name)
+    owner:SetAttribute("sel", nil)
+    owner:SetAttribute("page", 1)
+    owner:ClearBindings()
+    for i = 1, owner:GetAttribute("ak-n") or 0 do
+      local k = owner:GetAttribute("ak" .. i)
+      if not owner:GetAttribute("skip-" .. k) then
+        owner:SetBindingClick(true, k, owner:GetAttribute("ab" .. i))
+      end
+    end
+    owner:SetAttribute("state", "aim")
+    return false
+  end
+  local lock = self:GetAttribute("hp-lock")
+  if not lock then return end
+  self:SetAttribute("hp-lock", nil)
+  if owner:GetAttribute("held") == name then
+    owner:ClearBindings()
+    owner:SetAttribute("held", nil)
+    owner:SetAttribute("state", "idle")
+  end
+  if self:GetAttribute("hp-gen") ~= gen or self:GetAttribute("spell") ~= lock then
+    return false
+  end
+  local unit
+  local sel = owner:GetAttribute("sel")
+  if sel then
+    unit = owner:GetAttribute("u" .. (owner:GetAttribute("page") or 1) .. "-" .. sel)
+  else
+    local tap = self:GetAttribute("hp-tap")
+    if tap == "last" then
+      unit = owner:GetAttribute("last")
+    elseif tap == "tank" then
+      unit = owner:GetAttribute("tank")
+    elseif tap == "focus" then
+      unit = "focus"
+    end
+    if not unit or not UnitExists(unit) then
+      unit = "player"
+    end
+  end
+  if not unit or not UnitExists(unit) then
+    return false
+  end
+  if unit == "target" and SecureCmdOptionParse("[@target,help,nodead] yes; no") ~= "yes" then
+    return false
+  end
+  owner:SetAttribute("last", unit)
+  owner:SetAttribute("castunit", unit)
+  owner:SetAttribute("castn", (owner:GetAttribute("castn") or 0) + 1)
+  self:SetAttribute("useOnKeyDown", false)
+  self:SetAttribute("unit", unit)
+  return nil, "hp"
+]]
+
+-- After a Healpad cast from a KeyBars button: the button as KeyBars left it.
+ns.KB_POST = [[
+  self:SetAttribute("useOnKeyDown", nil)
+  self:SetAttribute("unit", nil)
+]]
+
 ns.DIR_SNIPPET = [[
   local c = self:GetFrameRef("ctl")
   if c:GetAttribute("held") then
@@ -211,14 +290,46 @@ end
 -- override bindings fire UPDATE_BINDINGS), so the same setup is not redone.
 local lastSig
 
+-- Whether a listed button holds to aim, and its settings.
+function ns.aimConf(b)
+  if not b then return nil end
+  if b.kb then return ns.db.aimSpell[b.cast] end
+  return ns.db.aim[b.key]
+end
+
+local wrapped = {} -- KeyBars buttons Healpad sits in
+local spellAttrs = {} -- aimspell-* attributes set on the controller
+
+-- Out of combat: sit in each KeyBars button once, and tell the controller
+-- which spells hold to aim and who their tap heals.
+local function applyKeyBars(binds)
+  for _, a in ipairs(spellAttrs) do ctl:SetAttribute(a, nil) end
+  wipe(spellAttrs)
+  for _, b in ipairs(binds) do
+    if b.kb then
+      local btn = _G[b.button]
+      if btn and not wrapped[b.button] then
+        SecureHandlerWrapScript(btn, "OnClick", ctl, ns.KB_PRE, ns.KB_POST)
+        wrapped[b.button] = true
+      end
+      local conf = ns.db.aimSpell[b.cast]
+      if conf then
+        local a = "aimspell-" .. b.cast
+        ctl:SetAttribute(a, conf.tap or "player")
+        table.insert(spellAttrs, a)
+      end
+    end
+  end
+end
+
 local function signature(binds)
   local db = ns.db
   local parts = { db.aimWith or "", db.cancel or "" }
   for _, b in ipairs(binds) do
-    local conf = db.aim[b.key]
+    local conf = ns.aimConf(b)
     local states = {}
     for _, s in ipairs(ns.BAR_STATES) do if b.states[s] then table.insert(states, s) end end
-    table.insert(parts, b.key .. "=" .. tostring(b.spell) .. ":" .. table.concat(states, ",")
+    table.insert(parts, (b.kb and ("kb:" .. b.button .. ":" .. b.layer .. ":" .. b.cast .. "=") or "") .. b.key .. "=" .. tostring(b.spell) .. ":" .. table.concat(states, ",")
       .. (conf and (":" .. (conf.tap or "")) or ""))
   end
   return table.concat(parts, "|")
@@ -234,8 +345,9 @@ function ns.applyKeys(force)
     if sig == lastSig and force ~= true then return end
     lastSig = sig
     local used = 0
+    applyKeyBars(ns.binds)
     for _, bind in ipairs(ns.binds) do
-      local conf = ns.db.aim[bind.key]
+      local conf = not bind.kb and ns.db.aim[bind.key]
       if conf and bind.heal and used < ns.HEALS then
         used = used + 1
         local b = ns.heals[used]
@@ -269,6 +381,9 @@ end
 ns.on("PLAYER_LOGIN", function()
   ns.applyRoster()
   ns.applyKeys(true)
+  if KeyBarsAPI and KeyBarsAPI.onChange then
+    KeyBarsAPI.onChange(function() ns.applyKeys() end)
+  end
 end)
 ns.on("GROUP_ROSTER_UPDATE", ns.applyRoster)
 ns.on("PLAYER_ROLES_ASSIGNED", ns.applyRoster)

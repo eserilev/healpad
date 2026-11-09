@@ -30,6 +30,7 @@ local BOOK = {
   { id = 5176, name = "Wrath", sub = "Rank 1", helpful = false },
   { id = 1082, name = "Claw", sub = "Rank 1", helpful = false },
   { id = 7777, name = "Walk on Air", sub = "Racial", helpful = true, selfOnly = true },
+  { id = 6807, name = "Maul", sub = "Rank 1", helpful = false },
 }
 
 local function party(W)
@@ -461,6 +462,78 @@ test("a KeyBars key is read through its override; self-only spells aren't heals"
   W.combat = true
   W.key("2", true) W.tap("UP") W.key("2", false)
   eq(last(W).spell, 5186) eq(last(W).unit, "party2")
+  clean(W)
+end)
+
+-- KeyBars with key 1: Healing Touch on Normal, Maul on the Bear layer.
+local function withKeyBars(W)
+  local kb = W.G.CreateFrame("Button", "KeyBarsButton1", W.G.UIParent, "SecureActionButtonTemplate")
+  kb.attrs.type, kb.attrs.spell = "spell", "Healing Touch"
+  W.overrides["1"] = { owner = kb, target = "KeyBarsButton1", priority = true }
+  local listeners = {}
+  W.G.KeyBarsAPI = {
+    version = 1,
+    slots = function()
+      return { { key = "1", button = "KeyBarsButton1", layers = {
+        { id = 1, name = "Normal", spell = 5185, cast = "Healing Touch" },
+        { id = 11, name = "Bear", spell = 6807, cast = "Maul" } } } }
+    end,
+    onChange = function(fn) table.insert(listeners, fn) end,
+  }
+  return kb, listeners
+end
+
+test("KeyBars: its layers are listed; Healpad sits in its button and leaves the key alone", function()
+  local W = Wow.new()
+  setup(W)
+  party(W)
+  local kb = withKeyBars(W)
+  local ns = W.load(DIR, FILES, { aim = {}, aimSpell = { ["Healing Touch"] = { tap = "player" } } })
+  local found
+  for _, b in ipairs(ns.binds) do if b.kb then found = b end end
+  eq(found and found.layer, "Normal", "Healing Touch on Normal is listed")
+  eq(found.cast, "Healing Touch")
+  eq(W.overrides["1"].target, "KeyBarsButton1", "KeyBars keeps key 1")
+  W.combat = true
+  W.key("1", true)
+  eq(#W.casts, 0, "the press casts nothing")
+  eq(ns.diamond:IsShown(), true)
+  W.tap("PADDRIGHT")
+  W.key("1", false)
+  eq(last(W).spell, "Healing Touch") eq(last(W).unit, "party4")
+  eq(kb.attrs.unit, nil, "the button is as KeyBars left it")
+  eq(kb.attrs.useOnKeyDown, nil)
+  eq(ns.diamond:IsShown(), false)
+  -- bear form: KeyBars puts Maul on the key; it casts on the press as always
+  kb.attrs.spell = "Maul"
+  W.key("1", true)
+  eq(last(W).spell, "Maul")
+  eq(ns.diamond:IsShown(), false)
+  W.key("1", false)
+  eq(#W.casts, 2)
+  clean(W)
+end)
+
+test("KeyBars: Hold to Aim set in the settings reaches the button", function()
+  local W = Wow.new()
+  setup(W)
+  party(W)
+  withKeyBars(W)
+  local ns = W.load(DIR, FILES, { aim = {} })
+  ns.openOptions()
+  local dbg = ns.optionsDebug()
+  local li, n = nil, 0
+  for _, r in ipairs(dbg.rows) do
+    if r.bind then n = n + 1 if r.bind.kb then li = n end end
+  end
+  dbg.st.li = li
+  ns.optionsNav("A")
+  eq(ns.db.aimSpell["Healing Touch"] ~= nil, true)
+  eq(ns.ctl:GetAttribute("aimspell-Healing Touch"), "player")
+  W.G.HealpadOptions:Hide()
+  W.combat = true
+  W.key("1", true) W.tap("UP") W.key("1", false)
+  eq(last(W).unit, "party2")
   clean(W)
 end)
 

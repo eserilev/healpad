@@ -56,10 +56,14 @@ local function buildRows()
   wipe(rows)
   local last
   for _, b in ipairs(ns.binds or {}) do
-    local group = b.pad and ns.keyGroup(b.key) or "keys"
+    local group = b.kb and ("kb:" .. b.layer) or (b.pad and ns.keyGroup(b.key) or "keys")
     if group ~= last then
       last = group
-      local label = group == "keys" and "KEYS" or (group == "" and "BUTTONS" or ("HOLD " .. group:upper()))
+      local label
+      if b.kb then label = "KeyBars · " .. b.layer
+      elseif group == "keys" then label = "Keys"
+      elseif group == "" then label = "Buttons"
+      else label = "Hold " .. group end
       table.insert(rows, { header = label })
     end
     table.insert(rows, { bind = b })
@@ -82,14 +86,16 @@ local function bindCount()
   return n
 end
 
-local function aimed(b) return b ~= nil and ns.db.aim[b.key] ~= nil end
+local function aimed(b) return ns.aimConf(b) ~= nil end
 
 local function setAim(b, on)
   if not b or not b.heal or InCombatLockdown() then return end
+  local t, k = ns.db.aim, b.key
+  if b.kb then t, k = ns.db.aimSpell, b.cast end
   if on then
-    ns.db.aim[b.key] = ns.db.aim[b.key] or { tap = "player" }
+    t[k] = t[k] or { tap = "player" }
   else
-    ns.db.aim[b.key] = nil
+    t[k] = nil
   end
   ns.applyKeys(true)
 end
@@ -173,7 +179,7 @@ local function drawDetail()
   local d = ui.detail
   d:SetShown(b ~= nil)
   if not b then return end
-  d.key:SetText(keyText(ns.keyLabel(b.key)))
+  d.key:SetText(keyText(ns.keyLabel(b.key)) .. (b.kb and ("  |cffaaaaaa" .. b.layer .. "|r") or ""))
   d.icon:SetTexture(ns.spellIcon(b.spell))
   d.name:SetText(ns.spellName(b.spell))
   d.rank:SetText(ns.spellRank(b.spell))
@@ -182,7 +188,7 @@ local function drawDetail()
   setChosen(d.cast, not on)
   setChosen(d.hold, on)
   d.tapBox:SetShown(b.heal and on)
-  local tap = on and ns.db.aim[b.key].tap or "player"
+  local tap = on and ns.aimConf(b).tap or "player"
   for i, t in ipairs(ns.TAPS) do setChosen(d.taps[i], tap == t) end
   if st.zone == "detail" then
     if st.row == 0 then return st.col == 0 and d.cast or d.hold end
@@ -309,7 +315,7 @@ local function nav(btn)
   if btn == "UP" then st.row, st.col = 0, aimed(b) and 1 or 0 end
   if btn == "DOWN" and aimed(b) then
     st.row = 1
-    for i, t in ipairs(ns.TAPS) do if t == ns.db.aim[b.key].tap then st.col = i - 1 end end
+    for i, t in ipairs(ns.TAPS) do if t == ns.aimConf(b).tap then st.col = i - 1 end end
   end
   if btn == "LEFT" then
     if st.col == 0 then st.zone = "list" else st.col = st.col - 1 end
@@ -319,7 +325,7 @@ local function nav(btn)
     if st.row == 0 then
       setAim(b, st.col == 1)
     elseif aimed(b) then
-      ns.db.aim[b.key].tap = ns.TAPS[st.col + 1]
+      ns.aimConf(b).tap = ns.TAPS[st.col + 1]
       ns.applyKeys(true)
     end
   end

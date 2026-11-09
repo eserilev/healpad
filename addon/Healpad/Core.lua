@@ -54,6 +54,7 @@ function ns.setupDB()
     if db[k] == nil then db[k] = v end
   end
   db.aim = db.aim or {} -- [binding key] = { tap = "player" }: that key holds to aim
+  db.aimSpell = db.aimSpell or {} -- [KeyBars cast value] = { tap }: that spell holds to aim on KeyBars keys
   ns.db = db
   for _, line in ipairs(early) do ns.log(line) end
   wipe(early)

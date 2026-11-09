@@ -170,10 +170,17 @@ function ns.keyGroup(key)
   return table.concat(out, "+")
 end
 
+-- The game draws pad buttons as icons that match the controller in use
+-- (Xbox, PlayStation, Switch, Steam Deck); letters are the fallback.
+local function padGlyph(base)
+  local ok, t = pcall(GetBindingText, base)
+  if ok and type(t) == "string" and (t:find("|A:", 1, true) or t:find("|T", 1, true)) then return t end
+end
+
 function ns.keyLabel(key)
   if not key then return "" end
   local _, base = ns.splitKey(key)
-  local name = PAD[base]
+  local name = padGlyph(base) or PAD[base]
   if not name then
     local ok, t = pcall(GetBindingText, base)
     name = (ok and t and t ~= "") and t or base
@@ -247,6 +254,8 @@ function ns.readBinds()
     if not seen[key] then
       seen[key] = true
       local command = commandOf(key)
+      -- KeyBars keys come from KeyBars itself, every layer at once.
+      if KeyBarsAPI and command:match("^CLICK KeyBarsButton") then command = "" end
       local r = command ~= "" and ns.resolve(command) or nil
       if r then
         local heal = ns.isHeal(r.spell)
@@ -259,5 +268,27 @@ function ns.readBinds()
     end
   end
   table.sort(list, before)
+  for _, e in ipairs(ns.readKeyBars()) do table.insert(list, e) end
   return list
+end
+
+-- KeyBars keys, one entry per layer with a heal: { key, kb = true, button,
+-- layer (its name), spell, cast (what the button's "spell" attribute holds
+-- on that layer) }. Hold to Aim follows the spell: Healing Touch aims on
+-- every key and layer that casts it.
+function ns.readKeyBars()
+  local out = {}
+  if not (KeyBarsAPI and KeyBarsAPI.slots) then return out end
+  local ok, slots = pcall(KeyBarsAPI.slots)
+  if not ok or type(slots) ~= "table" then return out end
+  for _, slot in ipairs(slots) do
+    for _, L in ipairs(slot.layers or {}) do
+      local id = spellId(L.spell) or spellId(L.cast)
+      if id and ns.isHeal(id) then
+        table.insert(out, { key = slot.key, kb = true, button = slot.button, layer = L.name or "",
+          spell = id, cast = tostring(L.cast), heal = true, states = {} })
+      end
+    end
+  end
+  return out
 end

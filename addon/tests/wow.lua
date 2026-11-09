@@ -153,23 +153,25 @@ function M.new()
     end,
   }
   G.SecureCmdOptionParse = function(s) return RESTRICTED.SecureCmdOptionParse(s) end
-  local function runSnippet(body, env, ...)
-    local fn = assert(loadstring("local self, button, down = ...\n" .. body))
+  local function runSnippetAs(args, body, env, ...)
+    local fn = assert(loadstring("local " .. args .. " = ...\n" .. body))
     setfenv(fn, setmetatable(env, { __index = function(_, k)
       if RESTRICTED[k] ~= nil then return RESTRICTED[k] end
       error("snippet uses " .. tostring(k) .. ", which the restricted environment lacks", 2)
     end, __newindex = function(_, k) error("snippet sets global " .. tostring(k), 2) end }))
     W.inSecure = true
-    local ok, res = pcall(fn, ...)
+    local out = (function(...) return { n = select("#", ...), ... } end)(pcall(fn, ...))
     W.inSecure = false
-    if not ok then error(res, 0) end
-    return res
+    if not out[1] then error(out[2], 0) end
+    return unpack(out, 2, out.n)
   end
+  local function runSnippet(body, env, ...) return runSnippetAs("self, button, down", body, env, ...) end
   W.runSnippet = runSnippet
 
-  G.SecureHandlerWrapScript = function(frame, script, header, pre)
+  G.SecureHandlerWrapScript = function(frame, script, header, pre, post)
     assert(script == "OnClick")
-    frame.wrap = { header = header, pre = pre }
+    if W.combat then table.insert(W.blocked, "SecureHandlerWrapScript") end
+    frame.wrap = { header = header, pre = pre, post = post }
   end
   G.SecureHandlerExecute = function(frame, body)
     if W.combat then table.insert(W.blocked, "SecureHandlerExecute") end
@@ -198,16 +200,20 @@ function M.new()
   end
 
   -- A click from a binding: the wrap, the template action, then the hooks.
+  W.keyDownCvar = true -- the game's ActionButtonUseKeyDown
   function W.click(f, down)
+    local message
     if f.wrap then
-      local res = runSnippet(f.wrap.pre, { owner = f.wrap.header }, f, "LeftButton", down)
+      local res, msg = runSnippet(f.wrap.pre, { owner = f.wrap.header }, f, "LeftButton", down)
       if res == false then
         for _, fn in ipairs(f.hooks.OnClick or {}) do fn(f, "LeftButton", down) end
         return
       end
+      message = msg
     end
     if f.template:find("SecureActionButtonTemplate") then
       local onDown = f.attrs.useOnKeyDown
+      if onDown == nil then onDown = W.keyDownCvar end
       if (down and onDown) or (not down and not onDown) then
         local unit = f.attrs.unit
         if unit and unit ~= "none" and not G.UnitExists(unit) then return end
@@ -217,6 +223,9 @@ function M.new()
       runSnippet(f.attrs._onclick, {}, f, "LeftButton", down)
     elseif f.template == "" and down and f.scripts.OnClick then
       f.scripts.OnClick(f, "LeftButton", down) -- a plain button: clicks on the press
+    end
+    if f.wrap and f.wrap.post and message ~= nil then
+      runSnippetAs("self, message, button, down", f.wrap.post, { owner = f.wrap.header }, f, message, "LeftButton", down)
     end
     for _, fn in ipairs(f.hooks.OnClick or {}) do fn(f, "LeftButton", down) end
   end

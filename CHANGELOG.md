@@ -8,6 +8,10 @@
 - Classic frames: portrait in a gold ring, level, health with numbers, mana, rage or energy.
 - A form or bar page that puts another spell on a heal button gives that button back.
 - The opposite direction brings the aim back to you.
+- KeyBars: every layer's heals are listed (Normal, Shift, forms); Healpad works inside
+  KeyBars' buttons, so KeyBars keeps its keys and a form's other spells cast as always.
+- Pad buttons show as the game's icons for your controller.
+- /hp test checks Healpad in the game and saves a log and screenshots.
 
 ## 0.1.0
 
