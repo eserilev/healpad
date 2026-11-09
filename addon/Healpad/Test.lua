@@ -1,8 +1,8 @@
 -- /hp test: checks Healpad inside the real game, out of combat.
 -- Opens each settings tab and the diamond and takes a screenshot of each,
--- walks a hold, an aim and a cancel through the secure buttons (nothing is
--- cast), records what it found and any Lua error in the saved log, then
--- reloads so the log is written to disk.
+-- runs a hold, an aim and a cancel through the real secure snippets (nothing
+-- is cast), and records what it found and any Lua error in the saved log.
+-- The game writes the log on /reload; an addon can't reload by itself.
 local _, ns = ...
 
 local results
@@ -76,8 +76,9 @@ local function steps()
     for _, d in ipairs(ns.DIRS) do
       local f = ns.spots[d]
       local x, y = f:GetCenter()
-      ns.log(string.format("REPORT spot %s shown=%s at %s,%s name=%s hp=%s", d, tostring(f:IsVisible()),
-        tostring(x and math.floor(x)), tostring(y and math.floor(y)), tostring(f.name:GetText()), tostring(f.hpText:GetText())))
+      local okName, name = pcall(function() return f.name:GetText() .. "" end)
+      ns.log(string.format("REPORT spot %s shown=%s at %s,%s name=%s", d, tostring(f:IsVisible()),
+        tostring(x and math.floor(x)), tostring(y and math.floor(y)), okName and name or "(secret)"))
     end
   end)
   add(function()
@@ -96,13 +97,15 @@ local function steps()
       return
     end
     local ctl = ns.ctl
-    heal:Click("LeftButton", true)
+    -- An addon can't click a secure button, so this runs the press part of
+    -- the heal snippet as the controller, the way the game would.
+    SecureHandlerExecute(ctl, ns.TEST_PRESS:format(heal:GetName()))
     check("press opens the diamond", ctl:GetAttribute("state") == "aim" and ns.diamond:IsShown())
     local cancel = ns.db.cancel or "PAD2"
     check("while aiming, arrows aim", bound("UP"):find("HealpadDirUP"), bound("UP"))
     check("while aiming, the d-pad aims", bound("PADDUP"):find("HealpadDir") or ns.db.aimWith ~= "dpad", bound("PADDUP"))
     check("while aiming, the cancel button cancels", bound(cancel):find("HealpadCancel"), cancel .. "=" .. bound(cancel))
-    _G.HealpadDirUP:Click("LeftButton", true)
+    SecureHandlerExecute(_G.HealpadDirUP, ns.DIR_SNIPPET)
     local up = ctl:GetAttribute("sel")
     check("up aims at someone (or nobody up there)", up == "UP" or not ctl:GetAttribute("u1-UP"), tostring(up))
     snap("aiming")
@@ -110,18 +113,31 @@ local function steps()
   add(function()
     local ctl = ns.ctl
     if ctl:GetAttribute("state") ~= "aim" then return end
-    _G.HealpadDirDOWN:Click("LeftButton", true)
+    SecureHandlerExecute(_G.HealpadDirDOWN, ns.DIR_SNIPPET)
     check("the opposite way comes back to you", ctl:GetAttribute("sel") == "SELF" or ctl:GetAttribute("sel") == nil,
       tostring(ctl:GetAttribute("sel")))
-    _G.HealpadCancel:Click("LeftButton", true)
+    SecureHandlerExecute(_G.HealpadCancel, ns.CANCEL_SNIPPET)
     check("cancel closes the diamond", ctl:GetAttribute("state") == "idle" and not ns.diamond:IsShown())
-    local held
-    for _, h in ipairs(ns.heals) do if h:GetAttribute("hp-key") and not held then held = h end end
-    held:Click("LeftButton", false) -- the release after a cancel casts nothing
     check("aim keys given back", not bound("UP"):find("HealpadDir"), bound("UP"))
   end)
   return list
 end
+
+-- The press half of the heal snippet, run as the controller (self).
+ns.TEST_PRESS = [[
+  local owner = self
+  owner:SetAttribute("held", "%s")
+  owner:SetAttribute("sel", nil)
+  owner:SetAttribute("page", 1)
+  owner:ClearBindings()
+  for i = 1, owner:GetAttribute("ak-n") or 0 do
+    local k = owner:GetAttribute("ak" .. i)
+    if not owner:GetAttribute("skip-" .. k) then
+      owner:SetBindingClick(true, k, owner:GetAttribute("ab" .. i))
+    end
+  end
+  owner:SetAttribute("state", "aim")
+]]
 
 function ns.selfTest()
   if InCombatLockdown() then ns.say("after combat.") return end
@@ -133,7 +149,7 @@ function ns.selfTest()
     ns.log("LUA ERROR " .. tostring(err))
     return oldHandler(err)
   end)
-  ns.say("testing… the game reloads when done.")
+  ns.say("testing…")
   local list = steps()
   local i = 0
   local function nextStep()
@@ -144,7 +160,7 @@ function ns.selfTest()
       local bad = 0
       for _, r in ipairs(results) do if not r.ok then bad = bad + 1 end end
       ns.log(string.format("TEST done: %d ok, %d failed", #results - bad, bad))
-      C_Timer.After(1, ReloadUI)
+      ns.say(string.format("test done: %d ok, %d failed. Type /reload so the log is saved.", #results - bad, bad))
       return
     end
     local ok, err = pcall(fn)

@@ -98,9 +98,13 @@ function ns.resolve(command)
   return nil
 end
 
+-- A heal you can aim: friendly and cast at someone. Self-only spells
+-- (Walk on Air, a teleport) are friendly too but have no range.
 function ns.isHeal(spell)
   local ok, yes = pcall(C_Spell.IsSpellHelpful, spell)
-  return ok and yes == true
+  if not (ok and yes == true) then return false end
+  local ok2, ranged = pcall(C_Spell.SpellHasRange, spell)
+  return ok2 and ranged == true
 end
 
 -- "Healing Touch" and "Rank 4" (or "").
@@ -190,30 +194,66 @@ local function before(a, b)
   return a.key < b.key
 end
 
+-- Keys worth asking about: every key in the game's binding list, plus the
+-- usual keys with modifiers, since addons like KeyBars bind keys as override
+-- bindings that the list doesn't have.
+local EXTRA = {}
+do
+  local bases = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "=", "`", "[", "]", ";", "'", ",", ".", "/",
+    "BUTTON3", "BUTTON4", "BUTTON5", "MOUSEWHEELUP", "MOUSEWHEELDOWN", "TAB", "SPACE" }
+  for c = string.byte("A"), string.byte("Z") do table.insert(bases, string.char(c)) end
+  for i = 1, 12 do table.insert(bases, "F" .. i) end
+  for i = 0, 9 do table.insert(bases, "NUMPAD" .. i) end
+  for _, k in ipairs(PAD_ORDER) do table.insert(bases, k) end
+  for _, m in ipairs({ "", "SHIFT-", "CTRL-", "ALT-" }) do
+    for _, b in ipairs(bases) do table.insert(EXTRA, m .. b) end
+  end
+end
+
+-- What a key does when Healpad isn't holding it. Healpad's own override
+-- bindings (heal buttons, the settings' nav keys) hide the one beneath, so
+-- the last one seen is kept.
+local beneath = {}
+local function commandOf(key)
+  local ok, action = pcall(GetBindingAction, key, true)
+  action = ok and action or ""
+  if action:match("^CLICK Healpad") then
+    if beneath[key] then return beneath[key] end
+    local ok2, plain = pcall(GetBindingAction, key)
+    return ok2 and plain or ""
+  end
+  beneath[key] = action
+  return action
+end
+
 -- Every bound button that casts a spell: { key, command, spell, states, heal,
 -- pad }. Pad buttons first, then keys; a key on the keyboard shows only when
 -- it casts a heal.
 function ns.readBinds()
   local list, seen = {}, {}
+  local keys = {}
   local ok, n = pcall(GetNumBindings)
   n = ok and n or 0
   for i = 1, n do
     local got = { pcall(GetBinding, i) }
     if got[1] then
-      local command = got[2]
       for j = 4, #got do
-        local key = got[j]
-        if type(key) == "string" and key ~= "" and not seen[key] then
-          seen[key] = true
-          local r = ns.resolve(command)
-          if r then
-            local heal = ns.isHeal(r.spell)
-            local pad = ns.isPad(key)
-            if pad or heal then
-              table.insert(list, { key = key, command = command, spell = r.spell, states = r.states,
-                heal = heal, pad = pad })
-            end
-          end
+        if type(got[j]) == "string" and got[j] ~= "" then table.insert(keys, got[j]) end
+      end
+    end
+  end
+  for _, k in ipairs(EXTRA) do table.insert(keys, k) end
+  for _, key in ipairs(keys) do
+    if not seen[key] then
+      seen[key] = true
+      local command = commandOf(key)
+      local r = command ~= "" and ns.resolve(command) or nil
+      if r then
+        local heal = ns.isHeal(r.spell)
+        local pad = ns.isPad(key)
+        if pad or heal then
+          table.insert(list, { key = key, command = command, spell = r.spell, states = r.states,
+            heal = heal, pad = pad })
         end
       end
     end

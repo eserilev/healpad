@@ -29,6 +29,7 @@ local BOOK = {
   { id = 774, name = "Rejuvenation", sub = "Rank 1", helpful = true },
   { id = 5176, name = "Wrath", sub = "Rank 1", helpful = false },
   { id = 1082, name = "Claw", sub = "Rank 1", helpful = false },
+  { id = 7777, name = "Walk on Air", sub = "Racial", helpful = true, selfOnly = true },
 }
 
 local function party(W)
@@ -435,6 +436,50 @@ test("settings: pad drives the tabs; A sets Hold to Aim; nav keys go back on clo
   clean(W)
 end)
 
+test("a KeyBars key is read through its override; self-only spells aren't heals", function()
+  local W = Wow.new()
+  setup(W)
+  party(W)
+  W.actions[9] = { "spell", 7777 }
+  W.bind("ACTIONBUTTON9", "9")
+  local kb = W.G.CreateFrame("Button", "KeyBarsSlot1", W.G.UIParent, "SecureActionButtonTemplate")
+  kb.attrs.type, kb.attrs.spell = "spell", 5186
+  W.overrides["2"] = { owner = kb, target = "KeyBarsSlot1", priority = true }
+  local ns = W.load(DIR, FILES, { aim = { ["2"] = { tap = "player" } } })
+  local found, walk = nil, nil
+  for _, b in ipairs(ns.binds) do
+    if b.key == "2" then found = b end
+    if b.key == "9" then walk = b end
+  end
+  eq(found and found.spell, 5186, "KeyBars key 2 casts Healing Touch")
+  eq(walk, nil, "Walk on Air is no heal")
+  eq(W.secureBinds["2"] and W.secureBinds["2"].target, "HealpadHeal1", "Healpad holds 2")
+  ns.applyKeys(true)
+  local again
+  for _, b in ipairs(ns.binds) do if b.key == "2" then again = b end end
+  eq(again and again.spell, 5186, "still read beneath Healpad's own binding")
+  W.combat = true
+  W.key("2", true) W.tap("UP") W.key("2", false)
+  eq(last(W).spell, 5186) eq(last(W).unit, "party2")
+  clean(W)
+end)
+
+test("Esc closes the whole window from any tab, and the diamond preview with it", function()
+  local W, ns = game()
+  ns.openOptions()
+  W.tap("PADRSHOULDER") W.tap("PADRSHOULDER") -- Frames: the diamond shows
+  eq(ns.diamond:IsShown(), true)
+  W.tap("ESCAPE")
+  eq(W.G.HealpadOptions:IsShown(), false, "closed")
+  eq(ns.diamond:IsShown(), false, "preview gone")
+  eq(W.overrides.ESCAPE, nil, "Esc is the game's again")
+  ns.openOptions()
+  W.tap("PADDRIGHT") -- into a heal's detail
+  W.tap("ESCAPE")
+  eq(W.G.HealpadOptions:IsShown(), false, "closed from the detail too")
+  clean(W)
+end)
+
 test("the settings close when combat starts", function()
   local W, ns = game()
   ns.openOptions()
@@ -447,7 +492,7 @@ test("the settings close when combat starts", function()
   clean(W)
 end)
 
-test("/hp test runs in the game: tabs, diamond, a hold, an aim, a cancel; then reloads", function()
+test("/hp test runs in the game: tabs, diamond, a hold, an aim, a cancel", function()
   local W, ns = game()
   W.G.SlashCmdList.HEALPAD("test")
   W.runTimers()
@@ -457,7 +502,6 @@ test("/hp test runs in the game: tabs, diamond, a hold, an aim, a cancel; then r
   eq(log:find("TEST done: %d+ ok, 0 failed") ~= nil, true, log)
   eq(W.shots, 4, "screenshots")
   eq(#W.casts, 0, "nothing cast")
-  eq(W.reloaded, true)
   clean(W)
 end)
 

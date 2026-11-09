@@ -325,6 +325,7 @@ function M.new()
     GetSpellSubtext = function(id) local s = spell(id) return s and s.sub end,
     GetSpellTexture = function() return 136041 end,
     IsSpellHelpful = function(id) local s = spell(id) return s and s.helpful or false end,
+    SpellHasRange = function(id) local s = spell(id) return s ~= nil and s.selfOnly ~= true end,
     GetSpellInfo = function(name)
       for _, s in ipairs(W.book) do if s.name == name then return { spellID = s.id } end end
     end,

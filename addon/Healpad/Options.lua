@@ -7,80 +7,47 @@
 -- the mouse. Settings change out of combat only; the panel closes in combat.
 local _, ns = ...
 
-local C = {
-  bg = { 0.027, 0.035, 0.047, 0.97 }, head = { 0.05, 0.067, 0.09, 1 }, line = { 0.12, 0.145, 0.19, 1 },
-  card = { 0.06, 0.08, 0.105, 1 }, cardOn = { 0.085, 0.105, 0.14, 1 }, edge = { 0.16, 0.19, 0.25, 1 },
-  gold = { 0.95, 0.76, 0.31, 1 }, goldBg = { 0.23, 0.18, 0.07, 1 }, cyan = { 0.5, 0.89, 0.89, 1 },
-  sel = { 0.17, 0.23, 0.3, 1 }, selEdge = { 0.3, 0.4, 0.53, 1 }, text = { 0.91, 0.89, 0.85, 1 },
-  dim = { 0.6, 0.64, 0.68, 1 }, faint = { 0.44, 0.47, 0.51, 1 }, red = { 1, 0.54, 0.5, 1 }, redBg = { 0.23, 0.1, 0.09, 1 },
-}
-local PAD_COLOR = { A = { 0.56, 0.88, 0.64, 1 }, B = { 1, 0.54, 0.5, 1 }, X = { 0.61, 0.76, 1, 1 }, Y = { 1, 0.88, 0.54, 1 } }
-local function padColor(label)
-  local last = (label or ""):match("([^+]+)$")
-  return PAD_COLOR[last] or C.cyan
-end
-
-local W, H = 820, 520
-local LIST_W, ROW_H = 330, 36
+local W, H = 660, 480
+local LIST_W, ROW_H = 270, 30
 local TABS = { "buttons", "aim", "frames" }
 local TAB_LABEL = { buttons = "Buttons", aim = "Aim", frames = "Frames" }
+local GOLD, WHITE, GREY = { 1, 0.82, 0 }, { 1, 1, 1 }, { 0.5, 0.5, 0.5 }
+local PAD_COLOR = { A = { 0.4, 0.9, 0.4 }, B = { 1, 0.35, 0.3 }, X = { 0.35, 0.6, 1 }, Y = { 1, 0.85, 0.2 } }
 
 local panel
 local ui = {}
 local st = { tab = "buttons", zone = "list", li = 1, row = 0, col = 0, top = 1 }
-local rows = {} -- the Buttons list: { header = "HOLD LT" } or { bind = b }
+local rows = {} -- the Buttons list: { header = "Hold LT" } or { bind = b }
 
 ---------------------------------------------------------------- small parts
+-- The game's own pieces: the window frame, its tabs, the red buttons and
+-- the checkboxes, so Healpad looks like the rest of the UI.
 
-local SOLID = { bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 }
-
-local function box(parent, w, h)
-  local f = CreateFrame("Button", nil, parent, "BackdropTemplate")
-  f:SetSize(w, h)
-  f:SetBackdrop(SOLID)
-  return f
-end
-local function paint(f, bg, edge)
-  f:SetBackdropColor(unpack(bg))
-  f:SetBackdropBorderColor(unpack(edge or bg))
-end
 local function text(parent, font, color)
   local t = parent:CreateFontString(nil, "OVERLAY", font or "GameFontHighlight")
   if color then t:SetTextColor(unpack(color)) end
   return t
 end
-local function caps(parent, label)
-  local t = text(parent, "GameFontNormalSmall", C.faint)
-  t:SetText(label)
-  return t
+
+local function keyText(label)
+  local last = (label or ""):match("([^+]+)$")
+  local c = PAD_COLOR[last]
+  if not c then return label end
+  return string.format("|cff%02x%02x%02x%s|r", c[1] * 255, c[2] * 255, c[3] * 255, label)
 end
 
--- A choice button: a box with a centered label.
-local function choice(parent, w, h, font)
-  local b = box(parent, w, h)
-  b.label = text(b, font or "GameFontHighlight")
-  b.label:SetPoint("CENTER")
+-- A red button that can be the chosen one: chosen stays lit with white text.
+local function redButton(parent, w, h, label)
+  local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+  b:SetSize(w, h)
+  b:SetText(label)
   return b
 end
-local function paintChoice(b, on, onBg, onEdge, onText)
-  paint(b, on and (onBg or C.sel) or C.card, on and (onEdge or C.selEdge) or C.line)
-  b.label:SetTextColor(unpack(on and (onText or C.text) or C.dim))
-end
-
--- The pill with a button's name in its color.
-local function pill(parent)
-  local p = CreateFrame("Frame", nil, parent, "BackdropTemplate")
-  p:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 2 })
-  p.label = text(p, "GameFontNormalSmall")
-  p.label:SetPoint("CENTER")
-  return p
-end
-local function setPill(p, label, h)
-  p.label:SetText(label)
-  local c = padColor(label)
-  p.label:SetTextColor(unpack(c))
-  p:SetBackdropBorderColor(unpack(c))
-  p:SetSize(math.max(h, (p.label:GetStringWidth() or 0) + 14), h)
+local function setChosen(b, on)
+  if on then b:LockHighlight() else b:UnlockHighlight() end
+  local fs = b.GetFontString and b:GetFontString()
+  if fs then fs:SetTextColor(unpack(on and WHITE or GOLD)) end
+  b.chosen = on
 end
 
 ---------------------------------------------------------------- the data
@@ -134,19 +101,20 @@ local function cancelTaken(key) return ns.db.aim[key] ~= nil end
 
 local refresh
 
+-- The glow around what the pad is on.
 local function ring(target)
   local r = ui.ring
   if not target then r:Hide() return end
   r:ClearAllPoints()
-  r:SetPoint("TOPLEFT", target, "TOPLEFT", -3, 3)
-  r:SetPoint("BOTTOMRIGHT", target, "BOTTOMRIGHT", 3, -3)
+  r:SetPoint("TOPLEFT", target, "TOPLEFT", -6, 6)
+  r:SetPoint("BOTTOMRIGHT", target, "BOTTOMRIGHT", 6, -6)
   r:Show()
 end
 
 local function drawTabs()
-  for _, t in ipairs(TABS) do
-    paintChoice(ui.tab[t], st.tab == t, C.sel, C.sel, C.text)
-  end
+  local index = 1
+  for i, t in ipairs(TABS) do if t == st.tab then index = i end end
+  if PanelTemplates_SetTab then PanelTemplates_SetTab(panel, index) end
   ui.buttons:SetShown(st.tab == "buttons")
   ui.aim:SetShown(st.tab == "aim")
   ui.frames:SetShown(st.tab == "frames")
@@ -179,23 +147,21 @@ local function drawList()
       f:Show()
       f.header:SetText(r.header)
       f.header:Show()
-      f.card:Hide()
+      f.line:Hide()
     else
       f:Show()
       f.header:Hide()
-      f.card:Show()
+      f.line:Show()
       local b = r.bind
-      local on = aimed(b)
-      setPill(f.pill, ns.keyLabel(b.key), 24)
+      f.key:SetText(keyText(ns.keyLabel(b.key)))
       f.icon:SetTexture(ns.spellIcon(b.spell))
+      f.icon:SetDesaturated(not b.heal)
       f.name:SetText(ns.spellName(b.spell))
-      f.card:SetAlpha(b.heal and 1 or 0.45)
-      paint(f.card, b == current and C.cardOn or C.card, on and C.goldBg or C.line)
-      f.switch:SetShown(b.heal)
-      f.switch:SetBackdropColor(unpack(on and { 0.72, 0.56, 0.18, 1 } or { 0.16, 0.2, 0.26, 1 }))
-      f.knob:ClearAllPoints()
-      f.knob:SetPoint("LEFT", f.switch, "LEFT", on and 18 or 2, 0)
-      if b == current and st.zone == "list" then focus = f.card end
+      f.name:SetTextColor(unpack(b.heal and GOLD or GREY))
+      f.check:SetShown(b.heal)
+      f.check:SetChecked(aimed(b))
+      f.selected:SetShown(b == current)
+      if b == current and st.zone == "list" then focus = f.line end
     end
   end
   ui.empty:SetShown(#rows == 0)
@@ -207,17 +173,17 @@ local function drawDetail()
   local d = ui.detail
   d:SetShown(b ~= nil)
   if not b then return end
-  setPill(d.pill, ns.keyLabel(b.key), 44)
+  d.key:SetText(keyText(ns.keyLabel(b.key)))
   d.icon:SetTexture(ns.spellIcon(b.spell))
   d.name:SetText(ns.spellName(b.spell))
   d.rank:SetText(ns.spellRank(b.spell))
   local on = aimed(b)
   d.modes:SetShown(b.heal)
-  paintChoice(d.cast, not on, C.sel, C.selEdge, C.text)
-  paintChoice(d.hold, on, C.goldBg, C.gold, C.gold)
+  setChosen(d.cast, not on)
+  setChosen(d.hold, on)
   d.tapBox:SetShown(b.heal and on)
   local tap = on and ns.db.aim[b.key].tap or "player"
-  for i, t in ipairs(ns.TAPS) do paintChoice(d.taps[i], tap == t) end
+  for i, t in ipairs(ns.TAPS) do setChosen(d.taps[i], tap == t) end
   if st.zone == "detail" then
     if st.row == 0 then return st.col == 0 and d.cast or d.hold end
     return d.taps[st.col + 1]
@@ -226,30 +192,27 @@ end
 
 local function drawAim()
   local a = ui.aim
+  local focus
   for i, k in ipairs(ns.AIMERS) do
-    paintChoice(a.aimers[i], ns.db.aimWith == k, C.goldBg, C.gold, C.gold)
+    setChosen(a.aimers[i], ns.db.aimWith == k)
+    if st.row == 0 and ns.db.aimWith == k then focus = a.aimers[i] end
   end
   for i, key in ipairs(ns.CANCELS) do
     local b = a.cancels[i]
-    local taken = cancelTaken(key)
-    local on = ns.db.cancel == key
-    paint(b, on and C.redBg or C.card, on and C.red or C.line)
-    b.label:SetTextColor(unpack(taken and C.faint or padColor(b.label:GetText())))
-    b:SetAlpha(taken and 0.35 or 1)
+    b:SetEnabled(not cancelTaken(key))
+    setChosen(b, ns.db.cancel == key)
+    if st.row == 1 and ns.db.cancel == key then focus = b end
   end
-  if st.row == 0 then
-    for i, k in ipairs(ns.AIMERS) do if ns.db.aimWith == k then return a.aimers[i] end end
-  end
-  for i, key in ipairs(ns.CANCELS) do if ns.db.cancel == key then return a.cancels[i] end end
+  return focus
 end
 
 local function drawFrames()
   local f = ui.frames
   local size, spread = ns.db.scale or 1, ns.db.distance or 3
   f.size.value:SetText(math.floor(size * 100 + 0.5) .. "%")
-  f.size.fill:SetWidth(math.max(1, (f.size.track:GetWidth() or 0) * (size - 0.6)))
+  f.size.bar:SetValue(size)
   f.spread.value:SetText(tostring(spread))
-  f.spread.fill:SetWidth(math.max(1, (f.spread.track:GetWidth() or 0) * (spread - 1) / 4))
+  f.spread.bar:SetValue(spread)
   return st.row == 0 and f.size or f.spread
 end
 
@@ -291,7 +254,7 @@ local function nav(btn)
     st.tab, st.zone, st.row, st.col = TABS[i], "list", 0, 0
     return refresh()
   end
-  if btn == "B" and (st.tab ~= "buttons" or st.zone == "list") then
+  if btn == "ESC" or (btn == "B" and (st.tab ~= "buttons" or st.zone == "list")) then
     panel:Hide()
     return
   end
@@ -369,9 +332,9 @@ local NAV_KEYS = {
   PADDUP = "UP", PADDDOWN = "DOWN", PADDLEFT = "LEFT", PADDRIGHT = "RIGHT",
   UP = "UP", DOWN = "DOWN", LEFT = "LEFT", RIGHT = "RIGHT",
   PAD1 = "A", ENTER = "A", SPACE = "A", PAD2 = "B",
-  PADLSHOULDER = "LB", PADRSHOULDER = "RB", Q = "LB", E = "RB",
+  PADLSHOULDER = "LB", PADRSHOULDER = "RB", Q = "LB", E = "RB", ESCAPE = "ESC",
 }
-for _, btn in ipairs({ "UP", "DOWN", "LEFT", "RIGHT", "A", "B", "LB", "RB" }) do
+for _, btn in ipairs({ "UP", "DOWN", "LEFT", "RIGHT", "A", "B", "LB", "RB", "ESC" }) do
   local f = CreateFrame("Button", "HealpadNav" .. btn, UIParent)
   f:SetScript("OnClick", function() nav(btn) end)
 end
@@ -403,49 +366,57 @@ end
 local function buildButtonsTab(parent)
   local t = CreateFrame("Frame", nil, parent)
   t:SetAllPoints()
-  local list = CreateFrame("Frame", nil, t, "BackdropTemplate")
-  list:SetPoint("TOPLEFT", 0, 0)
-  list:SetPoint("BOTTOMLEFT", 0, 0)
+  local list = CreateFrame("Frame", nil, t)
+  list:SetPoint("TOPLEFT", 8, -8)
+  list:SetPoint("BOTTOMLEFT", 8, 8)
   list:SetWidth(LIST_W)
-  list:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8" })
-  list:SetBackdropColor(0.04, 0.05, 0.07, 1)
+  local divider = t:CreateTexture(nil, "ARTWORK")
+  divider:SetColorTexture(0.35, 0.3, 0.2, 0.6)
+  divider:SetWidth(1)
+  divider:SetPoint("TOPLEFT", list, "TOPRIGHT", 6, 0)
+  divider:SetPoint("BOTTOMLEFT", list, "BOTTOMRIGHT", 6, 0)
   ui.rows = {}
-  for i = 1, math.floor((H - 76) / (ROW_H + 4)) do
+  for i = 1, math.floor((H - 100) / ROW_H) do
     local f = CreateFrame("Frame", nil, list)
-    f:SetSize(LIST_W - 24, ROW_H)
-    f:SetPoint("TOPLEFT", 12, -10 - (i - 1) * (ROW_H + 4))
-    f.header = caps(f, "")
-    f.header:SetPoint("BOTTOMLEFT", 4, 6)
-    local card = box(f, LIST_W - 24, ROW_H)
-    card:SetPoint("TOPLEFT")
-    f.card = card
-    f.pill = pill(card)
-    f.pill:SetPoint("LEFT", 8, 0)
-    f.icon = card:CreateTexture(nil, "ARTWORK")
-    f.icon:SetSize(24, 24)
-    f.icon:SetPoint("LEFT", 72, 0)
-    f.name = text(card)
-    f.name:SetPoint("LEFT", f.icon, "RIGHT", 8, 0)
-    f.name:SetPoint("RIGHT", -52, 0)
+    f:SetSize(LIST_W, ROW_H)
+    f:SetPoint("TOPLEFT", 0, -(i - 1) * ROW_H)
+    f.header = text(f, "GameFontHighlightSmall", { 0.7, 0.7, 0.7 })
+    f.header:SetPoint("BOTTOMLEFT", 4, 5)
+    local line = CreateFrame("Button", nil, f)
+    line:SetAllPoints()
+    f.line = line
+    local hl = line:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+    hl:SetBlendMode("ADD")
+    hl:SetAllPoints()
+    f.selected = line:CreateTexture(nil, "BACKGROUND")
+    f.selected:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+    f.selected:SetBlendMode("ADD")
+    f.selected:SetVertexColor(1, 0.82, 0, 0.6)
+    f.selected:SetAllPoints()
+    f.key = text(line, "GameFontHighlightSmall")
+    f.key:SetPoint("LEFT", 4, 0)
+    f.key:SetWidth(44)
+    f.key:SetJustifyH("LEFT")
+    f.icon = line:CreateTexture(nil, "ARTWORK")
+    f.icon:SetSize(22, 22)
+    f.icon:SetPoint("LEFT", 50, 0)
+    f.name = text(line, "GameFontNormal")
+    f.name:SetPoint("LEFT", f.icon, "RIGHT", 6, 0)
+    f.name:SetPoint("RIGHT", -30, 0)
     f.name:SetJustifyH("LEFT")
     f.name:SetWordWrap(false)
-    f.switch = CreateFrame("Frame", nil, card, "BackdropTemplate")
-    f.switch:SetSize(34, 18)
-    f.switch:SetPoint("RIGHT", -10, 0)
-    f.switch:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8" })
-    f.knob = f.switch:CreateTexture(nil, "OVERLAY")
-    f.knob:SetSize(14, 14)
-    f.knob:SetColorTexture(unpack(C.text))
-    card:SetScript("OnClick", function()
+    f.check = CreateFrame("CheckButton", nil, line, "UICheckButtonTemplate")
+    f.check:SetSize(24, 24)
+    f.check:SetPoint("RIGHT", -2, 0)
+    local function pick(flip)
       if InCombatLockdown() or not f.entry or not f.entry.bind then return end
-      local li = liOf(f.entry)
-      -- a click on the focused heal flips it; elsewhere it just moves there
-      if st.zone == "list" and li == st.li and f.entry.bind.heal then
-        setAim(f.entry.bind, not aimed(f.entry.bind))
-      end
-      st.li, st.zone = li or st.li, "list"
+      st.li, st.zone = liOf(f.entry) or st.li, "list"
+      if flip then setAim(f.entry.bind, not aimed(f.entry.bind)) end
       refresh()
-    end)
+    end
+    line:SetScript("OnClick", function() pick(false) end)
+    f.check:SetScript("OnClick", function() pick(true) end)
     ui.rows[i] = f
   end
   ui.empty = text(list, "GameFontDisable")
@@ -453,44 +424,44 @@ local function buildButtonsTab(parent)
   ui.empty:SetText("No heals on your buttons")
 
   local d = CreateFrame("Frame", nil, t)
-  d:SetPoint("TOPLEFT", list, "TOPRIGHT", 26, -22)
-  d:SetPoint("BOTTOMRIGHT", -26, 20)
+  d:SetPoint("TOPLEFT", list, "TOPRIGHT", 22, -6)
+  d:SetPoint("BOTTOMRIGHT", -14, 12)
   ui.detail = d
-  d.pill = pill(d)
-  d.pill:SetPoint("TOPLEFT", 0, 0)
   d.icon = d:CreateTexture(nil, "ARTWORK")
-  d.icon:SetSize(44, 44)
-  d.icon:SetPoint("LEFT", d.pill, "RIGHT", 14, 0)
-  d.name = text(d, "GameFontHighlightLarge")
-  d.name:SetPoint("TOPLEFT", d.icon, "TOPRIGHT", 12, -4)
-  d.rank = text(d, "GameFontHighlightSmall", C.dim)
-  d.rank:SetPoint("TOPLEFT", d.name, "BOTTOMLEFT", 0, -5)
+  d.icon:SetSize(40, 40)
+  d.icon:SetPoint("TOPLEFT", 0, 0)
+  d.name = text(d, "GameFontNormalLarge")
+  d.name:SetPoint("TOPLEFT", d.icon, "TOPRIGHT", 10, -2)
+  d.rank = text(d, "GameFontHighlightSmall")
+  d.rank:SetPoint("TOPLEFT", d.name, "BOTTOMLEFT", 0, -4)
+  d.key = text(d, "GameFontHighlightLarge")
+  d.key:SetPoint("TOPRIGHT", 0, -10)
 
   d.modes = CreateFrame("Frame", nil, d)
-  d.modes:SetPoint("TOPLEFT", 0, -74)
+  d.modes:SetPoint("TOPLEFT", 0, -64)
   d.modes:SetPoint("RIGHT")
-  d.modes:SetHeight(56)
-  local half = (W - LIST_W - 52 - 8) / 2
-  d.cast = choice(d.modes, half, 56, "GameFontHighlightLarge")
+  d.modes:SetHeight(36)
+  local half = (W - LIST_W - 56) / 2 - 4
+  d.cast = redButton(d.modes, half, 34, "Cast")
   d.cast:SetPoint("TOPLEFT")
-  d.cast.label:SetText("Cast")
-  d.hold = choice(d.modes, half, 56, "GameFontHighlightLarge")
+  d.hold = redButton(d.modes, half, 34, "Hold to Aim")
   d.hold:SetPoint("TOPLEFT", d.cast, "TOPRIGHT", 8, 0)
-  d.hold.label:SetText("Hold to Aim")
-  d.cast:SetScript("OnClick", function() st.zone, st.row, st.col = "detail", 0, 0 nav("A") end)
-  d.hold:SetScript("OnClick", function() st.zone, st.row, st.col = "detail", 0, 1 nav("A") end)
+  d.cast:SetScript("OnClick", function() st.zone, st.row, st.col = "detail", 0, 0 ns.optionsNav("A") end)
+  d.hold:SetScript("OnClick", function() st.zone, st.row, st.col = "detail", 0, 1 ns.optionsNav("A") end)
 
   d.tapBox = CreateFrame("Frame", nil, d)
-  d.tapBox:SetPoint("TOPLEFT", d.modes, "BOTTOMLEFT", 0, -26)
+  d.tapBox:SetPoint("TOPLEFT", d.modes, "BOTTOMLEFT", 0, -24)
   d.tapBox:SetPoint("RIGHT")
-  d.tapBox:SetHeight(70)
-  caps(d.tapBox, "TAP TO HEAL"):SetPoint("TOPLEFT")
+  d.tapBox:SetHeight(64)
+  local tapLabel = text(d.tapBox, "GameFontNormal")
+  tapLabel:SetText("Tap to heal")
+  tapLabel:SetPoint("TOPLEFT")
   d.taps = {}
+  local tw = (W - LIST_W - 56 - 18) / 4
   for i, tap in ipairs(ns.TAPS) do
-    local b = choice(d.tapBox, 100, 38)
-    b:SetPoint("TOPLEFT", (i - 1) * 106, -20)
-    b.label:SetText(ns.TAP_LABEL[tap])
-    b:SetScript("OnClick", function() st.zone, st.row, st.col = "detail", 1, i - 1 nav("A") end)
+    local b = redButton(d.tapBox, tw, 28, ns.TAP_LABEL[tap])
+    b:SetPoint("TOPLEFT", (i - 1) * (tw + 6), -20)
+    b:SetScript("OnClick", function() st.zone, st.row, st.col = "detail", 1, i - 1 ns.optionsNav("A") end)
     d.taps[i] = b
   end
   return t
@@ -499,13 +470,14 @@ end
 local function buildAimTab(parent)
   local t = CreateFrame("Frame", nil, parent)
   t:SetAllPoints()
-  caps(t, "AIM WITH"):SetPoint("TOPLEFT", 26, -24)
+  local h1 = text(t, "GameFontNormalLarge")
+  h1:SetText("Aim with")
+  h1:SetPoint("TOPLEFT", 20, -20)
   t.aimers = {}
-  local w = (W - 52 - 24) / 3
+  local w = (W - 40 - 24) / 3
   for i, k in ipairs(ns.AIMERS) do
-    local b = choice(t, w, 150, "GameFontHighlightLarge")
-    b:SetPoint("TOPLEFT", 26 + (i - 1) * (w + 12), -44)
-    b.label:SetText(ns.AIMER_LABEL[k])
+    local b = redButton(t, w, 44, ns.AIMER_LABEL[k])
+    b:SetPoint("TOPLEFT", 20 + (i - 1) * (w + 12), -48)
     b:SetScript("OnClick", function()
       if InCombatLockdown() then return end
       st.row = 0
@@ -515,13 +487,14 @@ local function buildAimTab(parent)
     end)
     t.aimers[i] = b
   end
-  caps(t, "CANCEL WITH"):SetPoint("TOPLEFT", 26, -224)
+  local h2 = text(t, "GameFontNormalLarge")
+  h2:SetText("Cancel with")
+  h2:SetPoint("TOPLEFT", 20, -130)
   t.cancels = {}
   local NAMES = { PAD1 = "A", PAD2 = "B", PAD3 = "X", PAD4 = "Y" }
   for i, key in ipairs(ns.CANCELS) do
-    local b = choice(t, 54, 44, "GameFontNormalLarge")
-    b:SetPoint("TOPLEFT", 26 + (i - 1) * 62, -244)
-    b.label:SetText(NAMES[key])
+    local b = redButton(t, 60, 34, keyText(NAMES[key]))
+    b:SetPoint("TOPLEFT", 20 + (i - 1) * 68, -158)
     b:SetScript("OnClick", function()
       if InCombatLockdown() or cancelTaken(key) then return end
       st.row = 1
@@ -534,94 +507,94 @@ local function buildAimTab(parent)
   return t
 end
 
-local function slider(parent, label, y, row)
-  local s = CreateFrame("Frame", nil, parent, "BackdropTemplate")
-  s:SetPoint("TOPLEFT", 26, y)
-  s:SetPoint("RIGHT", -26, 0)
-  s:SetHeight(84)
-  s:SetBackdrop(SOLID)
-  paint(s, C.card, C.line)
-  caps(s, label):SetPoint("TOPLEFT", 14, -14)
+local function slider(parent, label, y, row, lo, hi)
+  local s = CreateFrame("Frame", nil, parent)
+  s:SetPoint("TOPLEFT", 20, y)
+  s:SetPoint("RIGHT", -20, 0)
+  s:SetHeight(64)
+  local name = text(s, "GameFontNormalLarge")
+  name:SetText(label)
+  name:SetPoint("TOPLEFT")
   s.value = text(s, "GameFontHighlightLarge")
-  s.value:SetPoint("TOPRIGHT", -14, -12)
-  local minus = choice(s, 34, 30)
-  minus:SetPoint("BOTTOMLEFT", 14, 12)
-  minus.label:SetText("<")
-  paintChoice(minus, false)
-  local plus = choice(s, 34, 30)
-  plus:SetPoint("BOTTOMRIGHT", -14, 12)
-  plus.label:SetText(">")
-  paintChoice(plus, false)
-  s.track = s:CreateTexture(nil, "ARTWORK")
-  s.track:SetHeight(8)
-  s.track:SetPoint("LEFT", minus, "RIGHT", 12, 0)
-  s.track:SetPoint("RIGHT", plus, "LEFT", -12, 0)
-  s.track:SetColorTexture(0.11, 0.14, 0.19, 1)
-  s.fill = s:CreateTexture(nil, "OVERLAY")
-  s.fill:SetHeight(8)
-  s.fill:SetPoint("LEFT", s.track, "LEFT")
-  s.fill:SetColorTexture(unpack(C.cyan))
-  minus:SetScript("OnClick", function() st.row = row nav("LEFT") end)
-  plus:SetScript("OnClick", function() st.row = row nav("RIGHT") end)
+  s.value:SetPoint("TOPRIGHT")
+  local minus = redButton(s, 32, 26, "<")
+  minus:SetPoint("BOTTOMLEFT", 0, 4)
+  local plus = redButton(s, 32, 26, ">")
+  plus:SetPoint("BOTTOMRIGHT", 0, 4)
+  local frame = CreateFrame("Frame", nil, s, "BackdropTemplate")
+  frame:SetPoint("LEFT", minus, "RIGHT", 8, 0)
+  frame:SetPoint("RIGHT", plus, "LEFT", -8, 0)
+  frame:SetHeight(20)
+  frame:SetBackdrop({ bgFile = "Interface\\Tooltip\\UI-Tooltip-Background",
+    edgeFile = "Interface\\Tooltip\\UI-Tooltip-Border", edgeSize = 12,
+    insets = { left = 3, right = 3, top = 3, bottom = 3 } })
+  frame:SetBackdropColor(0, 0, 0, 0.8)
+  frame:SetBackdropBorderColor(0.6, 0.5, 0.25, 1)
+  s.bar = CreateFrame("StatusBar", nil, frame)
+  s.bar:SetPoint("TOPLEFT", 4, -4)
+  s.bar:SetPoint("BOTTOMRIGHT", -4, 4)
+  s.bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
+  s.bar:SetStatusBarColor(1, 0.82, 0)
+  s.bar:SetMinMaxValues(lo, hi)
+  minus:SetScript("OnClick", function() st.row = row ns.optionsNav("LEFT") end)
+  plus:SetScript("OnClick", function() st.row = row ns.optionsNav("RIGHT") end)
   return s
 end
 
 local function buildFramesTab(parent)
   local t = CreateFrame("Frame", nil, parent)
   t:SetAllPoints()
-  t.size = slider(t, "SIZE", -24, 0)
-  t.spread = slider(t, "SPREAD", -122, 1)
+  t.size = slider(t, "Size", -20, 0, 0.6, 1.6)
+  t.spread = slider(t, "Spread", -110, 1, 1, 5)
   return t
 end
 
 local function build()
-  panel = CreateFrame("Frame", "HealpadOptions", UIParent, "BackdropTemplate")
+  panel = CreateFrame("Frame", "HealpadOptions", UIParent, "ButtonFrameTemplate")
   panel:SetSize(W, H)
   panel:SetPoint("CENTER")
   panel:SetFrameStrata("DIALOG")
-  panel:SetBackdrop(SOLID)
-  paint(panel, C.bg, C.edge)
+  panel:SetToplevel(true)
   panel:EnableMouse(true)
   panel:SetClampedToScreen(true)
   panel:Hide()
+  if ButtonFrameTemplate_HideButtonBar then ButtonFrameTemplate_HideButtonBar(panel) end
+  if panel.SetTitle then panel:SetTitle("Healpad") end
+  if panel.SetPortraitToUnit then panel:SetPortraitToUnit("player") end
+  local inset = type(panel.Inset) == "table" and panel.Inset or nil
+  local body = inset or panel
+  if inset then
+    inset:ClearAllPoints()
+    inset:SetPoint("TOPLEFT", 4, -60)
+    inset:SetPoint("BOTTOMRIGHT", -6, 6)
+  end
 
-  local head = CreateFrame("Frame", nil, panel, "BackdropTemplate")
-  head:SetPoint("TOPLEFT", 1, -1)
-  head:SetPoint("TOPRIGHT", -1, -1)
-  head:SetHeight(56)
-  head:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8" })
-  head:SetBackdropColor(unpack(C.head))
-  local title = text(head, "GameFontNormalLarge", C.cyan)
-  title:SetText("Healpad")
-  title:SetPoint("LEFT", 20, 0)
-  ui.tab = {}
-  local x = 120
-  for _, t in ipairs(TABS) do
-    local b = choice(head, 92, 32)
-    b:SetPoint("LEFT", x, 0)
-    b.label:SetText(TAB_LABEL[t])
-    b:SetScript("OnClick", function()
+  -- tabs hang off the bottom edge, like the character window's
+  ui.tabs = {}
+  for i, t in ipairs(TABS) do
+    local tab = CreateFrame("Button", "HealpadOptionsTab" .. i, panel, "PanelTabButtonTemplate")
+    tab:SetID(i)
+    tab:SetText(TAB_LABEL[t])
+    if PanelTemplates_TabResize then PanelTemplates_TabResize(tab, 0) end
+    if i == 1 then tab:SetPoint("TOPLEFT", panel, "BOTTOMLEFT", 12, 2) end
+    tab:SetScript("OnClick", function()
       if InCombatLockdown() then return end
       st.tab, st.zone, st.row, st.col = t, "list", 0, 0
+      if PlaySound and SOUNDKIT then pcall(PlaySound, SOUNDKIT.IG_CHARACTER_INFO_TAB) end
       refresh()
     end)
-    ui.tab[t] = b
-    x = x + 96
+    ui.tabs[i] = tab
   end
-  local close = CreateFrame("Button", nil, head, "UIPanelCloseButton")
-  close:SetPoint("RIGHT", -6, 0)
+  if PanelTemplates_SetNumTabs then PanelTemplates_SetNumTabs(panel, #TABS) end
 
-  local body = CreateFrame("Frame", nil, panel)
-  body:SetPoint("TOPLEFT", 1, -57)
-  body:SetPoint("BOTTOMRIGHT", -1, 1)
   ui.buttons = buildButtonsTab(body)
   ui.aim = buildAimTab(body)
   ui.frames = buildFramesTab(body)
 
   ui.ring = CreateFrame("Frame", nil, panel, "BackdropTemplate")
-  ui.ring:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 2 })
-  ui.ring:SetBackdropBorderColor(unpack(C.cyan))
-  ui.ring:SetFrameLevel((panel:GetFrameLevel() or 0) + 20)
+  ui.ring:SetBackdrop({ edgeFile = "Interface\\Tooltip\\UI-Tooltip-Border", edgeSize = 14 })
+  ui.ring:SetBackdropBorderColor(0.45, 0.8, 1, 1)
+  ui.ring:SetFrameLevel((panel:GetFrameLevel() or 0) + 30)
 
   panel:SetScript("OnShow", takeKeys)
   panel:SetScript("OnHide", function()

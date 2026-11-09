@@ -257,22 +257,75 @@ end
 
 local ctl = ns.ctl
 
+local previewing = false
+
 local function heldSpell()
   local held = ctl:GetAttribute("held")
   local b = held and _G[held]
   return b and b:GetAttribute("hp-lock")
 end
 
+-- Example people for the Frames tab when you're not in a group.
+local SAMPLE = {
+  UP = { name = "Brakka", level = 60, hp = 0.82, power = 0.35, color = { 1, 0, 0 } },
+  RIGHT = { name = "Ysolde", level = 60, hp = 0.41, power = 0.64, color = { 0, 0, 1 } },
+  DOWN = { name = "Tomas", level = 59, hp = 1, power = 0.8, color = { 1, 1, 0 } },
+  LEFT = { name = "Kira", level = 60, hp = 0.63, power = 0.5, color = { 0, 0, 1 } },
+}
+
+local function drawSample(f, dir, sel)
+  local p = SAMPLE[dir]
+  f:Show()
+  f:SetAlpha(1)
+  f.face:SetColorTexture(0.25, 0.22, 0.18, 1)
+  pcall(f.face.SetDesaturated, f.face, false)
+  f.name:SetText(p.name)
+  f.name:SetTextColor(1, 0.82, 0)
+  f.level:SetText(tostring(p.level))
+  f.health:SetMinMaxValues(0, 1)
+  f.health:SetValue(p.hp)
+  f.incoming:SetValue(0)
+  f.hpText:SetText(string.format("%d / %d", p.hp * 3000, 3000))
+  f.power:SetStatusBarColor(unpack(p.color))
+  f.power:SetMinMaxValues(0, 1)
+  f.power:SetValue(p.power)
+  f.plate:SetBackdropBorderColor(unpack(dir == sel and AIMED or PLATE_EDGE))
+end
+
+-- Before you aim, the gold is on whoever letting go now would heal: you, or
+-- the held button's Tap to heal choice when that person is in the diamond.
+local function tapPlace(page)
+  local held = ctl:GetAttribute("held")
+  local b = held and _G[held]
+  local tap = b and b:GetAttribute("hp-tap")
+  local unit
+  if tap == "tank" then unit = ctl:GetAttribute("tank")
+  elseif tap == "last" then unit = ctl:GetAttribute("last")
+  elseif tap == "focus" then unit = "focus" end
+  if unit and UnitExists(unit) then
+    for _, d in ipairs(ns.DIRS) do
+      local u = ctl:GetAttribute("u" .. page .. "-" .. d)
+      if u and (u == unit or UnitIsUnit(u, unit)) then return d end
+    end
+  end
+  return "SELF"
+end
+
 function ns.redraw()
   if not root:IsShown() then return end
   local page = ctl:GetAttribute("page") or 1
   local pages = ctl:GetAttribute("pages") or 1
-  local sel = ctl:GetAttribute("sel") or "SELF"
+  local sel = ctl:GetAttribute("sel") or tapPlace(page)
   local spell = heldSpell() or ns.previewSpell
   title:SetText(spell and ns.spellLabel(spell) or "")
   pageText:SetText(pages > 1 and ("Group " .. page .. " / " .. pages) or "")
+  local sample = previewing and ctl:GetAttribute("state") ~= "aim" and not IsInGroup()
   for _, d in ipairs(ns.DIRS) do
-    drawSpot(spots[d], d, ctl:GetAttribute("u" .. page .. "-" .. d), sel, spell)
+    if sample and SAMPLE[d] then
+      drawSample(spots[d], d, sel)
+    else
+      drawSpot(spots[d], d, ctl:GetAttribute("u" .. page .. "-" .. d), sel, spell)
+    end
   end
   local at = spots[sel]
   aimArrow:ClearAllPoints()
@@ -314,7 +367,6 @@ ticker:SetScript("OnUpdate", function(_, elapsed)
 end)
 
 -- The settings' Frames tab shows the diamond as it is now, out of combat.
-local previewing = false
 function ns.preview(on)
   previewing = on and not InCombatLockdown()
   root:SetShown(previewing or ctl:GetAttribute("state") == "aim")
