@@ -7,8 +7,9 @@
 -- the mouse. Settings change out of combat only; the panel closes in combat.
 local _, ns = ...
 
-local W, H = 660, 480
-local LIST_W, ROW_H = 270, 30
+local W, H = 680, 460
+local LIST_W, ROW_H = 290, 32
+local PAD = 16 -- space inside the window's inset
 local TABS = { "buttons", "aim", "frames" }
 local TAB_LABEL = { buttons = "Buttons", aim = "Aim", frames = "Frames" }
 local GOLD, WHITE, GREY = { 1, 0.82, 0 }, { 1, 1, 1 }, { 0.5, 0.5, 0.5 }
@@ -107,13 +108,15 @@ local function cancelTaken(key) return ns.db.aim[key] ~= nil end
 
 local refresh
 
--- The glow around what the pad is on.
+-- The outline around what the pad is on: inside a list row, just outside a
+-- button.
 local function ring(target)
   local r = ui.ring
   if not target then r:Hide() return end
+  local pad = target.ringInside and -1 or 3
   r:ClearAllPoints()
-  r:SetPoint("TOPLEFT", target, "TOPLEFT", -4, 4)
-  r:SetPoint("BOTTOMRIGHT", target, "BOTTOMRIGHT", 4, -4)
+  r:SetPoint("TOPLEFT", target, "TOPLEFT", -pad, pad)
+  r:SetPoint("BOTTOMRIGHT", target, "BOTTOMRIGHT", pad, -pad)
   r:Show()
 end
 
@@ -179,7 +182,7 @@ local function drawDetail()
   local d = ui.detail
   d:SetShown(b ~= nil)
   if not b then return end
-  d.key:SetText(keyText(ns.keyLabel(b.key)) .. (b.kb and ("  |cffaaaaaa" .. b.layer .. "|r") or ""))
+  d.key:SetText(keyText(ns.keyLabel(b.key)) .. (b.kb and ("  |cff9a9a9a·  KeyBars " .. b.layer .. "|r") or ""))
   d.icon:SetTexture(ns.spellIcon(b.spell))
   d.name:SetText(ns.spellName(b.spell))
   d.rank:SetText(ns.spellRank(b.spell))
@@ -373,8 +376,8 @@ local function buildButtonsTab(parent)
   local t = CreateFrame("Frame", nil, parent)
   t:SetAllPoints()
   local list = CreateFrame("Frame", nil, t)
-  list:SetPoint("TOPLEFT", 8, -8)
-  list:SetPoint("BOTTOMLEFT", 8, 8)
+  list:SetPoint("TOPLEFT", PAD - 6, -PAD)
+  list:SetPoint("BOTTOMLEFT", PAD - 6, PAD)
   list:SetWidth(LIST_W)
   local divider = t:CreateTexture(nil, "ARTWORK")
   divider:SetColorTexture(0.35, 0.3, 0.2, 0.6)
@@ -382,14 +385,15 @@ local function buildButtonsTab(parent)
   divider:SetPoint("TOPLEFT", list, "TOPRIGHT", 6, 0)
   divider:SetPoint("BOTTOMLEFT", list, "BOTTOMRIGHT", 6, 0)
   ui.rows = {}
-  for i = 1, math.floor((H - 100) / ROW_H) do
+  for i = 1, math.floor((H - 60 - 2 * PAD - 8) / ROW_H) do
     local f = CreateFrame("Frame", nil, list)
     f:SetSize(LIST_W, ROW_H)
     f:SetPoint("TOPLEFT", 0, -(i - 1) * ROW_H)
     f.header = text(f, "GameFontHighlightSmall", { 0.7, 0.7, 0.7 })
-    f.header:SetPoint("BOTTOMLEFT", 4, 5)
+    f.header:SetPoint("BOTTOMLEFT", 8, 6)
     local line = CreateFrame("Button", nil, f)
     line:SetAllPoints()
+    line.ringInside = true
     f.line = line
     local hl = line:CreateTexture(nil, "HIGHLIGHT")
     hl:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
@@ -401,20 +405,20 @@ local function buildButtonsTab(parent)
     f.selected:SetVertexColor(1, 0.82, 0, 0.6)
     f.selected:SetAllPoints()
     f.key = text(line, "GameFontHighlightSmall")
-    f.key:SetPoint("LEFT", 4, 0)
-    f.key:SetWidth(44)
+    f.key:SetPoint("LEFT", 8, 0)
+    f.key:SetWidth(40)
     f.key:SetJustifyH("LEFT")
     f.icon = line:CreateTexture(nil, "ARTWORK")
     f.icon:SetSize(22, 22)
-    f.icon:SetPoint("LEFT", 50, 0)
+    f.icon:SetPoint("LEFT", 52, 0)
     f.name = text(line, "GameFontNormal")
     f.name:SetPoint("LEFT", f.icon, "RIGHT", 6, 0)
-    f.name:SetPoint("RIGHT", -30, 0)
+    f.name:SetPoint("RIGHT", -40, 0)
     f.name:SetJustifyH("LEFT")
     f.name:SetWordWrap(false)
     f.check = CreateFrame("CheckButton", nil, line, "UICheckButtonTemplate")
     f.check:SetSize(24, 24)
-    f.check:SetPoint("RIGHT", -2, 0)
+    f.check:SetPoint("RIGHT", -8, 0)
     local function pick(flip)
       if InCombatLockdown() or not f.entry or not f.entry.bind then return end
       st.li, st.zone = liOf(f.entry) or st.li, "list"
@@ -430,8 +434,8 @@ local function buildButtonsTab(parent)
   ui.empty:SetText("No heals on your buttons")
 
   local d = CreateFrame("Frame", nil, t)
-  d:SetPoint("TOPLEFT", list, "TOPRIGHT", 22, -6)
-  d:SetPoint("BOTTOMRIGHT", -14, 12)
+  d:SetPoint("TOPLEFT", list, "TOPRIGHT", PAD + 8, -4)
+  d:SetPoint("BOTTOMRIGHT", -PAD, PAD)
   ui.detail = d
   d.icon = d:CreateTexture(nil, "ARTWORK")
   d.icon:SetSize(40, 40)
@@ -440,14 +444,15 @@ local function buildButtonsTab(parent)
   d.name:SetPoint("TOPLEFT", d.icon, "TOPRIGHT", 10, -2)
   d.rank = text(d, "GameFontHighlightSmall")
   d.rank:SetPoint("TOPLEFT", d.name, "BOTTOMLEFT", 0, -4)
-  d.key = text(d, "GameFontHighlightLarge")
-  d.key:SetPoint("TOPRIGHT", 0, -10)
+  d.key = text(d, "GameFontHighlight")
+  d.key:SetPoint("TOPLEFT", d.icon, "BOTTOMLEFT", 0, -10)
 
   d.modes = CreateFrame("Frame", nil, d)
-  d.modes:SetPoint("TOPLEFT", 0, -64)
+  d.modes:SetPoint("TOPLEFT", 0, -88)
   d.modes:SetPoint("RIGHT")
   d.modes:SetHeight(36)
-  local half = (W - LIST_W - 56) / 2 - 4
+  local detailW = W - 10 - (PAD - 6) - LIST_W - (PAD + 8) - PAD
+  local half = (detailW - 8) / 2
   d.cast = redButton(d.modes, half, 34, "Cast")
   d.cast:SetPoint("TOPLEFT")
   d.hold = redButton(d.modes, half, 34, "Hold to Aim")
@@ -463,7 +468,7 @@ local function buildButtonsTab(parent)
   tapLabel:SetText("Tap to heal")
   tapLabel:SetPoint("TOPLEFT")
   d.taps = {}
-  local tw = (W - LIST_W - 56 - 18) / 4
+  local tw = (detailW - 18) / 4
   for i, tap in ipairs(ns.TAPS) do
     local b = redButton(d.tapBox, tw, 28, ns.TAP_LABEL[tap])
     b:SetPoint("TOPLEFT", (i - 1) * (tw + 6), -20)
@@ -478,12 +483,12 @@ local function buildAimTab(parent)
   t:SetAllPoints()
   local h1 = text(t, "GameFontNormalLarge")
   h1:SetText("Aim with")
-  h1:SetPoint("TOPLEFT", 20, -20)
+  h1:SetPoint("TOPLEFT", PAD, -PAD)
   t.aimers = {}
-  local w = (W - 40 - 24) / 3
+  local w = (W - 10 - 2 * PAD - 24) / 3
   for i, k in ipairs(ns.AIMERS) do
     local b = redButton(t, w, 44, ns.AIMER_LABEL[k])
-    b:SetPoint("TOPLEFT", 20 + (i - 1) * (w + 12), -48)
+    b:SetPoint("TOPLEFT", PAD + (i - 1) * (w + 12), -PAD - 30)
     b:SetScript("OnClick", function()
       if InCombatLockdown() then return end
       st.row = 0
@@ -495,12 +500,12 @@ local function buildAimTab(parent)
   end
   local h2 = text(t, "GameFontNormalLarge")
   h2:SetText("Cancel with")
-  h2:SetPoint("TOPLEFT", 20, -130)
+  h2:SetPoint("TOPLEFT", PAD, -PAD - 110)
   t.cancels = {}
   local NAMES = { PAD1 = "A", PAD2 = "B", PAD3 = "X", PAD4 = "Y" }
   for i, key in ipairs(ns.CANCELS) do
     local b = redButton(t, 60, 34, keyText(NAMES[key]))
-    b:SetPoint("TOPLEFT", 20 + (i - 1) * 68, -158)
+    b:SetPoint("TOPLEFT", PAD + (i - 1) * 68, -PAD - 140)
     b:SetScript("OnClick", function()
       if InCombatLockdown() or cancelTaken(key) then return end
       st.row = 1
@@ -515,8 +520,8 @@ end
 
 local function slider(parent, label, y, row, lo, hi)
   local s = CreateFrame("Frame", nil, parent)
-  s:SetPoint("TOPLEFT", 20, y)
-  s:SetPoint("RIGHT", -20, 0)
+  s:SetPoint("TOPLEFT", PAD, y)
+  s:SetPoint("RIGHT", -PAD, 0)
   s:SetHeight(64)
   local name = text(s, "GameFontNormalLarge")
   name:SetText(label)
@@ -548,8 +553,8 @@ end
 local function buildFramesTab(parent)
   local t = CreateFrame("Frame", nil, parent)
   t:SetAllPoints()
-  t.size = slider(t, "Size", -20, 0, 0.6, 1.6)
-  t.spread = slider(t, "Spread", -110, 1, 1, 5)
+  t.size = slider(t, "Size", -PAD - 4, 0, 0.6, 1.6)
+  t.spread = slider(t, "Spread", -PAD - 100, 1, 1, 5)
   return t
 end
 
