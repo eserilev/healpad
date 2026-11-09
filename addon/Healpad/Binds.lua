@@ -286,9 +286,14 @@ function ns.readKeyBars()
       local id = spellId(L.spell) or spellId(L.cast)
       if id and ns.isHeal(id) then
         table.insert(out, { key = slot.key, kb = true, button = slot.button, layer = L.name or "",
-          spell = id, cast = tostring(L.cast), heal = true, states = {} })
+          layerId = tonumber(L.id) or 0, order = #out, spell = id, cast = tostring(L.cast), heal = true, states = {} })
       end
     end
   end
+  -- One group per layer, in KeyBars' layer order; keys in KeyBars' order.
+  table.sort(out, function(a, b)
+    if a.layerId ~= b.layerId then return a.layerId < b.layerId end
+    return a.order < b.order
+  end)
   return out
 end

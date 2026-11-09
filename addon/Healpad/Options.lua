@@ -531,14 +531,12 @@ local function slider(parent, label, y, row, lo, hi)
   frame:SetPoint("LEFT", minus, "RIGHT", 8, 0)
   frame:SetPoint("RIGHT", plus, "LEFT", -8, 0)
   frame:SetHeight(20)
-  frame:SetBackdrop({ bgFile = "Interface\\Tooltip\\UI-Tooltip-Background",
-    edgeFile = "Interface\\Tooltip\\UI-Tooltip-Border", edgeSize = 12,
-    insets = { left = 3, right = 3, top = 3, bottom = 3 } })
-  frame:SetBackdropColor(0, 0, 0, 0.8)
-  frame:SetBackdropBorderColor(0.6, 0.5, 0.25, 1)
+  frame:SetBackdrop({ bgFile = "Interface\\Buttons\\UI-SliderBar-Background",
+    edgeFile = "Interface\\Buttons\\UI-SliderBar-Border", tile = true, tileEdge = true,
+    tileSize = 8, edgeSize = 8, insets = { left = 3, right = 3, top = 6, bottom = 6 } })
   s.bar = CreateFrame("StatusBar", nil, frame)
-  s.bar:SetPoint("TOPLEFT", 4, -4)
-  s.bar:SetPoint("BOTTOMRIGHT", -4, 4)
+  s.bar:SetPoint("TOPLEFT", 4, -6)
+  s.bar:SetPoint("BOTTOMRIGHT", -4, 6)
   s.bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
   s.bar:SetStatusBarColor(1, 0.82, 0)
   s.bar:SetMinMaxValues(lo, hi)
@@ -598,7 +596,7 @@ local function build()
   ui.frames = buildFramesTab(body)
 
   ui.ring = CreateFrame("Frame", nil, panel, "BackdropTemplate")
-  ui.ring:SetBackdrop({ edgeFile = "Interface\\Tooltip\\UI-Tooltip-Border", edgeSize = 14 })
+  ui.ring:SetBackdrop({ edgeFile = "Interface\\TutorialFrame\\UI-TutorialFrame-CalloutGlow", tileEdge = true, edgeSize = 16 })
   ui.ring:SetBackdropBorderColor(0.45, 0.8, 1, 1)
   ui.ring:SetFrameLevel((panel:GetFrameLevel() or 0) + 30)
 

@@ -4,8 +4,12 @@
 -- never compares them. Every read that may be secret is guarded.
 local _, ns = ...
 
-local PLATE_EDGE = { 0.62, 0.5, 0.24, 1 } -- old gold
 local AIMED = { 1, 0.82, 0, 1 }
+-- Textures the game itself uses (its tooltip art isn't in this client).
+local PLATE = { bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
+  edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Gold-Border", tile = true, tileEdge = true,
+  tileSize = 16, edgeSize = 16, insets = { left = 4, right = 4, top = 4, bottom = 4 } }
+local GLOW = { edgeFile = "Interface\\TutorialFrame\\UI-TutorialFrame-CalloutGlow", tileEdge = true, edgeSize = 16 }
 local SPOT_W, SPOT_H, FACE = 214, 58, 52
 
 local root = CreateFrame("Frame", "HealpadDiamond", UIParent)
@@ -46,11 +50,24 @@ local function makeSpot(dir)
   f.plate = CreateFrame("Frame", nil, f, "BackdropTemplate")
   f.plate:SetPoint("TOPLEFT", FACE / 2, -3)
   f.plate:SetPoint("BOTTOMRIGHT", 0, 3)
-  f.plate:SetBackdrop({ bgFile = "Interface\\Tooltip\\UI-Tooltip-Background",
-    edgeFile = "Interface\\Tooltip\\UI-Tooltip-Border", edgeSize = 12,
-    insets = { left = 3, right = 3, top = 3, bottom = 3 } })
-  f.plate:SetBackdropColor(0.02, 0.02, 0.02, 0.9)
-  f.plate:SetBackdropBorderColor(unpack(PLATE_EDGE))
+  f.plate:SetBackdrop(PLATE)
+  f.plate:SetBackdropColor(1, 1, 1, 0.92)
+  -- A glow around the plate: gold on the aimed person, the debuff's color
+  -- on someone you can cleanse.
+  f.glow = CreateFrame("Frame", nil, f, "BackdropTemplate")
+  f.glow:SetPoint("TOPLEFT", f.plate, "TOPLEFT", -9, 9)
+  f.glow:SetPoint("BOTTOMRIGHT", f.plate, "BOTTOMRIGHT", 9, -9)
+  f.glow:SetBackdrop(GLOW)
+  f.glow:Hide()
+  function f.plate.SetBackdropBorderColor(_, r, g, b, a)
+    f.glow.border = { r, g, b, a }
+    if r then
+      f.glow:SetBackdropBorderColor(r, g, b, a or 1)
+      f.glow:Show()
+    else
+      f.glow:Hide()
+    end
+  end
   -- portrait in a ring, drawn over the plate
   local top = CreateFrame("Frame", nil, f)
   top:SetAllPoints()
@@ -219,7 +236,7 @@ local function drawSpot(f, dir, unit, sel, spell)
       f.health:SetValue(0)
       f.incoming:SetValue(0)
       f.power:SetValue(0)
-      f.plate:SetBackdropBorderColor(unpack(aimed and AIMED or PLATE_EDGE))
+      if aimed then f.plate:SetBackdropBorderColor(unpack(AIMED)) else f.plate:SetBackdropBorderColor() end
       f:SetAlpha(0.45)
       return
     end
@@ -248,7 +265,7 @@ local function drawSpot(f, dir, unit, sel, spell)
   if aimed then
     f.plate:SetBackdropBorderColor(unpack(AIMED))
   elseif not dispelBorder(f.plate, unit) then
-    f.plate:SetBackdropBorderColor(unpack(PLATE_EDGE))
+    f.plate:SetBackdropBorderColor()
   end
   f:SetAlpha(outOfRange(spell, unit) and 0.45 or 1)
 end
@@ -289,7 +306,7 @@ local function drawSample(f, dir, sel)
   f.power:SetStatusBarColor(unpack(p.color))
   f.power:SetMinMaxValues(0, 1)
   f.power:SetValue(p.power)
-  f.plate:SetBackdropBorderColor(unpack(dir == sel and AIMED or PLATE_EDGE))
+  if dir == sel then f.plate:SetBackdropBorderColor(unpack(AIMED)) else f.plate:SetBackdropBorderColor() end
 end
 
 -- Before you aim, the gold is on whoever letting go now would heal: you, or
