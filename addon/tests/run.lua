@@ -634,6 +634,20 @@ test("Frames: Move nudges the diamond with the pad, Reset puts it back; it is sa
   clean(W)
 end)
 
+test("Frames without Move: the d-pad and sticks change settings, never the position", function()
+  local W, ns = game({ saved = { aim = {} } })
+  ns.openOptions()
+  W.tap("PADRSHOULDER") W.tap("PADRSHOULDER") -- Frames
+  W.G.C_GamePad = { GetActiveDeviceID = function() return 1 end,
+    GetDeviceMappedState = function() return { sticks = { { x = 1, y = 1 }, { x = -1, y = 0 } } } end }
+  W.update(0.5)
+  for _, k in ipairs({ "PADDUP", "PADDDOWN", "PADDLEFT", "PADDRIGHT", "PADDDOWN", "PADDDOWN", "PADDRIGHT" }) do W.tap(k) end
+  W.update(0.5)
+  eq(ns.db.x, 0, "x") eq(ns.db.y, 0, "y")
+  W.G.C_GamePad = nil
+  clean(W)
+end)
+
 test("the settings close when combat starts", function()
   local W, ns = game()
   ns.openOptions()
