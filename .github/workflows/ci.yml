@@ -1,0 +1,31 @@
+# The checks of each push and pull request. Every action is pinned to a commit.
+# The comment gives the tag.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  # release.yml runs this file on the tagged commit before it publishes.
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q luajit
+      # The tests, against a fake client that runs the secure snippets.
+      - run: luajit addon/tests/run.lua
+      # Every file the TOC loads is in the addon folder.
+      - run: |
+          cd addon/Healpad
+          grep -v '^#' Healpad.toc | grep -v '^\s*$' | tr -d '\r' | while read -r f; do
+            [ -f "$f" ] || { echo "error: Healpad.toc loads $f, which is missing" >&2; exit 1; }
+          done
