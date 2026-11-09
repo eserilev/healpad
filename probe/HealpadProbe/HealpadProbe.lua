@@ -46,6 +46,18 @@ local PRE = [[
     owner:SetBindingClick(true, "DOWN", "HealpadProbeDirDOWN")
     owner:SetBindingClick(true, "LEFT", "HealpadProbeDirLEFT")
     owner:SetBindingClick(true, "BACKSPACE", "HealpadProbeCancel")
+    owner:SetBindingClick(true, "PADLSTICKUP", "HealpadProbeStickPADLSTICKUP")
+    owner:SetBindingClick(true, "PADLSTICKRIGHT", "HealpadProbeStickPADLSTICKRIGHT")
+    owner:SetBindingClick(true, "PADLSTICKDOWN", "HealpadProbeStickPADLSTICKDOWN")
+    owner:SetBindingClick(true, "PADLSTICKLEFT", "HealpadProbeStickPADLSTICKLEFT")
+    owner:SetBindingClick(true, "PADRSTICKUP", "HealpadProbeStickPADRSTICKUP")
+    owner:SetBindingClick(true, "PADRSTICKRIGHT", "HealpadProbeStickPADRSTICKRIGHT")
+    owner:SetBindingClick(true, "PADRSTICKDOWN", "HealpadProbeStickPADRSTICKDOWN")
+    owner:SetBindingClick(true, "PADRSTICKLEFT", "HealpadProbeStickPADRSTICKLEFT")
+    owner:SetBindingClick(true, "PADDUP", "HealpadProbeStickPADDUP")
+    owner:SetBindingClick(true, "PADDRIGHT", "HealpadProbeStickPADDRIGHT")
+    owner:SetBindingClick(true, "PADDDOWN", "HealpadProbeStickPADDDOWN")
+    owner:SetBindingClick(true, "PADDLEFT", "HealpadProbeStickPADDLEFT")
     owner:SetAttribute("state", "aim")
     return false
   end
@@ -84,6 +96,22 @@ for _, d in ipairs(DIRS) do
   SecureHandlerSetFrameRef(b, "ctl", ctl)
   b:SetAttribute("_onclick", DIR)
 end
+-- Stick and d-pad directions, bound only while a heal is held: which ones reach us?
+local STICKS = { { "PADLSTICKUP", "UP" }, { "PADLSTICKRIGHT", "RIGHT" }, { "PADLSTICKDOWN", "DOWN" }, { "PADLSTICKLEFT", "LEFT" }, { "PADRSTICKUP", "UP" }, { "PADRSTICKRIGHT", "RIGHT" }, { "PADRSTICKDOWN", "DOWN" }, { "PADRSTICKLEFT", "LEFT" }, { "PADDUP", "UP" }, { "PADDRIGHT", "RIGHT" }, { "PADDDOWN", "DOWN" }, { "PADDLEFT", "LEFT" } }
+local STICK = [[
+  local c = self:GetFrameRef("ctl")
+  c:SetAttribute("note", "pad-dir:" .. self:GetAttribute("key"))
+  if c:GetAttribute("held") then c:SetAttribute("sel", self:GetAttribute("dir")) end
+]]
+for _, k in ipairs(STICKS) do
+  local b = CreateFrame("Button", "HealpadProbeStick" .. k[1], UIParent, "SecureHandlerClickTemplate")
+  b:RegisterForClicks("AnyDown")
+  b:SetAttribute("key", k[1])
+  b:SetAttribute("dir", k[2])
+  SecureHandlerSetFrameRef(b, "ctl", ctl)
+  b:SetAttribute("_onclick", STICK)
+end
+
 do
   local b = CreateFrame("Button", "HealpadProbeCancel", UIParent, "SecureHandlerClickTemplate")
   b:RegisterForClicks("AnyDown")
@@ -138,6 +166,41 @@ local function drawDiamond()
       f.text:SetText(key == "UP" and not IsInGroup() and "(your target)" or "-")
     end
     if key == sel then f:SetBackdropBorderColor(0.95, 0.76, 0.31, 1) else f:SetBackdropBorderColor(0.16, 0.19, 0.25, 1) end
+  end
+end
+
+local poller = CreateFrame("Frame")
+local lastDir = {}
+local function stickDir(x, y)
+  if not x or not y then return nil end
+  if math.abs(x) < 0.6 and math.abs(y) < 0.6 then return "center" end
+  if math.abs(x) > math.abs(y) then return x > 0 and "RIGHT" or "LEFT" end
+  return y > 0 and "UP" or "DOWN"
+end
+poller:SetScript("OnUpdate", function()
+  if not diamond:IsShown() then lastDir = {} return end
+  local ok, st = pcall(function()
+    local id = C_GamePad.GetActiveDeviceID()
+    return id and C_GamePad.GetDeviceMappedState(id)
+  end)
+  if not ok or not st or not st.sticks then return end
+  for i, stick in ipairs(st.sticks) do
+    local d = stickDir(stick.x, stick.y)
+    if d ~= lastDir[i] then
+      lastDir[i] = d
+      log("analog stick " .. i .. " " .. tostring(d))
+    end
+  end
+end)
+
+local function padReport()
+  for _, k in ipairs({ "PADLSTICKUP", "PADRSTICKUP", "PADDUP" }) do
+    local ok, a = pcall(GetBindingAction, k, true)
+    log(k .. " is bound to: " .. safe(ok and a))
+  end
+  for _, cv in ipairs({ "GamePadStickAxisButtons", "GamePadEnable", "GamePadCameraYawSpeed" }) do
+    local ok, v = pcall(C_CVar.GetCVar, cv)
+    log("cvar " .. cv .. " = " .. safe(ok and v))
   end
 end
 
@@ -212,7 +275,7 @@ local function help()
   print(PREFIX .. "hold " .. db.key .. " = spell A, hold Shift-" .. db.key .. " = spell B.")
   print(PREFIX .. "While holding: arrow keys aim (Up = party1, or your target when solo), Backspace cancels. Let go to cast; no arrow = you.")
   print(PREFIX .. "A: " .. spellLabel(db.a) .. "   B: " .. spellLabel(db.b))
-  print(PREFIX .. "/hpp list · /hpp a N · /hpp b N · /hpp key KEY · /hpp clear")
+  print(PREFIX .. "/hpp list · /hpp a N · /hpp b N · /hpp key KEY · /hpp pad · /hpp axis · /hpp clear")
 end
 
 SLASH_HEALPADPROBE1 = "/hpp"
@@ -238,6 +301,13 @@ SlashCmdList.HEALPADPROBE = function(msg)
     db.key = arg:upper()
     applyKeys()
     log("key = " .. db.key)
+  elseif cmd == "pad" then
+    padReport()
+  elseif cmd == "axis" then
+    if InCombatLockdown() then print(PREFIX .. "leave combat first") return end
+    local now = C_CVar.GetCVar("GamePadStickAxisButtons")
+    local ok = pcall(C_CVar.SetCVar, "GamePadStickAxisButtons", now == "1" and "0" or "1")
+    log("GamePadStickAxisButtons " .. safe(now) .. " -> " .. safe(C_CVar.GetCVar("GamePadStickAxisButtons")) .. (ok and "" or " (set failed)"))
   elseif cmd == "clear" then
     db.log = {}
     print(PREFIX .. "log cleared")
@@ -263,6 +333,7 @@ ev:SetScript("OnEvent", function(_, e, a1, a2, a3, a4)
     setUnits()
     applySpells()
     applyKeys()
+    padReport()
     log("ready, client " .. safe((GetBuildInfo())) .. ", gamepad " .. safe(C_GamePad and C_GamePad.IsEnabled and C_GamePad.IsEnabled()))
     help()
   elseif e == "GROUP_ROSTER_UPDATE" or e == "PLAYER_REGEN_ENABLED" then
