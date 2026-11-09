@@ -624,8 +624,13 @@ function ns.optionsDebug() return { panel = panel, ui = ui, st = st, rows = rows
 SLASH_HEALPAD1 = "/healpad"
 SLASH_HEALPAD2 = "/hp"
 SlashCmdList.HEALPAD = function(msg)
-  if (msg or ""):lower():match("^%s*test") then
+  local cmd = (msg or ""):lower():match("^%s*(%S*)")
+  if cmd == "test" then
     if ns.selfTest then ns.selfTest() end
+    return
+  end
+  if cmd == "shots" then
+    if ns.showcase then ns.showcase() end
     return
   end
   if panel and panel:IsShown() then panel:Hide() else ns.openOptions() end

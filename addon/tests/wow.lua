@@ -135,6 +135,9 @@ function M.new()
     return f
   end
   G.UIParent = G.CreateFrame("Frame", "UIParent")
+  G.WorldFrame = G.CreateFrame("Frame", "WorldFrame")
+  function Frame:SetParent(p) self.parent = p end
+  function Frame:GetScale() return self.scale or 1 end
   G.UISpecialFrames = {}
   G.SlashCmdList = {}
 

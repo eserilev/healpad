@@ -2,7 +2,7 @@
 package.path = "addon/tests/?.lua;" .. package.path
 local Wow = require("wow")
 
-local FILES = { "Core.lua", "Binds.lua", "Roster.lua", "Secure.lua", "Diamond.lua", "Options.lua", "Test.lua" }
+local FILES = { "Core.lua", "Binds.lua", "Roster.lua", "Secure.lua", "Diamond.lua", "Options.lua", "Test.lua", "Showcase.lua" }
 local DIR = "addon/Healpad"
 
 local passed, failed = 0, 0
@@ -575,6 +575,21 @@ test("/hp test runs in the game: tabs, diamond, a hold, an aim, a cancel", funct
   eq(log:find("TEST done: %d+ ok, 0 failed") ~= nil, true, log)
   eq(W.shots, 4, "screenshots")
   eq(#W.casts, 0, "nothing cast")
+  clean(W)
+end)
+
+test("/hp shots stages the diamond and each tab, takes 5 screenshots, puts the UI back", function()
+  local W, ns = game({ party = false })
+  W.G.SlashCmdList.HEALPAD("shots")
+  W.runTimers()
+  eq(W.shots, 5, "screenshots")
+  eq(W.G.UIParent:IsShown(), true, "the UI is back")
+  eq(ns.diamond.parent, W.G.UIParent, "the diamond is back on UIParent")
+  eq(ns.diamond:IsShown(), false)
+  eq(W.G.HealpadOptions:IsShown(), false)
+  eq(ns.stage, nil)
+  local log = table.concat(ns.db.log or {}, "\n")
+  eq(log:find("SHOTS error") == nil, true, log)
   clean(W)
 end)
 

@@ -12,3 +12,4 @@ Secure.lua
 Diamond.lua
 Options.lua
 Test.lua
+Showcase.lua

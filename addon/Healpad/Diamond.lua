@@ -244,6 +244,7 @@ local function drawSpot(f, dir, unit, sel, spell)
     return
   end
   f:Show()
+  f.face:SetTexCoord(0, 1, 0, 1)
   pcall(SetPortraitTexture, f.face, unit)
   local dead = status(unit)
   pcall(f.face.SetDesaturated, f.face, dead ~= nil)
@@ -284,29 +285,47 @@ end
 
 -- Example people for the Frames tab when you're not in a group.
 local SAMPLE = {
-  UP = { name = "Brakka", level = 60, hp = 0.82, power = 0.35, color = { 1, 0, 0 } },
-  RIGHT = { name = "Ysolde", level = 60, hp = 0.41, power = 0.64, color = { 0, 0, 1 } },
-  DOWN = { name = "Tomas", level = 59, hp = 1, power = 0.8, color = { 1, 1, 0 } },
-  LEFT = { name = "Kira", level = 60, hp = 0.63, power = 0.5, color = { 0, 0, 1 } },
+  UP = { name = "Brakka", class = "WARRIOR", level = 60, hp = 0.82, power = 0.35, color = { 1, 0, 0 } },
+  RIGHT = { name = "Ysolde", class = "PRIEST", level = 60, hp = 0.41, inc = 0.22, power = 0.64, color = { 0, 0, 1 } },
+  DOWN = { name = "Tomas", class = "ROGUE", level = 59, hp = 1, power = 0.8, color = { 1, 1, 0 } },
+  LEFT = { name = "Kira", class = "MAGE", level = 60, hp = 0.63, power = 0.5, color = { 0, 0, 1 },
+    dispel = { 0.2, 0.6, 1, 1 } },
 }
+
+-- A round class icon, for people with no portrait to show.
+local function classFace(tex, class)
+  local ok = pcall(function()
+    local c = CLASS_ICON_TCOORDS[class]
+    tex:SetTexture("Interface\\TargetingFrame\\UI-Classes-Circles")
+    tex:SetTexCoord(c[1], c[2], c[3], c[4])
+  end)
+  if not ok then tex:SetColorTexture(0.25, 0.22, 0.18, 1) end
+end
 
 local function drawSample(f, dir, sel)
   local p = SAMPLE[dir]
   f:Show()
   f:SetAlpha(1)
-  f.face:SetColorTexture(0.25, 0.22, 0.18, 1)
+  classFace(f.face, p.class)
   pcall(f.face.SetDesaturated, f.face, false)
   f.name:SetText(p.name)
   f.name:SetTextColor(1, 0.82, 0)
   f.level:SetText(tostring(p.level))
   f.health:SetMinMaxValues(0, 1)
   f.health:SetValue(p.hp)
-  f.incoming:SetValue(0)
+  f.incoming:SetMinMaxValues(0, 1)
+  f.incoming:SetValue(p.inc or 0)
   f.hpText:SetText(string.format("%d / %d", p.hp * 3000, 3000))
   f.power:SetStatusBarColor(unpack(p.color))
   f.power:SetMinMaxValues(0, 1)
   f.power:SetValue(p.power)
-  if dir == sel then f.plate:SetBackdropBorderColor(unpack(AIMED)) else f.plate:SetBackdropBorderColor() end
+  if dir == sel then
+    f.plate:SetBackdropBorderColor(unpack(AIMED))
+  elseif p.dispel then
+    f.plate:SetBackdropBorderColor(unpack(p.dispel))
+  else
+    f.plate:SetBackdropBorderColor()
+  end
 end
 
 -- Before you aim, the gold is on whoever letting go now would heal: you, or
@@ -332,11 +351,11 @@ function ns.redraw()
   if not root:IsShown() then return end
   local page = ctl:GetAttribute("page") or 1
   local pages = ctl:GetAttribute("pages") or 1
-  local sel = ctl:GetAttribute("sel") or tapPlace(page)
+  local sel = (ns.stage and ns.stage.sel) or ctl:GetAttribute("sel") or tapPlace(page)
   local spell = heldSpell() or ns.previewSpell
   title:SetText(spell and ns.spellLabel(spell) or "")
   pageText:SetText(pages > 1 and ("Group " .. page .. " / " .. pages) or "")
-  local sample = previewing and ctl:GetAttribute("state") ~= "aim" and not IsInGroup()
+  local sample = previewing and ctl:GetAttribute("state") ~= "aim" and (not IsInGroup() or ns.stage ~= nil)
   for _, d in ipairs(ns.DIRS) do
     if sample and SAMPLE[d] then
       drawSample(spots[d], d, sel)
