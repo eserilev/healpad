@@ -112,8 +112,8 @@ local function ring(target)
   local r = ui.ring
   if not target then r:Hide() return end
   r:ClearAllPoints()
-  r:SetPoint("TOPLEFT", target, "TOPLEFT", -6, 6)
-  r:SetPoint("BOTTOMRIGHT", target, "BOTTOMRIGHT", 6, -6)
+  r:SetPoint("TOPLEFT", target, "TOPLEFT", -4, 4)
+  r:SetPoint("BOTTOMRIGHT", target, "BOTTOMRIGHT", 4, -4)
   r:Show()
 end
 
@@ -595,9 +595,8 @@ local function build()
   ui.aim = buildAimTab(body)
   ui.frames = buildFramesTab(body)
 
-  ui.ring = CreateFrame("Frame", nil, panel, "BackdropTemplate")
-  ui.ring:SetBackdrop({ edgeFile = "Interface\\TutorialFrame\\UI-TutorialFrame-CalloutGlow", tileEdge = true, edgeSize = 16 })
-  ui.ring:SetBackdropBorderColor(0.45, 0.8, 1, 1)
+  ui.ring = ns.outline(panel, panel, 0, 2)
+  ui.ring:SetColor(0.45, 0.8, 1, 1)
   ui.ring:SetFrameLevel((panel:GetFrameLevel() or 0) + 30)
 
   panel:SetScript("OnShow", takeKeys)

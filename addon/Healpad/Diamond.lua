@@ -9,7 +9,6 @@ local AIMED = { 1, 0.82, 0, 1 }
 local PLATE = { bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
   edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Gold-Border", tile = true, tileEdge = true,
   tileSize = 16, edgeSize = 16, insets = { left = 4, right = 4, top = 4, bottom = 4 } }
-local GLOW = { edgeFile = "Interface\\TutorialFrame\\UI-TutorialFrame-CalloutGlow", tileEdge = true, edgeSize = 16 }
 local SPOT_W, SPOT_H, FACE = 214, 58, 52
 
 local root = CreateFrame("Frame", "HealpadDiamond", UIParent)
@@ -46,21 +45,26 @@ local function makeSpot(dir)
   f.plate:SetPoint("BOTTOMRIGHT", 0, 3)
   f.plate:SetBackdrop(PLATE)
   f.plate:SetBackdropColor(1, 1, 1, 0.92)
-  -- A glow around the plate: gold on the aimed person, the debuff's color
-  -- on someone you can cleanse.
-  f.glow = CreateFrame("Frame", nil, f, "BackdropTemplate")
-  f.glow:SetPoint("TOPLEFT", f.plate, "TOPLEFT", -9, 9)
-  f.glow:SetPoint("BOTTOMRIGHT", f.plate, "BOTTOMRIGHT", 9, -9)
-  f.glow:SetBackdrop(GLOW)
-  f.glow:Hide()
+  -- A thin line around the plate: gold on the aimed person (with a shine),
+  -- the debuff's color on someone you can cleanse.
+  f.glow = ns.outline(f, f.plate, 1, 3)
+  f.glow:SetFrameLevel(f.plate:GetFrameLevel() + 1)
+  f.shine = f.plate:CreateTexture(nil, "ARTWORK")
+  f.shine:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+  f.shine:SetBlendMode("ADD")
+  f.shine:SetVertexColor(1, 0.82, 0, 0.35)
+  f.shine:SetPoint("TOPLEFT", 4, -4)
+  f.shine:SetPoint("BOTTOMRIGHT", -4, 4)
+  f.shine:Hide()
   function f.plate.SetBackdropBorderColor(_, r, g, b, a)
     f.glow.border = { r, g, b, a }
     if r then
-      f.glow:SetBackdropBorderColor(r, g, b, a or 1)
+      f.glow:SetColor(r, g, b, a or 1)
       f.glow:Show()
     else
       f.glow:Hide()
     end
+    f.shine:SetShown(r ~= nil and r == AIMED[1] and g == AIMED[2] and b == AIMED[3])
   end
   -- portrait in a ring, drawn over the plate
   local top = CreateFrame("Frame", nil, f)
@@ -136,8 +140,9 @@ function ns.layout()
   local v, h = 62 + 14 * d, 214 + 24 * d
   local at = { UP = { 0, v }, RIGHT = { h, 0 }, DOWN = { 0, -v }, LEFT = { -h, 0 }, SELF = { 0, 0 } }
   for dir, f in pairs(spots) do
+    f.at = { at[dir][1], at[dir][2] + CENTER_Y }
     f:ClearAllPoints()
-    f:SetPoint("CENTER", root, "CENTER", at[dir][1], at[dir][2] + CENTER_Y)
+    f:SetPoint("CENTER", root, "CENTER", f.at[1], f.at[2])
   end
   title:ClearAllPoints()
   title:SetPoint("BOTTOM", spots.UP, "TOP", 0, 26)
@@ -360,9 +365,16 @@ function ns.redraw()
     end
   end
   -- The aimed person stands out: a gold glow, a touch larger, on top.
+  -- A frame's offsets count in its own scale, so a grown frame's point is
+  -- divided by its scale to stay in its place.
   for _, d in ipairs(ns.DIRS) do
     local f = spots[d]
-    f:SetScale(d == sel and 1.12 or 1)
+    local k = d == sel and 1.1 or 1
+    f:SetScale(k)
+    if f.at then
+      f:ClearAllPoints()
+      f:SetPoint("CENTER", root, "CENTER", f.at[1] / k, f.at[2] / k)
+    end
     f:SetFrameLevel(d == sel and 20 or 5)
   end
 end
@@ -401,8 +413,12 @@ ticker:SetScript("OnUpdate", function(_, elapsed)
 end)
 
 -- The settings' Frames tab shows the diamond as it is now, out of combat.
+-- While previewing, the diamond sits right of center so the settings window
+-- on the left doesn't cover it.
 function ns.preview(on)
   previewing = on and not InCombatLockdown()
+  root:ClearAllPoints()
+  root:SetPoint("CENTER", UIParent, "CENTER", previewing and 260 or 0, 0)
   root:SetShown(previewing or ctl:GetAttribute("state") == "aim")
   ns.redraw()
 end

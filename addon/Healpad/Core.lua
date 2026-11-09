@@ -60,6 +60,30 @@ function ns.setupDB()
   wipe(early)
 end
 
+-- A thin outline around a frame: four lines, nothing inside, so it never
+-- covers what it marks. pad: how far outside (negative: inside).
+function ns.outline(parent, anchor, pad, size)
+  local o = CreateFrame("Frame", nil, parent)
+  o:SetPoint("TOPLEFT", anchor, "TOPLEFT", -pad, pad)
+  o:SetPoint("BOTTOMRIGHT", anchor, "BOTTOMRIGHT", pad, -pad)
+  o.lines = {}
+  local sides = { { "TOPLEFT", "TOPRIGHT", "h" }, { "BOTTOMLEFT", "BOTTOMRIGHT", "h" },
+    { "TOPLEFT", "BOTTOMLEFT", "w" }, { "TOPRIGHT", "BOTTOMRIGHT", "w" } }
+  for i, side in ipairs(sides) do
+    local t = o:CreateTexture(nil, "OVERLAY")
+    t:SetPoint(side[1])
+    t:SetPoint(side[2])
+    if side[3] == "h" then t:SetHeight(size) else t:SetWidth(size) end
+    o.lines[i] = t
+  end
+  function o.SetColor(_, r, g, b, a)
+    o.color = { r, g, b, a }
+    for _, t in ipairs(o.lines) do t:SetColorTexture(r, g, b, a or 1) end
+  end
+  o:Hide()
+  return o
+end
+
 ns.events = CreateFrame("Frame")
 local handlers = {}
 function ns.on(event, fn)
