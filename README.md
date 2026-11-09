@@ -1,14 +1,18 @@
 # Healpad
 
-Heal your party without a mouse. Hold a heal, the party opens around your
-character as a diamond, aim with the d-pad or the arrow keys, let go.
+Heal your party without a mouse. Hold a heal button, the party opens around
+your character as a diamond, aim, let go.
 
-- **Hold a heal key**: the diamond opens. Tank up, you in the middle.
-- **D-pad or arrows**: aim. **B or Backspace**: cancel.
+- **Your buttons**: Healpad reads what you already bound (the game's controller
+  setup, or any key). In `/hp`, switch a heal to **Hold to Aim**.
+- **Hold it**: the diamond opens. Tank up, you in the middle.
+- **Aim** with the d-pad, the right stick or the left stick (your choice), or the
+  arrow keys. The opposite way comes back to you. **Cancel** with B (your choice).
 - **Let go**: that heal casts on the aimed person. Your target never changes.
-- **Just tap it**: heals you, or your last target, the tank, or your focus (per key).
+- **Just tap it**: heals you, your last target, the tank, or your focus.
 - **Raids**: LB/RB (or Page Up/Down) flip groups while you aim.
-
-Spells come from your spellbook, each rank on its own. `/healpad` to set up.
+- Aim and cancel buttons are only borrowed while you aim; the rest of the time
+  they do what you bound. A form or bar page with another spell on the button
+  gives the button back too.
 
 Tests: `luajit addon/tests/run.lua`

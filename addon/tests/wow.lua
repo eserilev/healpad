@@ -23,7 +23,8 @@ function M.new()
     secureBinds = {}, overrides = {}, downTarget = {}, frames = {},
     mods = { shift = false, ctrl = false, alt = false },
     units = {}, raid = nil, book = {}, talentGroup = 1, inSecure = false,
-    rangeOut = {}, now = 100,
+    rangeOut = {}, now = 100, bar = "p1", drivers = {}, actions = {}, bindList = {}, barPresses = {},
+    cvars = {},
   }
   local G = {}
   W.G = G
@@ -51,8 +52,26 @@ function M.new()
   end
 
   function Frame:GetName() return self.name end
-  function Frame:Show() protectedChange(self, "Show") self.shown = true end
-  function Frame:Hide() protectedChange(self, "Hide") self.shown = false end
+  function Frame:GetFrameLevel() return self.level or 1 end
+  function Frame:SetFrameLevel(l) self.level = l end
+  function Frame:CreateMaskTexture() return newRegion(self) end
+  function Frame:SetFormattedText(fmt, ...)
+    local args = {}
+    for i = 1, select("#", ...) do args[i] = plain((select(i, ...))) end
+    self.text = fmt:format(unpack(args))
+  end
+  function Frame:Show()
+    protectedChange(self, "Show")
+    local was = self.shown
+    self.shown = true
+    if not was then self:RunScript("OnShow") end
+  end
+  function Frame:Hide()
+    protectedChange(self, "Hide")
+    local was = self.shown
+    self.shown = false
+    if was then self:RunScript("OnHide") end
+  end
   function Frame:SetShown(v) if v then self:Show() else self:Hide() end end
   function Frame:IsShown() return self.shown end
   function Frame:SetAlpha(a) self.alpha = plain(a) end
@@ -96,6 +115,10 @@ function M.new()
       if b.owner == self then W.secureBinds[key] = nil end
     end
   end
+  function Frame:ClearBinding(key)
+    assert(W.inSecure, "ClearBinding outside a snippet")
+    if W.secureBinds[key] and W.secureBinds[key].owner == self then W.secureBinds[key] = nil end
+  end
   function Frame:SetBindingClick(priority, key, name)
     assert(W.inSecure, "SetBindingClick outside a snippet")
     W.secureBinds[key] = { owner = self, target = name, priority = priority }
@@ -119,6 +142,7 @@ function M.new()
     UnitExists = function(u) return G.UnitExists(u) end,
     UnitIsDead = function(u) return G.UnitIsDeadOrGhost(u) end,
     SecureCmdOptionParse = function(s)
+      if s:find("bonusbar", 1, true) then return W.bar end
       if s == "[@target,help,nodead] yes; no" then
         local t = W.units.target
         return (t and t.friendly and not t.dead) and "yes" or "no"
@@ -126,6 +150,7 @@ function M.new()
       error("fake SecureCmdOptionParse doesn't know " .. s)
     end,
   }
+  G.SecureCmdOptionParse = function(s) return RESTRICTED.SecureCmdOptionParse(s) end
   local function runSnippet(body, env, ...)
     local fn = assert(loadstring("local self, button, down = ...\n" .. body))
     setfenv(fn, setmetatable(env, { __index = function(_, k)
@@ -143,6 +168,27 @@ function M.new()
   G.SecureHandlerWrapScript = function(frame, script, header, pre)
     assert(script == "OnClick")
     frame.wrap = { header = header, pre = pre }
+  end
+  G.SecureHandlerExecute = function(frame, body)
+    if W.combat then table.insert(W.blocked, "SecureHandlerExecute") end
+    runSnippet(body, {}, frame)
+  end
+  G.RegisterStateDriver = function(frame, name, cond)
+    table.insert(W.drivers, { frame = frame, name = name, cond = cond })
+    W.inSecure = true
+    frame:SetAttribute("state-" .. name, G.SecureCmdOptionParse(cond))
+    W.inSecure = false
+  end
+  -- The bar changes (a form, a page): drivers update and their snippets run.
+  function W.setBar(state)
+    W.bar = state
+    for _, d in ipairs(W.drivers) do
+      W.inSecure = true
+      d.frame:SetAttribute("state-" .. d.name, G.SecureCmdOptionParse(d.cond))
+      W.inSecure = false
+      local body = d.frame.attrs["_onstate-" .. d.name]
+      if body then runSnippet(body, {}, d.frame) end
+    end
   end
   G.SecureHandlerSetFrameRef = function(frame, label, ref)
     frame.refs = frame.refs or {}
@@ -167,6 +213,8 @@ function M.new()
       end
     elseif f.template:find("SecureHandlerClickTemplate") and down then
       runSnippet(f.attrs._onclick, {}, f, "LeftButton", down)
+    elseif f.template == "" and down and f.scripts.OnClick then
+      f.scripts.OnClick(f, "LeftButton", down) -- a plain button: clicks on the press
     end
     for _, fn in ipairs(f.hooks.OnClick or {}) do fn(f, "LeftButton", down) end
   end
@@ -183,7 +231,11 @@ function M.new()
       target = W.downTarget[key]
       W.downTarget[key] = nil
     end
-    if target then W.click(G[target], down) end
+    if target then
+      W.click(G[target], down)
+    elseif down and W.normalBinds[key] then
+      table.insert(W.barPresses, { key = key, command = W.normalBinds[key] })
+    end
     return target
   end
   function W.tap(key) W.key(key, true) W.key(key, false) end
@@ -204,6 +256,22 @@ function M.new()
     return W.normalBinds[key] or ""
   end
   G.GetBindingText = function(key) return key end
+  -- W.bindList: { { command, key1, key2 } }; W.normalBinds follows it.
+  function W.bind(command, ...)
+    table.insert(W.bindList, { command, ... })
+    for _, k in ipairs({ ... }) do W.normalBinds[k] = command end
+  end
+  G.GetNumBindings = function() return #W.bindList end
+  G.GetBinding = function(i)
+    local b = W.bindList[i]
+    return b[1], "BINDING_HEADER_X", unpack(b, 2)
+  end
+  G.GetActionInfo = function(slot)
+    local a = W.actions[slot]
+    if a then return a[1], a[2] end
+  end
+  G.GetMacroSpell = function() return nil end
+  G.C_CVar = { GetCVar = function(k) return W.cvars[k] end }
 
   -- Units ---------------------------------------------------------------
   local function hidden(v) if W.combat then return secret(v) end return v end
@@ -216,6 +284,12 @@ function M.new()
   G.UnitGroupRolesAssigned = function(u) return W.units[u] and W.units[u].role or "NONE" end
   G.UnitIsConnected = function(u) return not (W.units[u] and W.units[u].offline) end
   G.UnitIsDeadOrGhost = function(u) return W.units[u] and W.units[u].dead or false end
+  G.UnitLevel = function(u) return W.units[u] and (W.units[u].level or 60) or 0 end
+  G.UnitPower = function(u) return hidden(W.units[u] and W.units[u].power or 50) end
+  G.UnitPowerMax = function(u) return hidden(100) end
+  G.UnitPowerType = function() return 0, "MANA" end
+  G.PowerBarColor = { MANA = { r = 0, g = 0, b = 1 } }
+  G.SetPortraitTexture = function(tex, unit) tex.portrait = unit end
   G.IsInRaid = function() return W.raid ~= nil end
   G.IsInGroup = function() return W.raid ~= nil or W.units.party1 ~= nil end
   G.GetNumGroupMembers = function() return W.raid and #W.raid or 0 end
@@ -247,6 +321,10 @@ function M.new()
     GetSpellName = function(id) local s = spell(id) return s and s.name end,
     GetSpellSubtext = function(id) local s = spell(id) return s and s.sub end,
     GetSpellTexture = function() return 136041 end,
+    IsSpellHelpful = function(id) local s = spell(id) return s and s.helpful or false end,
+    GetSpellInfo = function(name)
+      for _, s in ipairs(W.book) do if s.name == name then return { spellID = s.id } end end
+    end,
     IsSpellInRange = function(_, unit)
       if W.rangeOut[unit] then return hidden(false) end
       return hidden(true)
@@ -278,6 +356,7 @@ function M.new()
   end
   G.geterrorhandler = function() return function(e) table.insert(W.errors, e) end end
   G._G = G
+  G.wipe = function(t) for k in pairs(t) do t[k] = nil end return t end
 
   function W.fire(event, ...)
     for _, f in ipairs(W.frames) do

@@ -1,12 +1,12 @@
 ## Interface: 16001
 ## Title: Healpad
-## Notes: Hold a heal, aim with the d-pad or arrows, let go. Made for controllers. /healpad
+## Notes: Hold a heal button, aim at a party member, let go. Made for controllers. /hp
 ## Author: Eitan
-## Version: 0.1.0
+## Version: 0.2.0
 ## SavedVariablesPerCharacter: HealpadDB
 
 Core.lua
-Spells.lua
+Binds.lua
 Roster.lua
 Secure.lua
 Diamond.lua

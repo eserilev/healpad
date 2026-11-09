@@ -1,34 +1,20 @@
--- The secure parts: one controller, the heal keys, and the aim keys.
+-- The secure parts: one controller, the heal buttons, the aim buttons, and a
+-- key owner that follows the bar.
 --
--- Press a heal key: its spell is locked, the controller takes the d-pad and
--- arrow keys, and nothing casts. Release it: the locked spell casts on the
--- aimed person, or with no aim on the key's tap choice. All of it runs in
--- secure snippets, so it works in combat. Addon code only sets things up out
--- of combat and draws the plain diamond frames.
+-- Press a Hold to Aim button: its spell is locked, the controller takes the
+-- aim, cancel and page buttons, and nothing casts. Release it: the locked
+-- spell casts on the aimed person, or with no aim on its tap choice. All of
+-- it runs in secure snippets, so it works in combat. Addon code only sets
+-- things up out of combat and draws the plain diamond frames.
+--
+-- A heal button owns its key only in the bar states where that key casts
+-- the same spell: shift into cat form and the key is Claw again.
 local _, ns = ...
 
 local ctl = CreateFrame("Frame", "HealpadCtl", UIParent, "SecureHandlerBaseTemplate")
 ns.ctl = ctl
-local keyOwner = CreateFrame("Frame", "HealpadKeys", UIParent)
-
--- Keys the controller takes while aiming, and the button each one clicks.
-ns.AIM_KEYS = {
-  { "PADDUP", "HealpadDirUP" }, { "UP", "HealpadDirUP" },
-  { "PADDRIGHT", "HealpadDirRIGHT" }, { "RIGHT", "HealpadDirRIGHT" },
-  { "PADDDOWN", "HealpadDirDOWN" }, { "DOWN", "HealpadDirDOWN" },
-  { "PADDLEFT", "HealpadDirLEFT" }, { "LEFT", "HealpadDirLEFT" },
-  { "PADLSTICK", "HealpadDirSELF" }, { "HOME", "HealpadDirSELF" },
-  { "PAD2", "HealpadCancel" }, { "BACKSPACE", "HealpadCancel" },
-  { "PADRSHOULDER", "HealpadPageNext" }, { "PAGEDOWN", "HealpadPageNext" },
-  { "PADLSHOULDER", "HealpadPagePrev" }, { "PAGEUP", "HealpadPagePrev" },
-}
-
--- A heal key the player chose wins over an aim key: "skip-<key>" is set for it.
-local binds = {}
-for _, k in ipairs(ns.AIM_KEYS) do
-  table.insert(binds, ('    if not owner:GetAttribute("skip-%s") then owner:SetBindingClick(true, "%s", "%s") end')
-    :format(k[1], k[1], k[2]))
-end
+local keys = CreateFrame("Frame", "HealpadKeys", UIParent, "SecureHandlerStateTemplate")
+ns.keys = keys
 
 ns.HEAL_SNIPPET = [[
   local name = self:GetName()
@@ -44,8 +30,12 @@ ns.HEAL_SNIPPET = [[
     owner:SetAttribute("sel", nil)
     owner:SetAttribute("page", 1)
     owner:ClearBindings()
-]] .. table.concat(binds, "\n") .. [[
-
+    for i = 1, owner:GetAttribute("ak-n") or 0 do
+      local k = owner:GetAttribute("ak" .. i)
+      if not owner:GetAttribute("skip-" .. k) then
+        owner:SetBindingClick(true, k, owner:GetAttribute("ab" .. i))
+      end
+    end
     owner:SetAttribute("state", "aim")
     return false
   end
@@ -123,6 +113,25 @@ ns.PAGE_SNIPPET = [[
   c:SetAttribute("sel", nil)
 ]]
 
+-- Binds each heal button's key in the bar states where it casts that spell.
+ns.KEYS_SNIPPET = [[
+  local cur = self:GetAttribute("state-bar") or "p1"
+  local c = self:GetFrameRef("ctl")
+  self:ClearBindings()
+  for i = 1, 12 do
+    local b = self:GetFrameRef("heal" .. i)
+    local key = b and b:GetAttribute("hp-key")
+    if key then
+      if b:GetAttribute("hp-ok-" .. cur) then
+        self:SetBindingClick(true, key, b:GetName())
+        c:SetAttribute("skip-" .. key, true)
+      else
+        c:SetAttribute("skip-" .. key, nil)
+      end
+    end
+  end
+]]
+
 local function clicker(name, snippet)
   local b = CreateFrame("Button", name, UIParent, "SecureHandlerClickTemplate")
   b:RegisterForClicks("AnyDown")
@@ -139,17 +148,48 @@ clicker("HealpadPageNext", ns.PAGE_SNIPPET):SetAttribute("step", 1)
 clicker("HealpadPagePrev", ns.PAGE_SNIPPET):SetAttribute("step", -1)
 
 ns.heals = {}
-for i = 1, ns.KEYS do
+for i = 1, ns.HEALS do
   local b = CreateFrame("Button", "HealpadHeal" .. i, UIParent, "SecureActionButtonTemplate")
   b:RegisterForClicks("AnyUp", "AnyDown")
   b:SetAttribute("useOnKeyDown", false)
   b:SetAttribute("type", "spell")
   b:SetAttribute("unit", "player")
   SecureHandlerWrapScript(b, "OnClick", ctl, ns.HEAL_SNIPPET)
+  SecureHandlerSetFrameRef(keys, "heal" .. i, b)
   ns.heals[i] = b
 end
+SecureHandlerSetFrameRef(keys, "ctl", ctl)
+keys:SetAttribute("_onstate-bar", ns.KEYS_SNIPPET)
+RegisterStateDriver(keys, "bar", ns.BAR_DRIVER)
 
 ---------------------------------------------------------------- setup, out of combat
+
+-- The buttons the controller takes while you aim, and what each one clicks.
+function ns.aimKeys()
+  local db = ns.db
+  local list = {}
+  local function add(key, target, mods)
+    table.insert(list, { key, target })
+    if mods then
+      for _, m in ipairs({ "SHIFT-", "CTRL-", "ALT-" }) do table.insert(list, { m .. key, target }) end
+    end
+  end
+  local stick = ({ dpad = "PADD", rstick = "PADRSTICK", lstick = "PADLSTICK" })[db.aimWith] or "PADD"
+  for _, d in ipairs({ "UP", "RIGHT", "DOWN", "LEFT" }) do
+    add(stick .. d, "HealpadDir" .. d, true)
+    add(d, "HealpadDir" .. d, true)
+  end
+  add("PADLSTICK", "HealpadDirSELF", true)
+  add("PADRSTICK", "HealpadDirSELF", true)
+  add("HOME", "HealpadDirSELF")
+  add(db.cancel or "PAD2", "HealpadCancel", true)
+  add("BACKSPACE", "HealpadCancel")
+  add("PADRSHOULDER", "HealpadPageNext", true)
+  add("PADLSHOULDER", "HealpadPagePrev", true)
+  add("PAGEDOWN", "HealpadPageNext")
+  add("PAGEUP", "HealpadPagePrev")
+  return list
+end
 
 -- Who sits in each place of each page.
 function ns.applyRoster()
@@ -167,41 +207,73 @@ function ns.applyRoster()
   end)
 end
 
--- A key that KeyBars binds, for a warning: Healpad's binding wins while set.
-local function clash(key)
-  local ok, action = pcall(GetBindingAction, key, true)
-  return ok and type(action) == "string" and action:match("^CLICK KeyBars") ~= nil
+-- What applyKeys last set up. Binding and bar events come often (and our own
+-- override bindings fire UPDATE_BINDINGS), so the same setup is not redone.
+local lastSig
+
+local function signature(binds)
+  local db = ns.db
+  local parts = { db.aimWith or "", db.cancel or "" }
+  for _, b in ipairs(binds) do
+    local conf = db.aim[b.key]
+    local states = {}
+    for _, s in ipairs(ns.BAR_STATES) do if b.states[s] then table.insert(states, s) end end
+    table.insert(parts, b.key .. "=" .. tostring(b.spell) .. ":" .. table.concat(states, ",")
+      .. (conf and (":" .. (conf.tap or "")) or ""))
+  end
+  return table.concat(parts, "|")
 end
 
-local warned = {}
-function ns.applyKeys()
+-- Reads your bindings and gives each Hold to Aim heal a heal button.
+-- force: redo it even when nothing seems to have changed.
+function ns.applyKeys(force)
   ns.afterCombat("keys", function()
-    ClearOverrideBindings(keyOwner)
-    for _, k in ipairs(ns.AIM_KEYS) do ctl:SetAttribute("skip-" .. k[1], nil) end
-    for i, b in ipairs(ns.heals) do
-      local conf = ns.db.keys[i]
-      local spell = ns.spellOn(i)
-      b:SetAttribute("hp-spell", spell)
-      b:SetAttribute("spell", spell)
-      b:SetAttribute("hp-tap", conf.tap)
-      if conf.key and spell then
-        if clash(conf.key) and not warned[conf.key] then
-          warned[conf.key] = true
-          ns.say(conf.key .. " is also a KeyBars key. Healpad uses it while Healpad is on.")
+    local binds = ns.readBinds()
+    local sig = signature(binds)
+    ns.binds = binds
+    if sig == lastSig and force ~= true then return end
+    lastSig = sig
+    local used = 0
+    for _, bind in ipairs(ns.binds) do
+      local conf = ns.db.aim[bind.key]
+      if conf and bind.heal and used < ns.HEALS then
+        used = used + 1
+        local b = ns.heals[used]
+        b:SetAttribute("hp-spell", bind.spell)
+        b:SetAttribute("spell", bind.spell)
+        b:SetAttribute("hp-tap", conf.tap or "player")
+        b:SetAttribute("hp-key", bind.key)
+        for _, s in ipairs(ns.BAR_STATES) do
+          b:SetAttribute("hp-ok-" .. s, bind.states[s] or nil)
         end
-        SetOverrideBindingClick(keyOwner, true, conf.key, b:GetName(), "LeftButton")
-        ctl:SetAttribute("skip-" .. conf.key, true)
       end
     end
+    for i = used + 1, ns.HEALS do
+      local b = ns.heals[i]
+      local old = b:GetAttribute("hp-key")
+      if old then ctl:SetAttribute("skip-" .. old, nil) end
+      b:SetAttribute("hp-key", nil)
+      b:SetAttribute("hp-spell", nil)
+    end
+    local aim = ns.aimKeys()
+    for i, k in ipairs(aim) do
+      ctl:SetAttribute("ak" .. i, k[1])
+      ctl:SetAttribute("ab" .. i, k[2])
+    end
+    ctl:SetAttribute("ak-n", #aim)
+    SecureHandlerExecute(keys, ns.KEYS_SNIPPET)
+    if ns.refreshOptions then ns.refreshOptions() end
   end)
 end
 
 ns.on("PLAYER_LOGIN", function()
   ns.applyRoster()
-  ns.applyKeys()
+  ns.applyKeys(true)
 end)
 ns.on("GROUP_ROSTER_UPDATE", ns.applyRoster)
 ns.on("PLAYER_ROLES_ASSIGNED", ns.applyRoster)
 ns.on("PLAYER_REGEN_ENABLED", ns.applyRoster)
-ns.on("ACTIVE_TALENT_GROUP_CHANGED", ns.applyKeys)
-ns.on("PLAYER_SPECIALIZATION_CHANGED", ns.applyKeys)
+for _, e in ipairs({ "UPDATE_BINDINGS", "ACTIONBAR_SLOT_CHANGED", "UPDATE_BONUS_ACTIONBAR", "ACTIONBAR_PAGE_CHANGED",
+  "ACTIVE_TALENT_GROUP_CHANGED", "PLAYER_SPECIALIZATION_CHANGED", "SPELLS_CHANGED" }) do
+  ns.on(e, function() ns.applyKeys() end)
+end

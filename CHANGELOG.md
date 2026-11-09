@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0
+
+- Settings rebuilt: Buttons, Aim and Frames tabs, all usable with the pad.
+- Buttons lists what you already bound; switch a heal to Hold to Aim. No more picking spells.
+- Aim with the d-pad, the right stick or the left stick; choose the cancel button.
+- Classic frames: portrait in a gold ring, level, health with numbers, mana, rage or energy.
+- A form or bar page that puts another spell on a heal button gives that button back.
+- The opposite direction brings the aim back to you.
+
 ## 0.1.0
 
 - First version: hold-to-aim heals with the diamond, up to 8 heal keys, tap choices, raid groups, settings.

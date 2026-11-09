@@ -1,11 +1,19 @@
--- Healpad: hold a heal key, the party opens as a diamond, aim with the d-pad
--- or the arrow keys, let go to cast on the aimed person.
+-- Healpad: hold a heal button, the party opens as a diamond, aim with the
+-- d-pad or a stick, let go to cast on the aimed person.
+--
+-- Healpad doesn't pick spells. It reads the buttons you already bound (the
+-- game's controller setup, or any key), and you switch a heal button to
+-- Hold to Aim. While you aim, Healpad borrows the aim and cancel buttons;
+-- the rest of the time every button does what you bound it to.
 local ADDON, ns = ...
 
-ns.KEYS = 8 -- heal keys
+ns.HEALS = 12 -- buttons that can hold to aim at once
 ns.TAPS = { "player", "last", "tank", "focus" } -- who a tap with no aim heals
 ns.TAP_LABEL = { player = "You", last = "Last", tank = "Tank", focus = "Focus" }
 ns.DIRS = { "UP", "RIGHT", "DOWN", "LEFT", "SELF" }
+ns.AIMERS = { "dpad", "rstick", "lstick" }
+ns.AIMER_LABEL = { dpad = "D-pad", rstick = "Right stick", lstick = "Left stick" }
+ns.CANCELS = { "PAD1", "PAD2", "PAD3", "PAD4" }
 
 local PREFIX = "|cff7fe3e3Healpad|r: "
 function ns.say(msg) print(PREFIX .. msg) end
@@ -20,42 +28,18 @@ function ns.afterCombat(key, fn)
   end
 end
 
--- The spec index for the saved spells: the active spec group (dual spec).
-function ns.spec()
-  local ok, g = pcall(function()
-    local info = C_SpecializationInfo
-    return info and info.GetActiveSpecGroup and info.GetActiveSpecGroup() or 1
-  end)
-  return (ok and type(g) == "number") and g or 1
-end
-
-local DEFAULTS = { distance = 3, scale = 1, arrows = true }
+local DEFAULTS = { distance = 3, scale = 1, arrows = true, aimWith = "dpad", cancel = "PAD2" }
 
 function ns.setupDB()
   HealpadDB = HealpadDB or {}
   local db = HealpadDB
+  -- 0.1 kept heal keys and picked spells; 0.2 reads your own bindings.
+  db.keys, db.spells = nil, nil
   for k, v in pairs(DEFAULTS) do
     if db[k] == nil then db[k] = v end
   end
-  db.keys = db.keys or {}
-  for i = 1, ns.KEYS do
-    db.keys[i] = db.keys[i] or {}
-    db.keys[i].tap = db.keys[i].tap or "player"
-  end
-  db.spells = db.spells or {}
+  db.aim = db.aim or {} -- [binding key] = { tap = "player" }: that key holds to aim
   ns.db = db
-end
-
--- The spell id on heal key i in this spec, or nil.
-function ns.spellOn(i)
-  local s = ns.db.spells[ns.spec()]
-  return s and s[i]
-end
-
-function ns.setSpell(i, id)
-  local spec = ns.spec()
-  ns.db.spells[spec] = ns.db.spells[spec] or {}
-  ns.db.spells[spec][i] = id
 end
 
 ns.events = CreateFrame("Frame")
