@@ -1,0 +1,310 @@
+-- A fake WoW Forever client for the Healpad tests. Run with LuaJIT (Lua 5.1).
+--
+-- It runs the secure snippets in a restricted table that has only the
+-- names the real restricted environment gives, and it enforces the combat
+-- rule: addon code must not change a secure frame in combat (W.blocked).
+-- Health and the like are secret in combat: a compare or a sum with one is
+-- an error, as in the client.
+
+local M = {}
+
+local Secret = {}
+local function refuse() error("attempt to use a secret value", 2) end
+for _, mm in ipairs({ "__lt", "__le", "__add", "__sub", "__mul", "__div", "__mod", "__unm", "__concat", "__len", "__eq" }) do
+  Secret[mm] = refuse
+end
+local function secret(v) return setmetatable({ value = v }, Secret) end
+function M.isSecret(v) return type(v) == "table" and getmetatable(v) == Secret end
+local function plain(v) if M.isSecret(v) then return v.value end return v end
+
+function M.new()
+  local W = {
+    combat = false, blocked = {}, errors = {}, printed = {}, casts = {},
+    secureBinds = {}, overrides = {}, downTarget = {}, frames = {},
+    mods = { shift = false, ctrl = false, alt = false },
+    units = {}, raid = nil, book = {}, talentGroup = 1, inSecure = false,
+    rangeOut = {}, now = 100,
+  }
+  local G = {}
+  W.G = G
+  setmetatable(G, { __index = _G })
+
+  local function protectedChange(f, what)
+    if W.combat and f.protected and not W.inSecure then
+      table.insert(W.blocked, (f.name or "?") .. ":" .. what)
+    end
+  end
+
+  -- Frames ------------------------------------------------------------
+  local Frame = {}
+  Frame.__index = function(t, k)
+    local m = Frame[k]
+    if m then return m end
+    -- A widget method this fake doesn't model is a no-op; fields are nil.
+    if type(k) == "string" and k:match("^%u") then return function() end end
+    return nil
+  end
+
+  local function newRegion(parent)
+    local r = setmetatable({ shown = true, alpha = 1, attrs = {}, scripts = {}, hooks = {}, parent = parent }, Frame)
+    return r
+  end
+
+  function Frame:GetName() return self.name end
+  function Frame:Show() protectedChange(self, "Show") self.shown = true end
+  function Frame:Hide() protectedChange(self, "Hide") self.shown = false end
+  function Frame:SetShown(v) if v then self:Show() else self:Hide() end end
+  function Frame:IsShown() return self.shown end
+  function Frame:SetAlpha(a) self.alpha = plain(a) end
+  function Frame:GetAlpha() return self.alpha end
+  function Frame:SetText(t) self.text = t end
+  function Frame:GetText() return self.text end
+  function Frame:SetChecked(v) self.checked = v end
+  function Frame:GetChecked() return self.checked end
+  function Frame:SetPoint(...) protectedChange(self, "SetPoint") end
+  function Frame:ClearAllPoints() protectedChange(self, "ClearAllPoints") end
+  function Frame:SetScale(s) self.scale = s end
+  function Frame:SetBackdropBorderColor(r, g, b, a) self.border = { r, g, b, a } end
+  function Frame:SetMinMaxValues(lo, hi) self.min, self.max = lo, hi end
+  function Frame:SetValue(v) self.value = v end
+  function Frame:GetStatusBarTexture() self.tex = self.tex or newRegion(self) return self.tex end
+  function Frame:CreateFontString() return newRegion(self) end
+  function Frame:CreateTexture() return newRegion(self) end
+  function Frame:SetScript(name, fn) self.scripts[name] = fn end
+  function Frame:GetScript(name) return self.scripts[name] end
+  function Frame:HookScript(name, fn)
+    self.hooks[name] = self.hooks[name] or {}
+    table.insert(self.hooks[name], fn)
+  end
+  function Frame:RegisterEvent(e) self.events = self.events or {} self.events[e] = true end
+  function Frame:RegisterForClicks(...) self.clicks = { ... } end
+  function Frame:EnableKeyboard(v) self.keyboard = v end
+  function Frame:RunScript(name, ...)
+    if self.scripts[name] then self.scripts[name](self, ...) end
+    for _, fn in ipairs(self.hooks[name] or {}) do fn(self, ...) end
+  end
+  function Frame:SetAttribute(k, v)
+    protectedChange(self, "SetAttribute " .. tostring(k))
+    self.attrs[k] = v
+    self:RunScript("OnAttributeChanged", k, v)
+  end
+  function Frame:GetAttribute(k) return self.attrs[k] end
+  -- Restricted handle methods, used only from snippets.
+  function Frame:GetFrameRef(label) return self.refs and self.refs[label] end
+  function Frame:ClearBindings()
+    for key, b in pairs(W.secureBinds) do
+      if b.owner == self then W.secureBinds[key] = nil end
+    end
+  end
+  function Frame:SetBindingClick(priority, key, name)
+    assert(W.inSecure, "SetBindingClick outside a snippet")
+    W.secureBinds[key] = { owner = self, target = name, priority = priority }
+  end
+
+  G.CreateFrame = function(kind, name, parent, template)
+    local f = newRegion(parent)
+    f.kind, f.name, f.template = kind, name, template or ""
+    f.protected = f.template:find("Secure") ~= nil
+    if name then G[name] = f end
+    table.insert(W.frames, f)
+    return f
+  end
+  G.UIParent = G.CreateFrame("Frame", "UIParent")
+  G.UISpecialFrames = {}
+  G.SlashCmdList = {}
+
+  -- Snippets -------------------------------------------------------------
+  local RESTRICTED = {
+    tostring = tostring, tonumber = tonumber, type = type,
+    UnitExists = function(u) return G.UnitExists(u) end,
+    UnitIsDead = function(u) return G.UnitIsDeadOrGhost(u) end,
+    SecureCmdOptionParse = function(s)
+      if s == "[@target,help,nodead] yes; no" then
+        local t = W.units.target
+        return (t and t.friendly and not t.dead) and "yes" or "no"
+      end
+      error("fake SecureCmdOptionParse doesn't know " .. s)
+    end,
+  }
+  local function runSnippet(body, env, ...)
+    local fn = assert(loadstring("local self, button, down = ...\n" .. body))
+    setfenv(fn, setmetatable(env, { __index = function(_, k)
+      if RESTRICTED[k] ~= nil then return RESTRICTED[k] end
+      error("snippet uses " .. tostring(k) .. ", which the restricted environment lacks", 2)
+    end, __newindex = function(_, k) error("snippet sets global " .. tostring(k), 2) end }))
+    W.inSecure = true
+    local ok, res = pcall(fn, ...)
+    W.inSecure = false
+    if not ok then error(res, 0) end
+    return res
+  end
+  W.runSnippet = runSnippet
+
+  G.SecureHandlerWrapScript = function(frame, script, header, pre)
+    assert(script == "OnClick")
+    frame.wrap = { header = header, pre = pre }
+  end
+  G.SecureHandlerSetFrameRef = function(frame, label, ref)
+    frame.refs = frame.refs or {}
+    frame.refs[label] = ref
+  end
+
+  -- A click from a binding: the wrap, the template action, then the hooks.
+  function W.click(f, down)
+    if f.wrap then
+      local res = runSnippet(f.wrap.pre, { owner = f.wrap.header }, f, "LeftButton", down)
+      if res == false then
+        for _, fn in ipairs(f.hooks.OnClick or {}) do fn(f, "LeftButton", down) end
+        return
+      end
+    end
+    if f.template:find("SecureActionButtonTemplate") then
+      local onDown = f.attrs.useOnKeyDown
+      if (down and onDown) or (not down and not onDown) then
+        local unit = f.attrs.unit
+        if unit and unit ~= "none" and not G.UnitExists(unit) then return end
+        table.insert(W.casts, { spell = f.attrs.spell, unit = unit, combat = W.combat })
+      end
+    elseif f.template:find("SecureHandlerClickTemplate") and down then
+      runSnippet(f.attrs._onclick, {}, f, "LeftButton", down)
+    end
+    for _, fn in ipairs(f.hooks.OnClick or {}) do fn(f, "LeftButton", down) end
+  end
+
+  -- A key press: the controller's bindings first, then the override bindings.
+  -- The release goes where the press went.
+  function W.key(key, down)
+    local target
+    if down then
+      local b = W.secureBinds[key] or W.overrides[key]
+      target = b and b.target
+      W.downTarget[key] = target
+    else
+      target = W.downTarget[key]
+      W.downTarget[key] = nil
+    end
+    if target then W.click(G[target], down) end
+    return target
+  end
+  function W.tap(key) W.key(key, true) W.key(key, false) end
+
+  G.SetOverrideBindingClick = function(owner, priority, key, name)
+    if W.combat then table.insert(W.blocked, "SetOverrideBindingClick " .. key) end
+    W.overrides[key] = { owner = owner, target = name, priority = priority }
+  end
+  G.ClearOverrideBindings = function(owner)
+    if W.combat then table.insert(W.blocked, "ClearOverrideBindings") end
+    for key, b in pairs(W.overrides) do
+      if b.owner == owner then W.overrides[key] = nil end
+    end
+  end
+  W.normalBinds = {}
+  G.GetBindingAction = function(key, override)
+    if override and W.overrides[key] then return "CLICK " .. W.overrides[key].target .. ":LeftButton" end
+    return W.normalBinds[key] or ""
+  end
+  G.GetBindingText = function(key) return key end
+
+  -- Units ---------------------------------------------------------------
+  local function hidden(v) if W.combat then return secret(v) end return v end
+  G.UnitExists = function(u) return u ~= nil and W.units[u] ~= nil end
+  G.UnitName = function(u) local x = W.units[u] return x and x.name end
+  G.UnitIsUnit = function(a, b) return W.units[a] ~= nil and W.units[a] == W.units[b] end
+  G.UnitHealth = function(u) return hidden(W.units[u] and W.units[u].hp or 0) end
+  G.UnitHealthMax = function(u) return hidden(W.units[u] and W.units[u].max or 1) end
+  G.UnitGetIncomingHeals = function(u) return hidden(W.units[u] and W.units[u].incoming or 0) end
+  G.UnitGroupRolesAssigned = function(u) return W.units[u] and W.units[u].role or "NONE" end
+  G.UnitIsConnected = function(u) return not (W.units[u] and W.units[u].offline) end
+  G.UnitIsDeadOrGhost = function(u) return W.units[u] and W.units[u].dead or false end
+  G.IsInRaid = function() return W.raid ~= nil end
+  G.IsInGroup = function() return W.raid ~= nil or W.units.party1 ~= nil end
+  G.GetNumGroupMembers = function() return W.raid and #W.raid or 0 end
+  G.GetNumSubgroupMembers = function()
+    local n = 0
+    for i = 1, 4 do if W.units["party" .. i] then n = i end end
+    return n
+  end
+  G.GetRaidRosterInfo = function(i)
+    local r = W.raid[i]
+    return r.name, 0, r.group
+  end
+
+  -- Spells ----------------------------------------------------------------
+  G.Enum = { SpellBookSpellBank = { Player = 0 }, SpellBookItemType = { Spell = 1, Flyout = 4 }, LuaCurveType = { Step = 1 } }
+  G.C_SpellBook = {
+    GetNumSpellBookSkillLines = function() return 1 end,
+    GetSpellBookSkillLineInfo = function() return { itemIndexOffset = 0, numSpellBookItems = #W.book, shouldHide = false } end,
+    GetSpellBookItemInfo = function(slot)
+      local s = W.book[slot]
+      return { spellID = s.id, actionID = s.id, itemType = s.kind or 1, name = s.name, subName = s.sub or "" }
+    end,
+    IsSpellBookItemHelpful = function(slot) return W.book[slot].helpful == true end,
+  }
+  local function spell(id)
+    for _, s in ipairs(W.book) do if s.id == id then return s end end
+  end
+  G.C_Spell = {
+    GetSpellName = function(id) local s = spell(id) return s and s.name end,
+    GetSpellSubtext = function(id) local s = spell(id) return s and s.sub end,
+    GetSpellTexture = function() return 136041 end,
+    IsSpellInRange = function(_, unit)
+      if W.rangeOut[unit] then return hidden(false) end
+      return hidden(true)
+    end,
+  }
+  G.C_UnitAuras = {
+    GetAuraDataByIndex = function(unit)
+      local d = W.units[unit] and W.units[unit].debuff
+      return d and { auraInstanceID = 7, dispelName = d } or nil
+    end,
+    GetAuraDispelTypeColor = function()
+      return { GetRGBA = function() return 0.2, 0.6, 1, 1 end }
+    end,
+  }
+  G.C_CurveUtil = { CreateColorCurve = function() return { SetType = function() end, AddPoint = function() end } end }
+  G.CreateColor = function(r, g, b, a) return { GetRGBA = function() return r, g, b, a end } end
+
+  -- The rest -----------------------------------------------------------------
+  G.InCombatLockdown = function() return W.combat end
+  G.GetTime = function() return W.now end
+  G.C_SpecializationInfo = { GetActiveSpecGroup = function() return W.talentGroup end }
+  G.IsShiftKeyDown = function() return W.mods.shift end
+  G.IsControlKeyDown = function() return W.mods.ctrl end
+  G.IsAltKeyDown = function() return W.mods.alt end
+  G.print = function(...)
+    local parts = {}
+    for i = 1, select("#", ...) do parts[i] = tostring((select(i, ...))) end
+    table.insert(W.printed, table.concat(parts, " "))
+  end
+  G.geterrorhandler = function() return function(e) table.insert(W.errors, e) end end
+  G._G = G
+
+  function W.fire(event, ...)
+    for _, f in ipairs(W.frames) do
+      if f.events and f.events[event] and f.scripts.OnEvent then f.scripts.OnEvent(f, event, ...) end
+    end
+  end
+  function W.update(elapsed)
+    W.now = W.now + elapsed
+    for _, f in ipairs(W.frames) do
+      if f.scripts.OnUpdate then f.scripts.OnUpdate(f, elapsed) end
+    end
+  end
+
+  function W.load(dir, files, saved)
+    local ns = {}
+    G.HealpadDB = saved
+    for _, file in ipairs(files) do
+      local fn = assert(loadfile(dir .. "/" .. file))
+      setfenv(fn, G)
+      fn("Healpad", ns)
+    end
+    W.ns = ns
+    W.fire("ADDON_LOADED", "Healpad")
+    W.fire("PLAYER_LOGIN")
+    return ns
+  end
+  return W
+end
+
+return M

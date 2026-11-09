@@ -1,0 +1,13 @@
+## Interface: 16001
+## Title: Healpad
+## Notes: Hold a heal, aim with the d-pad or arrows, let go. Made for controllers. /healpad
+## Author: Eitan
+## Version: 0.1.0
+## SavedVariablesPerCharacter: HealpadDB
+
+Core.lua
+Spells.lua
+Roster.lua
+Secure.lua
+Diamond.lua
+Options.lua

@@ -1,0 +1,8 @@
+## Interface: 16001
+## Title: Healpad Probe
+## Notes: A one-off test of hold-to-aim heals. /hpp for help.
+## Author: Eitan
+## Version: 0.0.1
+## SavedVariablesPerCharacter: HealpadProbeDB
+
+HealpadProbe.lua
