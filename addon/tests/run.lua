@@ -206,6 +206,46 @@ test("tap heals the tank: the tank sits in the middle, you in the tank's place",
   clean(W)
 end)
 
+test("solo: a tap set to Focus heals your focus if it's a friend, else you; Tank and Last healed heal you", function()
+  local W = game({ party = false, saved = { aim = { PAD3 = { tap = "focus" }, PAD1 = { tap = "tank" } } } })
+  W.combat = true
+  W.units.focus = { name = "Pal", hp = 1, max = 2 }
+  W.tap("PAD3")
+  eq(last(W).unit, "focus", "a friendly focus")
+  W.units.focus = { name = "Wolf", hp = 1, max = 2, friendly = false }
+  W.tap("PAD3")
+  eq(last(W).unit, "player", "an enemy focus: you")
+  W.units.focus = nil
+  W.tap("PAD3")
+  eq(last(W).unit, "player", "no focus: you")
+  W.tap("PAD1")
+  eq(last(W).unit, "player", "no tank: you")
+  clean(W)
+end)
+
+test("Last healed never means your target, which may have changed", function()
+  local W = game({ party = false, saved = { aim = { PAD3 = { tap = "last" } } } })
+  W.units.target = { name = "Friend", hp = 1, max = 2, friendly = true }
+  W.combat = true
+  W.key("PAD3", true) W.tap("UP") W.key("PAD3", false)
+  eq(last(W).unit, "target")
+  W.units.target = { name = "Wolf", hp = 1, max = 2, friendly = false }
+  W.tap("PAD3")
+  eq(last(W).unit, "player", "not the wolf you target now")
+  clean(W)
+end)
+
+test("the raid's Main Tank counts as the tank when nobody has the role", function()
+  local W = Wow.new()
+  setup(W)
+  party(W)
+  W.units.party2.role = "DAMAGER"
+  W.units.party3.mainTank = true
+  local ns = W.load(DIR, FILES, { aim = { PAD3 = { tap = "tank" } } })
+  eq(ns.ctl:GetAttribute("tank"), "party3")
+  clean(W)
+end)
+
 test("cancel: nothing casts, keys come back", function()
   local W, ns = game()
   W.combat = true

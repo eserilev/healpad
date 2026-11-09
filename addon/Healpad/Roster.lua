@@ -48,7 +48,11 @@ function ns.buildPages(members, solo)
   return pages, tank and tank.unit
 end
 
+-- The tank: the raid's Main Tank, else the role from the role check or the
+-- dungeon finder. Nobody marked: no tank, and a tap set to Tank heals you.
 local function role(unit)
+  local okMT, mt = pcall(GetPartyAssignment, "MAINTANK", unit)
+  if okMT and mt then return "TANK" end
   local ok, r = pcall(UnitGroupRolesAssigned, unit)
   if ok and type(r) == "string" then return r end
   return "NONE"

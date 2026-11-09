@@ -148,9 +148,11 @@ function M.new()
     UnitIsDead = function(u) return G.UnitIsDeadOrGhost(u) end,
     SecureCmdOptionParse = function(s)
       if s:find("bonusbar", 1, true) then return W.bar end
-      if s == "[@target,help,nodead] yes; no" then
-        local t = W.units.target
-        return (t and t.friendly and not t.dead) and "yes" or "no"
+      local u = s:match("^%[@([%w]+),help,nodead%] yes; no$")
+      if u then
+        local t = W.units[u]
+        if u == "target" then return (t and t.friendly and not t.dead) and "yes" or "no" end
+        return (t and t.friendly ~= false and not t.dead) and "yes" or "no"
       end
       error("fake SecureCmdOptionParse doesn't know " .. s)
     end,
@@ -299,6 +301,7 @@ function M.new()
   G.UnitGroupRolesAssigned = function(u) return W.units[u] and W.units[u].role or "NONE" end
   G.UnitIsConnected = function(u) return not (W.units[u] and W.units[u].offline) end
   G.UnitIsDeadOrGhost = function(u) return W.units[u] and W.units[u].dead or false end
+  G.GetPartyAssignment = function(what, u) return what == "MAINTANK" and W.units[u] and W.units[u].mainTank or false end
   G.UnitLevel = function(u) return W.units[u] and (W.units[u].level or 60) or 0 end
   G.UnitPower = function(u) return hidden(W.units[u] and W.units[u].power or 50) end
   G.UnitPowerMax = function(u) return hidden(100) end

@@ -94,6 +94,11 @@ ns.HEAL_SNIPPET = [[
     elseif tap == "focus" then
       unit = "focus"
     end
+    -- A tap only heals a friend who's alive: an enemy focus, or nobody
+    -- there, and it's you.
+    if unit and unit ~= "player" and SecureCmdOptionParse("[@" .. unit .. ",help,nodead] yes; no") ~= "yes" then
+      unit = nil
+    end
     if not unit or not UnitExists(unit) then
       unit = "player"
     end
@@ -106,7 +111,8 @@ ns.HEAL_SNIPPET = [[
   end
   self:SetAttribute("spell", lock)
   self:SetAttribute("unit", unit)
-  owner:SetAttribute("last", unit)
+  -- "Last healed" is a person: your target changes, so it's never "target".
+  if unit ~= "target" then owner:SetAttribute("last", unit) end
   owner:SetAttribute("castunit", unit)
   owner:SetAttribute("castn", (owner:GetAttribute("castn") or 0) + 1)
 ]]
@@ -197,6 +203,11 @@ ns.KB_PRE = [[
     elseif tap == "focus" then
       unit = "focus"
     end
+    -- A tap only heals a friend who's alive: an enemy focus, or nobody
+    -- there, and it's you.
+    if unit and unit ~= "player" and SecureCmdOptionParse("[@" .. unit .. ",help,nodead] yes; no") ~= "yes" then
+      unit = nil
+    end
     if not unit or not UnitExists(unit) then
       unit = "player"
     end
@@ -207,7 +218,8 @@ ns.KB_PRE = [[
   if unit == "target" and SecureCmdOptionParse("[@target,help,nodead] yes; no") ~= "yes" then
     return false
   end
-  owner:SetAttribute("last", unit)
+  -- "Last healed" is a person: your target changes, so it's never "target".
+  if unit ~= "target" then owner:SetAttribute("last", unit) end
   owner:SetAttribute("castunit", unit)
   owner:SetAttribute("castn", (owner:GetAttribute("castn") or 0) + 1)
   self:SetAttribute("useOnKeyDown", false)
