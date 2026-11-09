@@ -6,6 +6,7 @@
 ## SavedVariablesPerCharacter: HealpadDB
 ## OptionalDeps: KeyBars
 ## X-License: MIT
+## X-Curse-Project-ID: 1793787
 
 Core.lua
 Binds.lua
