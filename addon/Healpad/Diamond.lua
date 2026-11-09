@@ -345,6 +345,7 @@ local SAMPLE = {
   UP = { name = "Party Member", class = "WARRIOR", level = 60, hp = 0.82, power = 0.35, color = { 1, 0, 0 } },
   RIGHT = { name = "Party Member", class = "PRIEST", level = 60, hp = 0.41, inc = 0.22, power = 0.64, color = { 0, 0, 1 } },
   DOWN = { name = "Party Member", class = "ROGUE", level = 60, hp = 1, power = 0.8, color = { 1, 1, 0 } },
+  SELF = { name = "Tap to Heal Target", face = "player", level = 60, hp = 0.9, power = 0.7, color = { 0, 0, 1 } },
   LEFT = { name = "Party Member", class = "MAGE", level = 60, hp = 0.63, power = 0.5, color = { 0, 0, 1 },
     dispel = { 0.2, 0.6, 1, 1 } },
 }
@@ -363,7 +364,12 @@ local function drawSample(f, dir, sel, from)
   local p = SAMPLE[from or dir]
   f:Show()
   f:SetAlpha(1)
-  classFace(f.face, p.class)
+  if p.face then
+    f.face:SetTexCoord(0, 1, 0, 1)
+    pcall(SetPortraitTexture, f.face, p.face)
+  else
+    classFace(f.face, p.class)
+  end
   pcall(f.face.SetDesaturated, f.face, false)
   f.name:SetText(p.name)
   f.name:SetTextColor(1, 0.82, 0)
@@ -410,8 +416,6 @@ function ns.redraw()
   local pages = ctl:GetAttribute("pages") or 1
   -- Who sits where: the tap target in the middle, you in their place.
   local swap = page == 1 and ctl:GetAttribute("swap") or nil
-  local sample0 = previewing and ctl:GetAttribute("state") ~= "aim" and (not IsInGroup() or ns.stage ~= nil)
-  if sample0 and not ns.stage and ns.previewTap == "tank" then swap = "UP" end
   local sel = (ns.stage and ns.stage.sel) or ctl:GetAttribute("sel") or (swap and "SELF") or tapPlace(page)
   local spell = heldSpell() or ns.previewSpell
   title:SetText(spell and ns.spellLabel(spell) or "")
