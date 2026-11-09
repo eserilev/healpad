@@ -43,7 +43,7 @@ function ns.afterCombat(key, fn)
   end
 end
 
-local DEFAULTS = { distance = 3, scale = 1, arrows = true, aimWith = "dpad", cancel = "PAD2" }
+local DEFAULTS = { distance = 3, scale = 1, arrows = true, aimWith = "dpad", cancel = "PAD2", x = 0, y = 0 }
 
 function ns.setupDB()
   HealpadDB = HealpadDB or {}

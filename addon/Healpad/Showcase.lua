@@ -52,7 +52,7 @@ function ns.showcase()
     end,
     shot,
     function()
-      ns.stage = { sel = "UP" }
+      ns.stage = { sel = "UP", dispel = true }
       ns.redraw()
     end,
     shot,

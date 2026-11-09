@@ -148,7 +148,37 @@ function ns.layout()
   title:SetPoint("BOTTOM", spots.UP, "TOP", 0, 26)
   pageText:ClearAllPoints()
   pageText:SetPoint("TOP", spots.DOWN, "BOTTOM", 0, -6)
-  root:SetScale(ns.db and ns.db.scale or 1)
+  local scale = ns.db and ns.db.scale or 1
+  root:SetScale(scale)
+  -- Where you put it: an offset from the middle of the screen, in screen
+  -- units; a point's offsets count in the frame's own scale.
+  root:ClearAllPoints()
+  root:SetPoint("CENTER", UIParent, "CENTER", (ns.db and ns.db.x or 0) / scale, (ns.db and ns.db.y or 0) / scale)
+end
+
+-- Dragging the diamond while the Frames tab shows it.
+root:SetMovable(true)
+root:SetClampedToScreen(false)
+local function startDrag()
+  if not ns.previewing() or InCombatLockdown() then return end
+  root:StartMoving()
+end
+local function stopDrag()
+  root:StopMovingOrSizing()
+  if not ns.db then return end
+  local x, y = root:GetCenter()
+  local ux, uy = UIParent:GetCenter()
+  if x and ux then
+    local k = root:GetEffectiveScale() / UIParent:GetEffectiveScale()
+    ns.db.x = math.floor(x * k - ux + 0.5)
+    ns.db.y = math.floor(y * k - uy + 0.5)
+  end
+  ns.layout()
+  if ns.refreshOptions then ns.refreshOptions() end
+end
+for _, f in pairs(spots) do
+  f:SetScript("OnMouseDown", function(_, b) if b == "LeftButton" then startDrag() end end)
+  f:SetScript("OnMouseUp", stopDrag)
 end
 
 ---------------------------------------------------------------- reads that may be secret
@@ -322,7 +352,7 @@ local function drawSample(f, dir, sel)
   f.power:SetValue(p.power)
   if dir == sel then
     f.plate:SetBackdropBorderColor(unpack(AIMED))
-  elseif p.dispel then
+  elseif p.dispel and ns.stage and ns.stage.dispel then
     f.plate:SetBackdropBorderColor(unpack(p.dispel))
   else
     f.plate:SetBackdropBorderColor()
@@ -412,13 +442,12 @@ ticker:SetScript("OnUpdate", function(_, elapsed)
   end
 end)
 
--- The settings' Frames tab shows the diamond as it is now, out of combat.
--- While previewing, the diamond sits right of center so the settings window
--- on the left doesn't cover it.
+-- The settings' Frames tab shows the diamond where it will be, out of
+-- combat; then it can be dragged.
+function ns.previewing() return previewing end
 function ns.preview(on)
   previewing = on and not InCombatLockdown()
-  root:ClearAllPoints()
-  root:SetPoint("CENTER", UIParent, "CENTER", previewing and 260 or 0, 0)
+  for _, f in pairs(spots) do f:EnableMouse(previewing) end
   root:SetShown(previewing or ctl:GetAttribute("state") == "aim")
   ns.redraw()
 end

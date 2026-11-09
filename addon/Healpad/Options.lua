@@ -129,7 +129,14 @@ local function drawTabs()
   ui.frames:SetShown(st.tab == "frames")
   if ns.preview then ns.preview(st.tab == "frames") end
   panel:ClearAllPoints()
-  if st.tab == "frames" then panel:SetPoint("LEFT", UIParent, "LEFT", 40, 0) else panel:SetPoint("CENTER") end
+  -- On Frames the window gets narrow and steps aside so the diamond shows.
+  if st.tab == "frames" then
+    panel:SetWidth(400)
+    panel:SetPoint("LEFT", UIParent, "LEFT", 24, 0)
+  else
+    panel:SetWidth(W)
+    panel:SetPoint("CENTER")
+  end
 end
 
 local function drawList()
@@ -222,6 +229,8 @@ local function drawFrames()
   f.size.bar:SetValue(size)
   f.spread.value:SetText(tostring(spread))
   f.spread.bar:SetValue(spread)
+  setChosen(f.move, st.moving)
+  if st.row == 2 then return st.col == 0 and f.move or f.reset end
   return st.row == 0 and f.size or f.spread
 end
 
@@ -238,7 +247,8 @@ refresh = function()
   else
     focus = drawFrames()
   end
-  ring(focus)
+  ring(st.keys and focus or nil)
+  if ui.ring and st.moving then ui.ring:SetColor(1, 0.82, 0, 1) elseif ui.ring then ui.ring:SetColor(0.45, 0.8, 1, 1) end
 end
 
 -- After applyKeys: your bindings may have changed.
@@ -254,8 +264,11 @@ end
 
 local function clamp(v, lo, hi) return math.max(lo, math.min(hi, v)) end
 
-local function nav(btn)
+-- fromKeys: a pad button or key, not the mouse. The focus line shows only
+-- while you drive with keys or the pad.
+local function nav(btn, fromKeys)
   if InCombatLockdown() or not panel then return end
+  st.keys = fromKeys == true
   if btn == "LB" or btn == "RB" then
     local i = 1
     for n, t in ipairs(TABS) do if t == st.tab then i = n end end
@@ -290,8 +303,32 @@ local function nav(btn)
   end
 
   if st.tab == "frames" then
-    if btn == "UP" or btn == "DOWN" then st.row = btn == "UP" and 0 or 1 end
+    -- Moving: the d-pad or arrows nudge the diamond; A or B is done.
+    if st.moving then
+      local step = 20
+      if btn == "UP" then ns.db.y = ns.db.y + step
+      elseif btn == "DOWN" then ns.db.y = ns.db.y - step
+      elseif btn == "LEFT" then ns.db.x = ns.db.x - step
+      elseif btn == "RIGHT" then ns.db.x = ns.db.x + step
+      elseif btn == "A" or btn == "B" then st.moving = false end
+      ns.layout()
+      return refresh()
+    end
+    if btn == "UP" then st.row, st.col = math.max(0, st.row - 1), 0 end
+    if btn == "DOWN" then st.row, st.col = math.min(2, st.row + 1), 0 end
     local d = btn == "RIGHT" and 1 or btn == "LEFT" and -1 or 0
+    if st.row == 2 then
+      if d ~= 0 then st.col = clamp(st.col + d, 0, 1) end
+      if btn == "A" then
+        if st.col == 0 then
+          st.moving = true
+        else
+          ns.db.x, ns.db.y = 0, 0
+          ns.layout()
+        end
+      end
+      return refresh()
+    end
     if d ~= 0 and st.row == 0 then
       ns.db.scale = clamp(math.floor((ns.db.scale + d * 0.1) * 10 + 0.5) / 10, 0.6, 1.6)
     elseif d ~= 0 then
@@ -345,7 +382,7 @@ local NAV_KEYS = {
 }
 for _, btn in ipairs({ "UP", "DOWN", "LEFT", "RIGHT", "A", "B", "LB", "RB", "ESC" }) do
   local f = CreateFrame("Button", "HealpadNav" .. btn, UIParent)
-  f:SetScript("OnClick", function() nav(btn) end)
+  f:SetScript("OnClick", function() nav(btn, true) end)
 end
 
 local function takeKeys()
@@ -555,6 +592,16 @@ local function buildFramesTab(parent)
   t:SetAllPoints()
   t.size = slider(t, "Size", -PAD - 4, 0, 0.6, 1.6)
   t.spread = slider(t, "Spread", -PAD - 100, 1, 1, 5)
+  -- Position: drag the diamond with the mouse, or Move with the pad.
+  local pos = text(t, "GameFontNormalLarge")
+  pos:SetText("Position")
+  pos:SetPoint("TOPLEFT", PAD, -PAD - 196)
+  t.move = redButton(t, 120, 30, "Move")
+  t.move:SetPoint("TOPLEFT", PAD, -PAD - 224)
+  t.reset = redButton(t, 120, 30, "Reset")
+  t.reset:SetPoint("LEFT", t.move, "RIGHT", 10, 0)
+  t.move:SetScript("OnClick", function() st.row, st.col = 2, 0 nav("A") end)
+  t.reset:SetScript("OnClick", function() st.row, st.col = 2, 1 nav("A") end)
   return t
 end
 
@@ -604,7 +651,10 @@ local function build()
   ui.ring:SetColor(0.45, 0.8, 1, 1)
   ui.ring:SetFrameLevel((panel:GetFrameLevel() or 0) + 30)
 
-  panel:SetScript("OnShow", takeKeys)
+  panel:SetScript("OnShow", function()
+    st.keys, st.moving = false, false
+    takeKeys()
+  end)
   panel:SetScript("OnHide", function()
     giveKeys()
     if ns.preview then ns.preview(false) end

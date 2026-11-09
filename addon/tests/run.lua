@@ -553,6 +553,21 @@ test("Esc closes the whole window from any tab, and the diamond preview with it"
   clean(W)
 end)
 
+test("Frames: Move nudges the diamond with the pad, Reset puts it back; it is saved", function()
+  local W, ns = game({ saved = { aim = {} } })
+  ns.openOptions()
+  W.tap("PADRSHOULDER") W.tap("PADRSHOULDER") -- Frames
+  W.tap("PADDDOWN") W.tap("PADDDOWN") -- Position
+  W.tap("PAD1") -- Move
+  W.tap("PADDRIGHT") W.tap("PADDRIGHT") W.tap("PADDUP")
+  W.tap("PAD1") -- done
+  eq(ns.db.x, 40) eq(ns.db.y, 20)
+  W.tap("PADDUP") W.tap("PADDDOWN") -- still on Position after leaving Move
+  W.tap("PADDRIGHT") W.tap("PAD1") -- Reset
+  eq(ns.db.x, 0) eq(ns.db.y, 0)
+  clean(W)
+end)
+
 test("the settings close when combat starts", function()
   local W, ns = game()
   ns.openOptions()
