@@ -559,6 +559,13 @@ test("Frames: Move nudges the diamond with the pad, Reset puts it back; it is sa
   W.tap("PADRSHOULDER") W.tap("PADRSHOULDER") -- Frames
   W.tap("PADDDOWN") W.tap("PADDDOWN") -- Position
   W.tap("PAD1") -- Move
+  -- a stick glides it too: right at full tilt for half a second
+  W.G.C_GamePad = { GetActiveDeviceID = function() return 1 end,
+    GetDeviceMappedState = function() return { sticks = { { x = 1, y = 0 }, { x = 0, y = 0 } } } end }
+  W.update(0.5)
+  eq(ns.db.x, 350, "the stick moved it")
+  W.G.C_GamePad = nil
+  ns.db.x = 0
   W.tap("PADDRIGHT") W.tap("PADDRIGHT") W.tap("PADDUP")
   W.tap("PAD1") -- done
   eq(ns.db.x, 40) eq(ns.db.y, 20)

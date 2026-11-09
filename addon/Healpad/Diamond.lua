@@ -179,6 +179,32 @@ end
 for _, f in pairs(spots) do
   f:SetScript("OnMouseDown", function(_, b) if b == "LeftButton" then startDrag() end end)
   f:SetScript("OnMouseUp", stopDrag)
+  f:SetScript("OnEnter", function() if ns.previewing() then pcall(SetCursor, "UI_MOVE_CURSOR") end end)
+  f:SetScript("OnLeave", function() pcall(ResetCursor) end)
+end
+
+-- Move mode: a pulsing gold box around the whole diamond, with the move icon.
+local bounds = CreateFrame("Frame", nil, root)
+bounds:SetPoint("TOP", spots.UP, "TOP", 0, 14)
+bounds:SetPoint("BOTTOM", spots.DOWN, "BOTTOM", 0, -14)
+bounds:SetPoint("LEFT", spots.LEFT, "LEFT", -14, 0)
+bounds:SetPoint("RIGHT", spots.RIGHT, "RIGHT", 14, 0)
+local box = ns.outline(bounds, bounds, 0, 3)
+box:SetColor(1, 0.82, 0, 1)
+local moveIcon = bounds:CreateTexture(nil, "OVERLAY")
+moveIcon:SetSize(40, 40)
+moveIcon:SetPoint("CENTER", bounds, "TOP", 0, 0)
+moveIcon:SetTexture("Interface\\CURSOR\\UI-Cursor-Move")
+moveIcon:Hide()
+local pulse = 0
+bounds:SetScript("OnUpdate", function(_, elapsed)
+  if not box:IsShown() then return end
+  pulse = pulse + elapsed
+  box:SetAlpha(0.55 + 0.45 * math.abs(math.sin(pulse * 3)))
+end)
+function ns.showMoving(on)
+  box:SetShown(on)
+  moveIcon:SetShown(on)
 end
 
 ---------------------------------------------------------------- reads that may be secret

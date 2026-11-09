@@ -247,7 +247,8 @@ refresh = function()
   else
     focus = drawFrames()
   end
-  ring(st.keys and focus or nil)
+  ring((st.keys or st.moving) and focus or nil)
+  if ns.showMoving then ns.showMoving(st.moving == true and st.tab == "frames") end
   if ui.ring and st.moving then ui.ring:SetColor(1, 0.82, 0, 1) elseif ui.ring then ui.ring:SetColor(0.45, 0.8, 1, 1) end
 end
 
@@ -372,6 +373,29 @@ local function nav(btn, fromKeys)
   refresh()
 end
 ns.optionsNav = nav
+
+-- Move with a stick: either stick glides the diamond while Move is on.
+local SPEED = 700 -- screen units a second at full tilt
+local glide = CreateFrame("Frame")
+glide:SetScript("OnUpdate", function(_, elapsed)
+  if not st.moving or not panel or not panel:IsShown() then return end
+  local ok, state = pcall(function()
+    return C_GamePad.GetDeviceMappedState(C_GamePad.GetActiveDeviceID())
+  end)
+  if not ok or type(state) ~= "table" or type(state.sticks) ~= "table" then return end
+  local dx, dy = 0, 0
+  for _, stick in ipairs(state.sticks) do
+    local x, y = tonumber(stick.x) or 0, tonumber(stick.y) or 0
+    if math.abs(x) > math.abs(dx) then dx = x end
+    if math.abs(y) > math.abs(dy) then dy = y end
+  end
+  local function dead(v) return math.abs(v) < 0.2 and 0 or v end
+  dx, dy = dead(dx), dead(dy)
+  if dx == 0 and dy == 0 then return end
+  ns.db.x = ns.db.x + dx * SPEED * elapsed
+  ns.db.y = ns.db.y + dy * SPEED * elapsed
+  ns.layout()
+end)
 
 -- While the panel is open these keys drive it; they go back when it closes.
 local NAV_KEYS = {
@@ -658,6 +682,9 @@ local function build()
   panel:SetScript("OnHide", function()
     giveKeys()
     if ns.preview then ns.preview(false) end
+    st.moving = false
+    if ns.showMoving then ns.showMoving(false) end
+    if ns.db then ns.db.x, ns.db.y = math.floor(ns.db.x + 0.5), math.floor(ns.db.y + 0.5) end
   end)
   table.insert(UISpecialFrames, "HealpadOptions")
 end
