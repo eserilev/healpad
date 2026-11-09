@@ -2,7 +2,7 @@
 package.path = "addon/tests/?.lua;" .. package.path
 local Wow = require("wow")
 
-local FILES = { "Core.lua", "Binds.lua", "Roster.lua", "Secure.lua", "Diamond.lua", "Options.lua" }
+local FILES = { "Core.lua", "Binds.lua", "Roster.lua", "Secure.lua", "Diamond.lua", "Options.lua", "Test.lua" }
 local DIR = "addon/Healpad"
 
 local passed, failed = 0, 0
@@ -444,6 +444,20 @@ test("the settings close when combat starts", function()
   W.combat = true
   ns.openOptions()
   eq(W.G.HealpadOptions:IsShown(), false, "not in combat")
+  clean(W)
+end)
+
+test("/hp test runs in the game: tabs, diamond, a hold, an aim, a cancel; then reloads", function()
+  local W, ns = game()
+  W.G.SlashCmdList.HEALPAD("test")
+  W.runTimers()
+  local log = table.concat(ns.db.log, "\n")
+  eq(log:find("TEST FAIL") == nil, true, log)
+  eq(log:find("LUA ERROR") == nil, true, log)
+  eq(log:find("TEST done: %d+ ok, 0 failed") ~= nil, true, log)
+  eq(W.shots, 4, "screenshots")
+  eq(#W.casts, 0, "nothing cast")
+  eq(W.reloaded, true)
   clean(W)
 end)
 

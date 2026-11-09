@@ -9,7 +9,7 @@ local ADDON, ns = ...
 
 ns.HEALS = 12 -- buttons that can hold to aim at once
 ns.TAPS = { "player", "last", "tank", "focus" } -- who a tap with no aim heals
-ns.TAP_LABEL = { player = "You", last = "Last", tank = "Tank", focus = "Focus" }
+ns.TAP_LABEL = { player = "You", last = "Last healed", tank = "Tank", focus = "Focus" }
 ns.DIRS = { "UP", "RIGHT", "DOWN", "LEFT", "SELF" }
 ns.AIMERS = { "dpad", "rstick", "lstick" }
 ns.AIMER_LABEL = { dpad = "D-pad", rstick = "Right stick", lstick = "Left stick" }
@@ -17,6 +17,21 @@ ns.CANCELS = { "PAD1", "PAD2", "PAD3", "PAD4" }
 
 local PREFIX = "|cff7fe3e3Healpad|r: "
 function ns.say(msg) print(PREFIX .. msg) end
+
+-- A log kept in the saved variables (written on /reload or logout), for
+-- reading what happened in the game afterwards. Errors land here too.
+local early = {}
+function ns.log(msg)
+  local ok, line = pcall(function()
+    return string.format("%s %.1f %s%s", date("%H:%M:%S"), GetTime(), InCombatLockdown() and "[combat] " or "", tostring(msg))
+  end)
+  if not ok then line = "(unprintable log line)" end
+  local db = ns.db
+  if not db then table.insert(early, line) return end
+  db.log = db.log or {}
+  table.insert(db.log, line)
+  while #db.log > 600 do table.remove(db.log, 1) end
+end
 
 -- Runs fn after combat if combat locks protected changes now.
 local pending = {}
@@ -40,6 +55,8 @@ function ns.setupDB()
   end
   db.aim = db.aim or {} -- [binding key] = { tap = "player" }: that key holds to aim
   ns.db = db
+  for _, line in ipairs(early) do ns.log(line) end
+  wipe(early)
 end
 
 ns.events = CreateFrame("Frame")
@@ -54,7 +71,10 @@ end
 ns.events:SetScript("OnEvent", function(_, event, ...)
   for _, fn in ipairs(handlers[event] or {}) do
     local ok, err = pcall(fn, ...)
-    if not ok then geterrorhandler()(err) end
+    if not ok then
+      ns.log("ERROR in " .. event .. ": " .. tostring(err))
+      geterrorhandler()(err)
+    end
   end
 end)
 

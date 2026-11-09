@@ -74,6 +74,8 @@ function M.new()
   end
   function Frame:SetShown(v) if v then self:Show() else self:Hide() end end
   function Frame:IsShown() return self.shown end
+  function Frame:IsVisible() return self.shown end
+  function Frame:Click(_, down) W.click(self, down) end
   function Frame:SetAlpha(a) self.alpha = plain(a) end
   function Frame:GetAlpha() return self.alpha end
   function Frame:SetText(t) self.text = t end
@@ -252,7 +254,8 @@ function M.new()
   end
   W.normalBinds = {}
   G.GetBindingAction = function(key, override)
-    if override and W.overrides[key] then return "CLICK " .. W.overrides[key].target .. ":LeftButton" end
+    local o = override and (W.secureBinds[key] or W.overrides[key])
+    if o then return "CLICK " .. o.target .. ":LeftButton" end
     return W.normalBinds[key] or ""
   end
   G.GetBindingText = function(key) return key end
@@ -354,8 +357,19 @@ function M.new()
     for i = 1, select("#", ...) do parts[i] = tostring((select(i, ...))) end
     table.insert(W.printed, table.concat(parts, " "))
   end
-  G.geterrorhandler = function() return function(e) table.insert(W.errors, e) end end
   G._G = G
+  W.timers, W.shots, W.reloaded = {}, 0, false
+  G.C_Timer = { After = function(_, fn) table.insert(W.timers, fn) end }
+  function W.runTimers()
+    while #W.timers > 0 do table.remove(W.timers, 1)() end
+  end
+  G.Screenshot = function() W.shots = W.shots + 1 end
+  G.ReloadUI = function() W.reloaded = true end
+  G.GetBuildInfo = function() return "1.60.1" end
+  G.date = os.date
+  local handler = function(e) table.insert(W.errors, e) end
+  G.geterrorhandler = function() return handler end
+  G.seterrorhandler = function(fn) handler = fn end
   G.wipe = function(t) for k in pairs(t) do t[k] = nil end return t end
 
   function W.fire(event, ...)

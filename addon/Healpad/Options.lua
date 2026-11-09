@@ -487,8 +487,8 @@ local function buildButtonsTab(parent)
   caps(d.tapBox, "TAP TO HEAL"):SetPoint("TOPLEFT")
   d.taps = {}
   for i, tap in ipairs(ns.TAPS) do
-    local b = choice(d.tapBox, 86, 38)
-    b:SetPoint("TOPLEFT", (i - 1) * 92, -20)
+    local b = choice(d.tapBox, 100, 38)
+    b:SetPoint("TOPLEFT", (i - 1) * 106, -20)
     b.label:SetText(ns.TAP_LABEL[tap])
     b:SetScript("OnClick", function() st.zone, st.row, st.col = "detail", 1, i - 1 nav("A") end)
     d.taps[i] = b
@@ -641,10 +641,16 @@ function ns.openOptions()
   refresh()
 end
 function ns.optionsPanel() return panel end
+-- For /hp test: the parts and the focus.
+function ns.optionsDebug() return { panel = panel, ui = ui, st = st, rows = rows } end
 
 SLASH_HEALPAD1 = "/healpad"
 SLASH_HEALPAD2 = "/hp"
-SlashCmdList.HEALPAD = function()
+SlashCmdList.HEALPAD = function(msg)
+  if (msg or ""):lower():match("^%s*test") then
+    if ns.selfTest then ns.selfTest() end
+    return
+  end
   if panel and panel:IsShown() then panel:Hide() else ns.openOptions() end
 end
 

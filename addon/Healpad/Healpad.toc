@@ -11,3 +11,4 @@ Roster.lua
 Secure.lua
 Diamond.lua
 Options.lua
+Test.lua
