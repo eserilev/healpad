@@ -13,11 +13,13 @@ end
 -- the same size.
 local moved = {}
 local function lift(f)
-  if not f then return end
+  if not f then
+    return
+  end
   moved[f] = f:GetScale() or 1
   local k = eff(UIParent) / eff(WorldFrame)
   f:SetParent(WorldFrame)
-  f:SetScale((moved[f]) * k)
+  f:SetScale(moved[f] * k)
 end
 local function restore()
   for f, scale in pairs(moved) do
@@ -27,18 +29,29 @@ local function restore()
   wipe(moved)
   ns.stage, ns.previewSpell = nil, nil
   local panel = ns.optionsPanel and ns.optionsPanel()
-  if panel then panel:Hide() end
-  if ns.preview then ns.preview(false) end
+  if panel then
+    panel:Hide()
+  end
+  if ns.preview then
+    ns.preview(false)
+  end
   UIParent:Show()
 end
 
 function ns.showcase()
-  if InCombatLockdown() then ns.say("after combat.") return end
+  if InCombatLockdown() then
+    ns.say("after combat.")
+    return
+  end
   local spell
   for _, b in ipairs(ns.readBinds()) do
-    if b.heal and not spell then spell = b.spell end
+    if b.heal and not spell then
+      spell = b.spell
+    end
   end
-  local function shot() pcall(Screenshot) end
+  local function shot()
+    pcall(Screenshot)
+  end
   local scenes = {
     function()
       ns.openOptions()
@@ -65,7 +78,9 @@ function ns.showcase()
       ns.refreshOptions()
     end,
     shot,
-    function() ns.optionsNav("RB") end,
+    function()
+      ns.optionsNav("RB")
+    end,
     shot,
     function()
       ns.optionsNav("RB")

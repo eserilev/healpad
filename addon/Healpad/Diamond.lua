@@ -6,9 +6,15 @@ local _, ns = ...
 
 local AIMED = { 1, 0.82, 0, 1 }
 -- Textures the game itself uses (its tooltip art isn't in this client).
-local PLATE = { bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
-  edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Gold-Border", tile = true, tileEdge = true,
-  tileSize = 16, edgeSize = 16, insets = { left = 4, right = 4, top = 4, bottom = 4 } }
+local PLATE = {
+  bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
+  edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Gold-Border",
+  tile = true,
+  tileEdge = true,
+  tileSize = 16,
+  edgeSize = 16,
+  insets = { left = 4, right = 4, top = 4, bottom = 4 },
+}
 local SPOT_W, SPOT_H, FACE = 214, 58, 52
 
 local root = CreateFrame("Frame", "HealpadDiamond", UIParent)
@@ -20,7 +26,6 @@ ns.diamond = root
 
 local title = root:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
 local pageText = root:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-
 
 local MASK = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
 local function disc(f, anchor, size, layer, sub)
@@ -129,7 +134,9 @@ local function makeSpot(dir)
   spots[dir] = f
   return f
 end
-for _, d in ipairs(ns.DIRS) do makeSpot(d) end
+for _, d in ipairs(ns.DIRS) do
+  makeSpot(d)
+end
 ns.spots = spots
 
 -- A diamond: you in the middle, the others up, right, down and left of you,
@@ -160,12 +167,16 @@ end
 root:SetMovable(true)
 root:SetClampedToScreen(false)
 local function startDrag()
-  if not ns.previewing() or InCombatLockdown() then return end
+  if not ns.previewing() or InCombatLockdown() then
+    return
+  end
   root:StartMoving()
 end
 local function stopDrag()
   root:StopMovingOrSizing()
-  if not ns.db then return end
+  if not ns.db then
+    return
+  end
   local x, y = root:GetCenter()
   local ux, uy = UIParent:GetCenter()
   if x and ux then
@@ -174,13 +185,25 @@ local function stopDrag()
     ns.db.y = math.floor(y * k - uy + 0.5)
   end
   ns.layout()
-  if ns.refreshOptions then ns.refreshOptions() end
+  if ns.refreshOptions then
+    ns.refreshOptions()
+  end
 end
 for _, f in pairs(spots) do
-  f:SetScript("OnMouseDown", function(_, b) if b == "LeftButton" then startDrag() end end)
+  f:SetScript("OnMouseDown", function(_, b)
+    if b == "LeftButton" then
+      startDrag()
+    end
+  end)
   f:SetScript("OnMouseUp", stopDrag)
-  f:SetScript("OnEnter", function() if ns.previewing() then pcall(SetCursor, "UI_MOVE_CURSOR") end end)
-  f:SetScript("OnLeave", function() pcall(ResetCursor) end)
+  f:SetScript("OnEnter", function()
+    if ns.previewing() then
+      pcall(SetCursor, "UI_MOVE_CURSOR")
+    end
+  end)
+  f:SetScript("OnLeave", function()
+    pcall(ResetCursor)
+  end)
 end
 
 -- Move mode: a pulsing gold box around the whole diamond, with the move icon.
@@ -198,7 +221,9 @@ moveIcon:SetTexture("Interface\\CURSOR\\UI-Cursor-Move")
 moveIcon:Hide()
 local pulse = 0
 bounds:SetScript("OnUpdate", function(_, elapsed)
-  if not box:IsShown() then return end
+  if not box:IsShown() then
+    return
+  end
   pulse = pulse + elapsed
   box:SetAlpha(0.55 + 0.45 * math.abs(math.sin(pulse * 3)))
 end)
@@ -211,7 +236,9 @@ end
 
 local curve
 local function dispelCurve()
-  if curve ~= nil then return curve end
+  if curve ~= nil then
+    return curve
+  end
   curve = false
   pcall(function()
     local c = C_CurveUtil.CreateColorCurve()
@@ -230,30 +257,39 @@ end
 local function dispelBorder(f, unit)
   return pcall(function()
     local aura = C_UnitAuras.GetAuraDataByIndex(unit, 1, "HARMFUL|RAID")
-    if not aura then error("none") end
+    if not aura then
+      error("none")
+    end
     local c = dispelCurve()
     local color
     if c then
       color = C_UnitAuras.GetAuraDispelTypeColor(unit, aura.auraInstanceID, c)
-    elseif DebuffTypeColor and aura.dispelName then
-      local t = DebuffTypeColor[aura.dispelName]
-      color = t and CreateColor(t.r, t.g, t.b, 1)
     end
-    if not color then error("none") end
+    if not color then
+      error("none")
+    end
     f:SetBackdropBorderColor(color:GetRGBA())
   end)
 end
 
 local function outOfRange(spell, unit)
-  if not spell then return false end
-  local ok, res = pcall(function() return C_Spell.IsSpellInRange(spell, unit) == false end)
+  if not spell then
+    return false
+  end
+  local ok, res = pcall(function()
+    return C_Spell.IsSpellInRange(spell, unit) == false
+  end)
   return ok and res
 end
 
 local function status(unit)
   local ok, res = pcall(function()
-    if UnitIsConnected(unit) == false then return "Offline" end
-    if UnitIsDeadOrGhost(unit) then return "Dead" end
+    if UnitIsConnected(unit) == false then
+      return "Offline"
+    end
+    if UnitIsDeadOrGhost(unit) then
+      return "Dead"
+    end
     return nil
   end)
   return ok and res or nil
@@ -263,11 +299,19 @@ local function setPower(f, unit)
   local ok = pcall(function()
     local _, token = UnitPowerType(unit)
     local c = PowerBarColor and PowerBarColor[token]
-    if c then f.power:SetStatusBarColor(c.r, c.g, c.b) end
+    if c then
+      f.power:SetStatusBarColor(c.r, c.g, c.b)
+    end
   end)
-  if not ok then f.power:SetStatusBarColor(0, 0, 1) end
-  if not (pcall(f.power.SetMinMaxValues, f.power, 0, UnitPowerMax(unit))
-    and pcall(f.power.SetValue, f.power, UnitPower(unit))) then
+  if not ok then
+    f.power:SetStatusBarColor(0, 0, 1)
+  end
+  if
+    not (
+      pcall(f.power.SetMinMaxValues, f.power, 0, UnitPowerMax(unit))
+      and pcall(f.power.SetValue, f.power, UnitPower(unit))
+    )
+  then
     f.power:SetMinMaxValues(0, 1)
     f.power:SetValue(0)
   end
@@ -275,7 +319,9 @@ end
 
 -- "1240 / 3010" from values that may be secret: the font string takes them.
 local function setHealthText(f, unit)
-  if pcall(f.hpText.SetFormattedText, f.hpText, "%d / %d", UnitHealth(unit), UnitHealthMax(unit)) then return end
+  if pcall(f.hpText.SetFormattedText, f.hpText, "%d / %d", UnitHealth(unit), UnitHealthMax(unit)) then
+    return
+  end
   f.hpText:SetText("")
 end
 
@@ -293,7 +339,11 @@ local function drawSpot(f, dir, unit, sel, spell)
       f.health:SetValue(0)
       f.incoming:SetValue(0)
       f.power:SetValue(0)
-      if aimed then f.plate:SetBackdropBorderColor(unpack(AIMED)) else f.plate:SetBackdropBorderColor() end
+      if aimed then
+        f.plate:SetBackdropBorderColor(unpack(AIMED))
+      else
+        f.plate:SetBackdropBorderColor()
+      end
       f:SetAlpha(0.45)
       return
     end
@@ -305,20 +355,43 @@ local function drawSpot(f, dir, unit, sel, spell)
   pcall(SetPortraitTexture, f.face, unit)
   local dead = status(unit)
   pcall(f.face.SetDesaturated, f.face, dead ~= nil)
-  if not pcall(f.name.SetText, f.name, UnitName(unit)) then f.name:SetText("") end
-  if dead then f.name:SetTextColor(0.55, 0.55, 0.55) else f.name:SetTextColor(1, 0.82, 0) end
-  local okLevel, lvl = pcall(function() local l = UnitLevel(unit) return (l and l > 0) and tostring(l) or "??" end)
+  if not pcall(f.name.SetText, f.name, UnitName(unit)) then
+    f.name:SetText("")
+  end
+  if dead then
+    f.name:SetTextColor(0.55, 0.55, 0.55)
+  else
+    f.name:SetTextColor(1, 0.82, 0)
+  end
+  local okLevel, lvl = pcall(function()
+    local l = UnitLevel(unit)
+    return (l and l > 0) and tostring(l) or "??"
+  end)
   f.level:SetText(okLevel and lvl or "")
-  if not (pcall(f.health.SetMinMaxValues, f.health, 0, UnitHealthMax(unit))
-    and pcall(f.health.SetValue, f.health, UnitHealth(unit))) then
+  if
+    not (
+      pcall(f.health.SetMinMaxValues, f.health, 0, UnitHealthMax(unit))
+      and pcall(f.health.SetValue, f.health, UnitHealth(unit))
+    )
+  then
     f.health:SetMinMaxValues(0, 1)
     f.health:SetValue(1)
   end
-  if not (pcall(f.incoming.SetMinMaxValues, f.incoming, 0, UnitHealthMax(unit))
-    and pcall(function() f.incoming:SetValue(UnitGetIncomingHeals(unit)) end)) then
+  if
+    not (
+      pcall(f.incoming.SetMinMaxValues, f.incoming, 0, UnitHealthMax(unit))
+      and pcall(function()
+        f.incoming:SetValue(UnitGetIncomingHeals(unit))
+      end)
+    )
+  then
     f.incoming:SetValue(0)
   end
-  if dead then f.hpText:SetText(dead) else setHealthText(f, unit) end
+  if dead then
+    f.hpText:SetText(dead)
+  else
+    setHealthText(f, unit)
+  end
   setPower(f, unit)
   if aimed then
     f.plate:SetBackdropBorderColor(unpack(AIMED))
@@ -343,11 +416,26 @@ end
 -- Example people for the Frames tab when you're not in a group.
 local SAMPLE = {
   UP = { name = "Party Member", class = "WARRIOR", level = 60, hp = 0.82, power = 0.35, color = { 1, 0, 0 } },
-  RIGHT = { name = "Party Member", class = "PRIEST", level = 60, hp = 0.41, inc = 0.22, power = 0.64, color = { 0, 0, 1 } },
+  RIGHT = {
+    name = "Party Member",
+    class = "PRIEST",
+    level = 60,
+    hp = 0.41,
+    inc = 0.22,
+    power = 0.64,
+    color = { 0, 0, 1 },
+  },
   DOWN = { name = "Party Member", class = "ROGUE", level = 60, hp = 1, power = 0.8, color = { 1, 1, 0 } },
   SELF = { name = "Tap to Heal Target", face = "player", level = 60, hp = 0.9, power = 0.7, color = { 0, 0, 1 } },
-  LEFT = { name = "Party Member", class = "MAGE", level = 60, hp = 0.63, power = 0.5, color = { 0, 0, 1 },
-    dispel = { 0.2, 0.6, 1, 1 } },
+  LEFT = {
+    name = "Party Member",
+    class = "MAGE",
+    level = 60,
+    hp = 0.63,
+    power = 0.5,
+    color = { 0, 0, 1 },
+    dispel = { 0.2, 0.6, 1, 1 },
+  },
 }
 
 -- A round class icon, for people with no portrait to show.
@@ -357,7 +445,9 @@ local function classFace(tex, class)
     tex:SetTexture("Interface\\TargetingFrame\\UI-Classes-Circles")
     tex:SetTexCoord(c[1], c[2], c[3], c[4])
   end)
-  if not ok then tex:SetColorTexture(0.25, 0.22, 0.18, 1) end
+  if not ok then
+    tex:SetColorTexture(0.25, 0.22, 0.18, 1)
+  end
 end
 
 local function drawSample(f, dir, sel, from)
@@ -398,20 +488,28 @@ local function tapPlace(page)
   local b = held and _G[held]
   local tap = b and b:GetAttribute("hp-tap")
   local unit
-  if tap == "tank" then unit = ctl:GetAttribute("tank")
-  elseif tap == "last" then unit = ctl:GetAttribute("last")
-  elseif tap == "focus" then unit = "focus" end
+  if tap == "tank" then
+    unit = ctl:GetAttribute("tank")
+  elseif tap == "last" then
+    unit = ctl:GetAttribute("last")
+  elseif tap == "focus" then
+    unit = "focus"
+  end
   if unit and UnitExists(unit) then
     for _, d in ipairs(ns.DIRS) do
       local u = ctl:GetAttribute("u" .. page .. "-" .. d)
-      if u and (u == unit or UnitIsUnit(u, unit)) then return d end
+      if u and (u == unit or UnitIsUnit(u, unit)) then
+        return d
+      end
     end
   end
   return "SELF"
 end
 
 function ns.redraw()
-  if not root:IsShown() then return end
+  if not root:IsShown() then
+    return
+  end
   local page = ctl:GetAttribute("page") or 1
   local pages = ctl:GetAttribute("pages") or 1
   -- Who sits where: the tap target in the middle, you in their place.
@@ -423,12 +521,18 @@ function ns.redraw()
   local sample = previewing and ctl:GetAttribute("state") ~= "aim" and (not IsInGroup() or ns.stage ~= nil)
   for _, d in ipairs(ns.DIRS) do
     local from = d
-    if swap and d == "SELF" then from = swap elseif swap and d == swap then from = "SELF" end
+    if swap and d == "SELF" then
+      from = swap
+    elseif swap and d == swap then
+      from = "SELF"
+    end
     if sample and SAMPLE[from] then
       drawSample(spots[d], d, sel, from)
     else
       local unit = ctl:GetAttribute("u" .. page .. "-" .. from)
-      if from == "SELF" and swap then unit = "player" end
+      if from == "SELF" and swap then
+        unit = "player"
+      end
       drawSpot(spots[d], d, unit, sel, spell)
     end
   end
@@ -456,11 +560,15 @@ local function showCast(unit)
   local page = ctl:GetAttribute("page") or 1
   local at = spots.SELF
   for _, d in ipairs(ns.DIRS) do
-    if ctl:GetAttribute("u" .. page .. "-" .. d) == unit then at = spots[d] end
+    if ctl:GetAttribute("u" .. page .. "-" .. d) == unit then
+      at = spots[d]
+    end
   end
   flash:ClearAllPoints()
   flash:SetPoint("BOTTOM", at, "TOP", 0, 4)
-  if not pcall(flash.SetText, flash, UnitName(unit)) then flash:SetText("") end
+  if not pcall(flash.SetText, flash, UnitName(unit)) then
+    flash:SetText("")
+  end
   flash:SetAlpha(1)
   flash:Show()
   flashUntil = GetTime() + 0.8
@@ -471,7 +579,11 @@ local since = 0
 ticker:SetScript("OnUpdate", function(_, elapsed)
   if flash:IsShown() then
     local left = flashUntil - GetTime()
-    if left <= 0 then flash:Hide() else flash:SetAlpha(math.min(1, left / 0.4)) end
+    if left <= 0 then
+      flash:Hide()
+    else
+      flash:SetAlpha(math.min(1, left / 0.4))
+    end
   end
   since = since + elapsed
   if since > 0.2 and root:IsShown() then
@@ -482,10 +594,14 @@ end)
 
 -- The settings' Frames tab shows the diamond where it will be, out of
 -- combat; then it can be dragged.
-function ns.previewing() return previewing end
+function ns.previewing()
+  return previewing
+end
 function ns.preview(on)
   previewing = on and not InCombatLockdown()
-  for _, f in pairs(spots) do f:EnableMouse(previewing) end
+  for _, f in pairs(spots) do
+    f:EnableMouse(previewing)
+  end
   root:SetShown(previewing or ctl:GetAttribute("state") == "aim")
   ns.redraw()
 end
@@ -496,7 +612,9 @@ ctl:HookScript("OnAttributeChanged", function(_, name, value)
     ns.redraw()
   elseif name == "castn" then
     local unit = ctl:GetAttribute("castunit")
-    if unit then showCast(unit) end
+    if unit then
+      showCast(unit)
+    end
   elseif name == "sel" or name == "page" then
     ns.redraw()
   end

@@ -325,7 +325,9 @@ function ns.aimKeys()
   local function add(key, target, mods)
     table.insert(list, { key, target })
     if mods then
-      for _, m in ipairs({ "SHIFT-", "CTRL-", "ALT-" }) do table.insert(list, { m .. key, target }) end
+      for _, m in ipairs({ "SHIFT-", "CTRL-", "ALT-" }) do
+        table.insert(list, { m .. key, target })
+      end
     end
   end
   local stick = ({ dpad = "PADD", rstick = "PADRSTICK", lstick = "PADLSTICK" })[db.aimWith] or "PADD"
@@ -357,7 +359,9 @@ function ns.applyRoster()
     end
     ctl:SetAttribute("pages", #pages)
     ctl:SetAttribute("tank", tank)
-    if ns.redraw then ns.redraw() end
+    if ns.redraw then
+      ns.redraw()
+    end
   end)
 end
 
@@ -367,8 +371,12 @@ local lastSig
 
 -- Whether a listed button holds to aim, and its settings.
 function ns.aimConf(b)
-  if not b then return nil end
-  if b.kb then return ns.db.aimSpell[b.cast] end
+  if not b then
+    return nil
+  end
+  if b.kb then
+    return ns.db.aimSpell[b.cast]
+  end
   return ns.db.aim[b.key]
 end
 
@@ -378,7 +386,9 @@ local spellAttrs = {} -- aimspell-* attributes set on the controller
 -- Out of combat: sit in each KeyBars button once, and tell the controller
 -- which spells hold to aim and who their tap heals.
 local function applyKeyBars(binds)
-  for _, a in ipairs(spellAttrs) do ctl:SetAttribute(a, nil) end
+  for _, a in ipairs(spellAttrs) do
+    ctl:SetAttribute(a, nil)
+  end
   wipe(spellAttrs)
   for _, b in ipairs(binds) do
     if b.kb then
@@ -403,9 +413,21 @@ local function signature(binds)
   for _, b in ipairs(binds) do
     local conf = ns.aimConf(b)
     local states = {}
-    for _, s in ipairs(ns.BAR_STATES) do if b.states[s] then table.insert(states, s) end end
-    table.insert(parts, (b.kb and ("kb:" .. b.button .. ":" .. b.layer .. ":" .. b.cast .. "=") or "") .. b.key .. "=" .. tostring(b.spell) .. ":" .. table.concat(states, ",")
-      .. (conf and (":" .. (conf.tap or "")) or ""))
+    for _, s in ipairs(ns.BAR_STATES) do
+      if b.states[s] then
+        table.insert(states, s)
+      end
+    end
+    table.insert(
+      parts,
+      (b.kb and ("kb:" .. b.button .. ":" .. b.layer .. ":" .. b.cast .. "=") or "")
+        .. b.key
+        .. "="
+        .. tostring(b.spell)
+        .. ":"
+        .. table.concat(states, ",")
+        .. (conf and (":" .. (conf.tap or "")) or "")
+    )
   end
   return table.concat(parts, "|")
 end
@@ -417,7 +439,9 @@ function ns.applyKeys(force)
     local binds = ns.readBinds()
     local sig = signature(binds)
     ns.binds = binds
-    if sig == lastSig and force ~= true then return end
+    if sig == lastSig and force ~= true then
+      return
+    end
     lastSig = sig
     local used = 0
     applyKeyBars(ns.binds)
@@ -438,7 +462,9 @@ function ns.applyKeys(force)
     for i = used + 1, ns.HEALS do
       local b = ns.heals[i]
       local old = b:GetAttribute("hp-key")
-      if old then ctl:SetAttribute("skip-" .. old, nil) end
+      if old then
+        ctl:SetAttribute("skip-" .. old, nil)
+      end
       b:SetAttribute("hp-key", nil)
       b:SetAttribute("hp-spell", nil)
     end
@@ -449,7 +475,9 @@ function ns.applyKeys(force)
     end
     ctl:SetAttribute("ak-n", #aim)
     SecureHandlerExecute(keys, ns.KEYS_SNIPPET)
-    if ns.refreshOptions then ns.refreshOptions() end
+    if ns.refreshOptions then
+      ns.refreshOptions()
+    end
   end)
 end
 
@@ -457,13 +485,24 @@ ns.on("PLAYER_LOGIN", function()
   ns.applyRoster()
   ns.applyKeys(true)
   if KeyBarsAPI and KeyBarsAPI.onChange then
-    KeyBarsAPI.onChange(function() ns.applyKeys() end)
+    KeyBarsAPI.onChange(function()
+      ns.applyKeys()
+    end)
   end
 end)
 ns.on("GROUP_ROSTER_UPDATE", ns.applyRoster)
 ns.on("PLAYER_ROLES_ASSIGNED", ns.applyRoster)
 ns.on("PLAYER_REGEN_ENABLED", ns.applyRoster)
-for _, e in ipairs({ "UPDATE_BINDINGS", "ACTIONBAR_SLOT_CHANGED", "UPDATE_BONUS_ACTIONBAR", "ACTIONBAR_PAGE_CHANGED",
-  "ACTIVE_TALENT_GROUP_CHANGED", "PLAYER_SPECIALIZATION_CHANGED", "SPELLS_CHANGED" }) do
-  ns.on(e, function() ns.applyKeys() end)
+for _, e in ipairs({
+  "UPDATE_BINDINGS",
+  "ACTIONBAR_SLOT_CHANGED",
+  "UPDATE_BONUS_ACTIONBAR",
+  "ACTIONBAR_PAGE_CHANGED",
+  "ACTIVE_TALENT_GROUP_CHANGED",
+  "PLAYER_SPECIALIZATION_CHANGED",
+  "SPELLS_CHANGED",
+}) do
+  ns.on(e, function()
+    ns.applyKeys()
+  end)
 end

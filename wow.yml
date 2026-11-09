@@ -1,0 +1,142 @@
+# The WoW API that Healpad uses, for selene. Lua 5.1 plus these globals.
+# scripts/api-check.sh checks each name against the Forever client source.
+base: lua51
+globals:
+  ButtonFrameTemplate_HideButtonBar:
+    any: true
+  C_AddOns:
+    any: true
+  C_CurveUtil:
+    any: true
+  C_CVar:
+    any: true
+  C_GamePad:
+    any: true
+  C_Spell:
+    any: true
+  C_Timer:
+    any: true
+  C_UnitAuras:
+    any: true
+  CLASS_ICON_TCOORDS:
+    any: true
+  ClearOverrideBindings:
+    any: true
+  CreateColor:
+    any: true
+  CreateFrame:
+    any: true
+  date:
+    any: true
+  Enum:
+    any: true
+  GetActionInfo:
+    any: true
+  GetBinding:
+    any: true
+  GetBindingAction:
+    any: true
+  GetBindingText:
+    any: true
+  GetBuildInfo:
+    any: true
+  geterrorhandler:
+    any: true
+  GetMacroSpell:
+    any: true
+  GetNumBindings:
+    any: true
+  GetNumGroupMembers:
+    any: true
+  GetNumSubgroupMembers:
+    any: true
+  GetPartyAssignment:
+    any: true
+  GetRaidRosterInfo:
+    any: true
+  GetTime:
+    any: true
+  HealpadDB:
+    any: true
+  InCombatLockdown:
+    any: true
+  IsInGroup:
+    any: true
+  IsInRaid:
+    any: true
+  KeyBarsAPI:
+    any: true
+  PanelTemplates_SetNumTabs:
+    any: true
+  PanelTemplates_SetTab:
+    any: true
+  PanelTemplates_TabResize:
+    any: true
+  PlaySound:
+    any: true
+  PowerBarColor:
+    any: true
+  RegisterStateDriver:
+    any: true
+  ResetCursor:
+    any: true
+  Screenshot:
+    any: true
+  SecureCmdOptionParse:
+    any: true
+  SecureHandlerExecute:
+    any: true
+  SecureHandlerSetFrameRef:
+    any: true
+  SecureHandlerWrapScript:
+    any: true
+  SetCursor:
+    any: true
+  seterrorhandler:
+    any: true
+  SetOverrideBindingClick:
+    any: true
+  SetPortraitTexture:
+    any: true
+  SLASH_HEALPAD1:
+    any: true
+  SLASH_HEALPAD2:
+    any: true
+  SlashCmdList:
+    any: true
+  SOUNDKIT:
+    any: true
+  UIParent:
+    any: true
+  UISpecialFrames:
+    any: true
+  UnitExists:
+    any: true
+  UnitGetIncomingHeals:
+    any: true
+  UnitGroupRolesAssigned:
+    any: true
+  UnitHealth:
+    any: true
+  UnitHealthMax:
+    any: true
+  UnitIsConnected:
+    any: true
+  UnitIsDeadOrGhost:
+    any: true
+  UnitIsUnit:
+    any: true
+  UnitLevel:
+    any: true
+  UnitName:
+    any: true
+  UnitPower:
+    any: true
+  UnitPowerMax:
+    any: true
+  UnitPowerType:
+    any: true
+  wipe:
+    any: true
+  WorldFrame:
+    any: true

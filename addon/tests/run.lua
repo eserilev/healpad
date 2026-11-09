@@ -2,7 +2,8 @@
 package.path = "addon/tests/?.lua;" .. package.path
 local Wow = require("wow")
 
-local FILES = { "Core.lua", "Binds.lua", "Roster.lua", "Secure.lua", "Diamond.lua", "Options.lua", "Test.lua", "Showcase.lua" }
+local FILES =
+  { "Core.lua", "Binds.lua", "Roster.lua", "Secure.lua", "Diamond.lua", "Options.lua", "Test.lua", "Showcase.lua" }
 local DIR = "addon/Healpad"
 
 local passed, failed = 0, 0
@@ -16,7 +17,9 @@ local function test(name, fn)
   end
 end
 local function eq(a, b, what)
-  if a ~= b then error((what or "value") .. ": expected " .. tostring(b) .. ", got " .. tostring(a), 2) end
+  if a ~= b then
+    error((what or "value") .. ": expected " .. tostring(b) .. ", got " .. tostring(a), 2)
+  end
 end
 local function clean(W)
   eq(#W.blocked, 0, "blocked: " .. table.concat(W.blocked, ", "))
@@ -70,18 +73,26 @@ local function game(opts)
   opts = opts or {}
   local W = Wow.new()
   setup(W)
-  if opts.party ~= false then party(W) else W.units.player = { name = "Me", hp = 90, max = 100 } end
+  if opts.party ~= false then
+    party(W)
+  else
+    W.units.player = { name = "Me", hp = 90, max = 100 }
+  end
   local saved = opts.saved or { aim = { PAD3 = { tap = "player" }, PAD1 = { tap = opts.tap or "player" } } }
   local ns = W.load(DIR, FILES, saved)
   return W, ns
 end
 
-local function last(W) return W.casts[#W.casts] end
+local function last(W)
+  return W.casts[#W.casts]
+end
 
 test("your bindings: pad buttons with spells, keyboard heals only, LT combos named", function()
   local W, ns = game()
   local keys = {}
-  for _, b in ipairs(ns.binds) do keys[#keys + 1] = b.key end
+  for _, b in ipairs(ns.binds) do
+    keys[#keys + 1] = b.key
+  end
   eq(table.concat(keys, " "), "PAD1 PAD2 PAD3 PAD4 SHIFT-PAD3 1")
   eq(ns.binds[4].heal, false, "Wrath is no heal")
   eq(ns.keyLabel("SHIFT-PAD3"), "LT+X")
@@ -111,11 +122,15 @@ test("solo: up is your target", function()
   eq(ns.ctl:GetAttribute("u1-UP"), "target")
   W.units.target = { name = "Friend", hp = 1, max = 2, friendly = true }
   W.combat = true
-  W.key("PAD3", true) W.tap("UP") W.key("PAD3", false)
+  W.key("PAD3", true)
+  W.tap("UP")
+  W.key("PAD3", false)
   eq(last(W).unit, "target")
   W.units.target = { name = "Wolf", hp = 1, max = 2, friendly = false }
   local n = #W.casts
-  W.key("PAD3", true) W.tap("UP") W.key("PAD3", false)
+  W.key("PAD3", true)
+  W.tap("UP")
+  W.key("PAD3", false)
   eq(#W.casts, n, "no heal on an enemy")
   clean(W)
 end)
@@ -129,7 +144,9 @@ test("press casts nothing, aim, release casts the locked spell on the aimed one"
   W.tap("PADDUP")
   eq(ns.ctl:GetAttribute("sel"), "UP")
   W.key("PAD3", false)
-  eq(last(W).spell, 5186) eq(last(W).unit, "party2") eq(last(W).combat, true)
+  eq(last(W).spell, 5186)
+  eq(last(W).unit, "party2")
+  eq(last(W).combat, true)
   eq(ns.diamond:IsShown(), false, "closed after")
   eq(W.secureBinds.PADDUP, nil, "d-pad given back")
   clean(W)
@@ -139,13 +156,17 @@ test("the opposite way comes back to you", function()
   local W, ns = game({ party = false })
   W.units.target = { name = "Friend", hp = 1, max = 2, friendly = true }
   W.combat = true
-  W.key("PAD3", true) W.tap("UP") W.tap("DOWN")
+  W.key("PAD3", true)
+  W.tap("UP")
+  W.tap("DOWN")
   eq(ns.ctl:GetAttribute("sel"), "SELF")
   W.key("PAD3", false)
   eq(last(W).unit, "player")
   local W2, ns2 = game()
   W2.combat = true
-  W2.key("PAD3", true) W2.tap("PADDLEFT") W2.tap("PADDRIGHT")
+  W2.key("PAD3", true)
+  W2.tap("PADDLEFT")
+  W2.tap("PADDRIGHT")
   eq(ns2.ctl:GetAttribute("sel"), "SELF")
   W2.tap("PADDRIGHT")
   eq(ns2.ctl:GetAttribute("sel"), "RIGHT", "a second press goes on")
@@ -156,7 +177,9 @@ end)
 test("arrow keys aim too", function()
   local W = game()
   W.combat = true
-  W.key("PAD3", true) W.tap("LEFT") W.key("PAD3", false)
+  W.key("PAD3", true)
+  W.tap("LEFT")
+  W.key("PAD3", false)
   eq(last(W).unit, "party1")
   clean(W)
 end)
@@ -174,7 +197,9 @@ test("tap with no aim heals you; other tap choices", function()
   eq(last(W2).spell, 774)
   local W3 = game({ tap = "last" })
   W3.combat = true
-  W3.key("PAD3", true) W3.tap("PADDDOWN") W3.key("PAD3", false)
+  W3.key("PAD3", true)
+  W3.tap("PADDDOWN")
+  W3.key("PAD3", false)
   W3.tap("PAD1")
   eq(last(W3).unit, "party3", "last healed")
   local W4 = game({ tap = "focus" })
@@ -184,7 +209,10 @@ test("tap with no aim heals you; other tap choices", function()
   W4.units.focus = W4.units.party1
   W4.tap("PAD1")
   eq(last(W4).unit, "focus")
-  clean(W) clean(W2) clean(W3) clean(W4)
+  clean(W)
+  clean(W2)
+  clean(W3)
+  clean(W4)
 end)
 
 test("tap heals the tank: the tank sits in the middle, you in the tank's place", function()
@@ -197,11 +225,18 @@ test("tap heals the tank: the tank sits in the middle, you in the tank's place",
   eq(ns.spots.UP.name.text, "Me", "you in the tank's place")
   W.key("PAD3", false)
   eq(last(W).unit, "party2", "no aim: the tank")
-  W.key("PAD3", true) W.tap("PADDUP") W.key("PAD3", false)
+  W.key("PAD3", true)
+  W.tap("PADDUP")
+  W.key("PAD3", false)
   eq(last(W).unit, "player", "up is you now")
-  W.key("PAD3", true) W.tap("PADDUP") W.tap("PADDDOWN") W.key("PAD3", false)
+  W.key("PAD3", true)
+  W.tap("PADDUP")
+  W.tap("PADDDOWN")
+  W.key("PAD3", false)
   eq(last(W).unit, "party2", "back to the middle: the tank")
-  W.key("PAD3", true) W.tap("PADDLEFT") W.key("PAD3", false)
+  W.key("PAD3", true)
+  W.tap("PADDLEFT")
+  W.key("PAD3", false)
   eq(last(W).unit, "party1", "the others are where they were")
   clean(W)
 end)
@@ -227,7 +262,9 @@ test("Last healed never means your target, which may have changed", function()
   local W = game({ party = false, saved = { aim = { PAD3 = { tap = "last" } } } })
   W.units.target = { name = "Friend", hp = 1, max = 2, friendly = true }
   W.combat = true
-  W.key("PAD3", true) W.tap("UP") W.key("PAD3", false)
+  W.key("PAD3", true)
+  W.tap("UP")
+  W.key("PAD3", false)
   eq(last(W).unit, "target")
   W.units.target = { name = "Wolf", hp = 1, max = 2, friendly = false }
   W.tap("PAD3")
@@ -249,11 +286,16 @@ end)
 test("cancel: nothing casts, keys come back", function()
   local W, ns = game()
   W.combat = true
-  W.key("PAD3", true) W.tap("PADDUP") W.tap("PAD2") W.key("PAD3", false)
+  W.key("PAD3", true)
+  W.tap("PADDUP")
+  W.tap("PAD2")
+  W.key("PAD3", false)
   eq(#W.casts, 0)
   eq(ns.diamond:IsShown(), false)
   eq(W.secureBinds.PADDUP, nil)
-  W.key("PAD3", true) W.tap("BACKSPACE") W.key("PAD3", false)
+  W.key("PAD3", true)
+  W.tap("BACKSPACE")
+  W.key("PAD3", false)
   eq(#W.casts, 0, "backspace cancels")
   clean(W)
 end)
@@ -275,12 +317,16 @@ end)
 test("a second heal key casts on the aimed one, the diamond stays open", function()
   local W, ns = game()
   W.combat = true
-  W.key("PAD3", true) W.tap("PADDUP")
-  W.key("PAD1", true) W.key("PAD1", false)
-  eq(last(W).spell, 774) eq(last(W).unit, "party2")
+  W.key("PAD3", true)
+  W.tap("PADDUP")
+  W.key("PAD1", true)
+  W.key("PAD1", false)
+  eq(last(W).spell, 774)
+  eq(last(W).unit, "party2")
   eq(ns.diamond:IsShown(), true, "still open")
   W.key("PAD3", false)
-  eq(last(W).spell, 5186) eq(last(W).unit, "party2")
+  eq(last(W).spell, 5186)
+  eq(last(W).unit, "party2")
   eq(#W.casts, 2)
   clean(W)
 end)
@@ -302,7 +348,9 @@ test("roster changes in combat wait for the end of combat", function()
   W.units.party4 = nil
   W.fire("GROUP_ROSTER_UPDATE")
   eq(ns.ctl:GetAttribute("u1-RIGHT"), "party4", "unchanged in combat")
-  W.key("PAD3", true) W.tap("PADDRIGHT") W.key("PAD3", false)
+  W.key("PAD3", true)
+  W.tap("PADDRIGHT")
+  W.key("PAD3", false)
   eq(#W.casts, 0, "the gone person is not healed")
   W.combat = false
   W.fire("PLAYER_REGEN_ENABLED")
@@ -351,11 +399,17 @@ test("cat form: X is Claw again, A still aims; back in caster form X aims", func
   W.tap("PAD3")
   eq(#W.casts, 0, "X did not heal")
   eq(W.barPresses[1].command, "ACTIONBUTTON1", "Claw")
-  W.key("PAD1", true) W.tap("PADDUP") W.key("PAD1", false)
-  eq(last(W).spell, 774) eq(last(W).unit, "party2")
+  W.key("PAD1", true)
+  W.tap("PADDUP")
+  W.key("PAD1", false)
+  eq(last(W).spell, 774)
+  eq(last(W).unit, "party2")
   W.setBar("p1")
-  W.key("PAD3", true) W.tap("PADDLEFT") W.key("PAD3", false)
-  eq(last(W).spell, 5186) eq(last(W).unit, "party1")
+  W.key("PAD3", true)
+  W.tap("PADDLEFT")
+  W.key("PAD3", false)
+  eq(last(W).spell, 5186)
+  eq(last(W).unit, "party1")
   clean(W)
 end)
 
@@ -373,7 +427,10 @@ test("B cancels only while aiming; your B spell works the rest of the time", fun
   W.combat = true
   W.tap("PAD2")
   eq(W.barPresses[1].command, "ACTIONBUTTON4", "B casts its spell")
-  W.key("PAD3", true) W.tap("PADDUP") W.tap("PAD2") W.key("PAD3", false)
+  W.key("PAD3", true)
+  W.tap("PADDUP")
+  W.tap("PAD2")
+  W.key("PAD3", false)
   eq(#W.casts, 0, "B cancelled the aim")
   eq(#W.barPresses, 1, "and did not cast its spell")
   clean(W)
@@ -382,7 +439,8 @@ end)
 test("cancel with Y, aim with the right stick", function()
   local W, ns = game({ saved = { aim = { PAD3 = { tap = "player" } }, cancel = "PAD4", aimWith = "rstick" } })
   W.combat = true
-  W.key("PAD3", true) W.tap("PADDUP")
+  W.key("PAD3", true)
+  W.tap("PADDUP")
   eq(ns.ctl:GetAttribute("sel"), nil, "the d-pad doesn't aim now")
   W.tap("PADRSTICKUP")
   eq(ns.ctl:GetAttribute("sel"), "UP")
@@ -395,8 +453,11 @@ end)
 test("an LT combo holds to aim; aiming works with LT still down", function()
   local W = game({ saved = { aim = { ["SHIFT-PAD3"] = { tap = "player" } } } })
   W.combat = true
-  W.key("SHIFT-PAD3", true) W.tap("SHIFT-PADDRIGHT") W.key("SHIFT-PAD3", false)
-  eq(last(W).spell, 5185) eq(last(W).unit, "party4")
+  W.key("SHIFT-PAD3", true)
+  W.tap("SHIFT-PADDRIGHT")
+  W.key("SHIFT-PAD3", false)
+  eq(last(W).spell, 5185)
+  eq(last(W).unit, "party4")
   clean(W)
 end)
 
@@ -408,7 +469,9 @@ test("a heal button that is also an aim button stays a heal button", function()
   W.actions[5] = { "spell", 5185 }
   W.load(DIR, FILES, { aim = { PADRSHOULDER = { tap = "player" }, PAD1 = { tap = "player" } } })
   W.combat = true
-  W.key("PAD1", true) W.tap("PADDUP") W.tap("PADRSHOULDER")
+  W.key("PAD1", true)
+  W.tap("PADDUP")
+  W.tap("PADRSHOULDER")
   eq(last(W).spell, 5185, "RB cast its heal")
   eq(last(W).unit, "party2")
   W.key("PAD1", false)
@@ -422,10 +485,14 @@ test("raid: your group first, LB/RB flip groups", function()
   local function add(i, name, group, role, me)
     W.raid[i] = { name = name, group = group }
     W.units["raid" .. i] = { name = name, hp = 50, max = 100, role = role }
-    if me then W.units.player = W.units["raid" .. i] end
+    if me then
+      W.units.player = W.units["raid" .. i]
+    end
   end
-  add(1, "Tanky", 1, "TANK") add(2, "Bob", 1, "DAMAGER")
-  add(3, "Me", 2, "HEALER", true) add(4, "Cat", 2, "DAMAGER")
+  add(1, "Tanky", 1, "TANK")
+  add(2, "Bob", 1, "DAMAGER")
+  add(3, "Me", 2, "HEALER", true)
+  add(4, "Cat", 2, "DAMAGER")
   add(5, "Dee", 3, "DAMAGER")
   local ns = W.load(DIR, FILES, { aim = { PAD3 = { tap = "player" } } })
   local c = ns.ctl
@@ -439,7 +506,8 @@ test("raid: your group first, LB/RB flip groups", function()
   W.tap("PADDUP")
   W.key("PAD3", false)
   eq(last(W).unit, "raid1")
-  W.key("PAD3", true) W.tap("PADLSHOULDER")
+  W.key("PAD3", true)
+  W.tap("PADLSHOULDER")
   eq(c:GetAttribute("page"), 3, "back wraps")
   W.tap("PAGEDOWN")
   eq(c:GetAttribute("page"), 1, "keyboard page key")
@@ -451,7 +519,10 @@ test("binding events don't redo an unchanged setup; a rebind is picked up after 
   local W, ns = game()
   local n = 0
   local old = W.G.SecureHandlerExecute
-  W.G.SecureHandlerExecute = function(...) n = n + 1 return old(...) end
+  W.G.SecureHandlerExecute = function(...)
+    n = n + 1
+    return old(...)
+  end
   W.fire("UPDATE_BINDINGS")
   W.fire("ACTIONBAR_SLOT_CHANGED")
   eq(n, 0, "nothing changed")
@@ -473,17 +544,23 @@ test("settings: pad drives the tabs; A sets Hold to Aim; nav keys go back on clo
   eq(p:IsShown(), true)
   eq(W.overrides.PADDDOWN.target, "HealpadNavDOWN", "pad drives the panel")
   -- the list: A (Rejuvenation), B, X, Y, LT+X, 1
-  W.tap("PADDDOWN") W.tap("PADDDOWN")
+  W.tap("PADDDOWN")
+  W.tap("PADDDOWN")
   W.tap("PAD1")
   eq(ns.db.aim.PAD3 ~= nil, true, "X holds to aim")
   eq(ns.heals[1]:GetAttribute("hp-key"), "PAD3")
-  W.tap("PADDRIGHT") W.tap("PADDDOWN") W.tap("PADDRIGHT") W.tap("PADDRIGHT") W.tap("PAD1")
+  W.tap("PADDRIGHT")
+  W.tap("PADDDOWN")
+  W.tap("PADDRIGHT")
+  W.tap("PADDRIGHT")
+  W.tap("PAD1")
   eq(ns.db.aim.PAD3.tap, "tank", "tap to heal: tank")
   W.tap("PAD2") -- back to the list
   W.tap("PADRSHOULDER") -- Aim tab
   W.tap("PADDRIGHT")
   eq(ns.db.aimWith, "rstick")
-  W.tap("PADDDOWN") W.tap("PADDRIGHT")
+  W.tap("PADDDOWN")
+  W.tap("PADDRIGHT")
   eq(ns.db.cancel, "PAD4", "cancel moved on from B to Y, skipping X")
   W.tap("PADRSHOULDER") -- Frames tab
   W.tap("PADDRIGHT")
@@ -508,19 +585,30 @@ test("a KeyBars key is read through its override; self-only spells aren't heals"
   local ns = W.load(DIR, FILES, { aim = { ["2"] = { tap = "player" } } })
   local found, walk = nil, nil
   for _, b in ipairs(ns.binds) do
-    if b.key == "2" then found = b end
-    if b.key == "9" then walk = b end
+    if b.key == "2" then
+      found = b
+    end
+    if b.key == "9" then
+      walk = b
+    end
   end
   eq(found and found.spell, 5186, "KeyBars key 2 casts Healing Touch")
   eq(walk, nil, "Walk on Air is no heal")
   eq(W.secureBinds["2"] and W.secureBinds["2"].target, "HealpadHeal1", "Healpad holds 2")
   ns.applyKeys(true)
   local again
-  for _, b in ipairs(ns.binds) do if b.key == "2" then again = b end end
+  for _, b in ipairs(ns.binds) do
+    if b.key == "2" then
+      again = b
+    end
+  end
   eq(again and again.spell, 5186, "still read beneath Healpad's own binding")
   W.combat = true
-  W.key("2", true) W.tap("UP") W.key("2", false)
-  eq(last(W).spell, 5186) eq(last(W).unit, "party2")
+  W.key("2", true)
+  W.tap("UP")
+  W.key("2", false)
+  eq(last(W).spell, 5186)
+  eq(last(W).unit, "party2")
   clean(W)
 end)
 
@@ -533,11 +621,20 @@ local function withKeyBars(W)
   W.G.KeyBarsAPI = {
     version = 1,
     slots = function()
-      return { { key = "1", button = "KeyBarsButton1", layers = {
-        { id = 1, name = "Normal", spell = 5185, cast = "Healing Touch" },
-        { id = 11, name = "Bear", spell = 6807, cast = "Maul" } } } }
+      return {
+        {
+          key = "1",
+          button = "KeyBarsButton1",
+          layers = {
+            { id = 1, name = "Normal", spell = 5185, cast = "Healing Touch" },
+            { id = 11, name = "Bear", spell = 6807, cast = "Maul" },
+          },
+        },
+      }
     end,
-    onChange = function(fn) table.insert(listeners, fn) end,
+    onChange = function(fn)
+      table.insert(listeners, fn)
+    end,
   }
   return kb, listeners
 end
@@ -549,7 +646,11 @@ test("KeyBars: its layers are listed; Healpad sits in its button and leaves the 
   local kb = withKeyBars(W)
   local ns = W.load(DIR, FILES, { aim = {}, aimSpell = { ["Healing Touch"] = { tap = "player" } } })
   local found
-  for _, b in ipairs(ns.binds) do if b.kb then found = b end end
+  for _, b in ipairs(ns.binds) do
+    if b.kb then
+      found = b
+    end
+  end
   eq(found and found.layer, "Normal", "Healing Touch on Normal is listed")
   eq(found.cast, "Healing Touch")
   eq(W.overrides["1"].target, "KeyBarsButton1", "KeyBars keeps key 1")
@@ -559,7 +660,8 @@ test("KeyBars: its layers are listed; Healpad sits in its button and leaves the 
   eq(ns.diamond:IsShown(), true)
   W.tap("PADDRIGHT")
   W.key("1", false)
-  eq(last(W).spell, "Healing Touch") eq(last(W).unit, "party4")
+  eq(last(W).spell, "Healing Touch")
+  eq(last(W).unit, "party4")
   eq(kb.attrs.unit, nil, "the button is as KeyBars left it")
   eq(kb.attrs.useOnKeyDown, nil)
   eq(ns.diamond:IsShown(), false)
@@ -583,7 +685,12 @@ test("KeyBars: Hold to Aim set in the settings reaches the button", function()
   local dbg = ns.optionsDebug()
   local li, n = nil, 0
   for _, r in ipairs(dbg.rows) do
-    if r.bind then n = n + 1 if r.bind.kb then li = n end end
+    if r.bind then
+      n = n + 1
+      if r.bind.kb then
+        li = n
+      end
+    end
   end
   dbg.st.li = li
   ns.optionsNav("A")
@@ -591,7 +698,9 @@ test("KeyBars: Hold to Aim set in the settings reaches the button", function()
   eq(ns.ctl:GetAttribute("aimspell-Healing Touch"), "player")
   W.G.HealpadOptions:Hide()
   W.combat = true
-  W.key("1", true) W.tap("UP") W.key("1", false)
+  W.key("1", true)
+  W.tap("UP")
+  W.key("1", false)
   eq(last(W).unit, "party2")
   clean(W)
 end)
@@ -599,7 +708,8 @@ end)
 test("Esc closes the whole window from any tab, and the diamond preview with it", function()
   local W, ns = game()
   ns.openOptions()
-  W.tap("PADRSHOULDER") W.tap("PADRSHOULDER") -- Frames: the diamond shows
+  W.tap("PADRSHOULDER")
+  W.tap("PADRSHOULDER") -- Frames: the diamond shows
   eq(ns.diamond:IsShown(), true)
   W.tap("ESCAPE")
   eq(W.G.HealpadOptions:IsShown(), false, "closed")
@@ -615,35 +725,59 @@ end)
 test("Frames: Move nudges the diamond with the pad, Reset puts it back; it is saved", function()
   local W, ns = game({ saved = { aim = {} } })
   ns.openOptions()
-  W.tap("PADRSHOULDER") W.tap("PADRSHOULDER") -- Frames
-  W.tap("PADDDOWN") W.tap("PADDDOWN") -- Position
+  W.tap("PADRSHOULDER")
+  W.tap("PADRSHOULDER") -- Frames
+  W.tap("PADDDOWN")
+  W.tap("PADDDOWN") -- Position
   W.tap("PAD1") -- Move
   -- a stick glides it too: right at full tilt for half a second
-  W.G.C_GamePad = { GetActiveDeviceID = function() return 1 end,
-    GetDeviceMappedState = function() return { sticks = { { x = 1, y = 0 }, { x = 0, y = 0 } } } end }
+  W.G.C_GamePad = {
+    GetActiveDeviceID = function()
+      return 1
+    end,
+    GetDeviceMappedState = function()
+      return { sticks = { { x = 1, y = 0 }, { x = 0, y = 0 } } }
+    end,
+  }
   W.update(0.5)
   eq(ns.db.x, 350, "the stick moved it")
   W.G.C_GamePad = nil
   ns.db.x = 0
-  W.tap("PADDRIGHT") W.tap("PADDRIGHT") W.tap("PADDUP")
+  W.tap("PADDRIGHT")
+  W.tap("PADDRIGHT")
+  W.tap("PADDUP")
   W.tap("PAD1") -- done
-  eq(ns.db.x, 40) eq(ns.db.y, 20)
-  W.tap("PADDUP") W.tap("PADDDOWN") -- still on Position after leaving Move
-  W.tap("PADDRIGHT") W.tap("PAD1") -- Reset
-  eq(ns.db.x, 0) eq(ns.db.y, 0)
+  eq(ns.db.x, 40)
+  eq(ns.db.y, 20)
+  W.tap("PADDUP")
+  W.tap("PADDDOWN") -- still on Position after leaving Move
+  W.tap("PADDRIGHT")
+  W.tap("PAD1") -- Reset
+  eq(ns.db.x, 0)
+  eq(ns.db.y, 0)
   clean(W)
 end)
 
 test("Frames without Move: the d-pad and sticks change settings, never the position", function()
   local W, ns = game({ saved = { aim = {} } })
   ns.openOptions()
-  W.tap("PADRSHOULDER") W.tap("PADRSHOULDER") -- Frames
-  W.G.C_GamePad = { GetActiveDeviceID = function() return 1 end,
-    GetDeviceMappedState = function() return { sticks = { { x = 1, y = 1 }, { x = -1, y = 0 } } } end }
+  W.tap("PADRSHOULDER")
+  W.tap("PADRSHOULDER") -- Frames
+  W.G.C_GamePad = {
+    GetActiveDeviceID = function()
+      return 1
+    end,
+    GetDeviceMappedState = function()
+      return { sticks = { { x = 1, y = 1 }, { x = -1, y = 0 } } }
+    end,
+  }
   W.update(0.5)
-  for _, k in ipairs({ "PADDUP", "PADDDOWN", "PADDLEFT", "PADDRIGHT", "PADDDOWN", "PADDDOWN", "PADDRIGHT" }) do W.tap(k) end
+  for _, k in ipairs({ "PADDUP", "PADDDOWN", "PADDLEFT", "PADDRIGHT", "PADDDOWN", "PADDDOWN", "PADDRIGHT" }) do
+    W.tap(k)
+  end
   W.update(0.5)
-  eq(ns.db.x, 0, "x") eq(ns.db.y, 0, "y")
+  eq(ns.db.x, 0, "x")
+  eq(ns.db.y, 0, "y")
   W.G.C_GamePad = nil
   clean(W)
 end)

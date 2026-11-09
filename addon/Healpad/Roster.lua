@@ -9,39 +9,59 @@ local AROUND = { "UP", "RIGHT", "DOWN", "LEFT" }
 
 local function before(a, b)
   local ra, rb = ROLE_ORDER[a.role] or 4, ROLE_ORDER[b.role] or 4
-  if ra ~= rb then return ra < rb end
-  if a.name ~= b.name then return a.name < b.name end
+  if ra ~= rb then
+    return ra < rb
+  end
+  if a.name ~= b.name then
+    return a.name < b.name
+  end
   return a.unit < b.unit
 end
 
 -- members: { unit, role, name, group, me } for everyone in the group.
 -- Returns pages { [dir] = unit }, and the first tank's unit or nil.
 function ns.buildPages(members, solo)
-  if solo then return { { UP = "target", SELF = "player" } }, nil end
+  if solo then
+    return { { UP = "target", SELF = "player" } }, nil
+  end
   local groups, mine = {}, nil
   local tank
   for _, m in ipairs(members) do
     local g = m.group or 1
     groups[g] = groups[g] or {}
     table.insert(groups[g], m)
-    if m.me then mine = g end
-    if m.role == "TANK" and not m.me and (not tank or before(m, tank)) then tank = m end
+    if m.me then
+      mine = g
+    end
+    if m.role == "TANK" and not m.me and (not tank or before(m, tank)) then
+      tank = m
+    end
   end
   local order = {}
-  if mine then table.insert(order, mine) end
+  if mine then
+    table.insert(order, mine)
+  end
   for g = 1, 8 do
-    if groups[g] and g ~= mine then table.insert(order, g) end
+    if groups[g] and g ~= mine then
+      table.insert(order, g)
+    end
   end
   local pages = {}
   for _, g in ipairs(order) do
     local list, page = {}, {}
     for _, m in ipairs(groups[g]) do
-      if m.me then page.SELF = m.unit else table.insert(list, m) end
+      if m.me then
+        page.SELF = m.unit
+      else
+        table.insert(list, m)
+      end
     end
     table.sort(list, before)
     for i, m in ipairs(list) do
       local dir = AROUND[i] or (not page.SELF and "SELF")
-      if dir then page[dir] = m.unit end
+      if dir then
+        page[dir] = m.unit
+      end
     end
     table.insert(pages, page)
   end
@@ -52,14 +72,20 @@ end
 -- dungeon finder. Nobody marked: no tank, and a tap set to Tank heals you.
 local function role(unit)
   local okMT, mt = pcall(GetPartyAssignment, "MAINTANK", unit)
-  if okMT and mt then return "TANK" end
+  if okMT and mt then
+    return "TANK"
+  end
   local ok, r = pcall(UnitGroupRolesAssigned, unit)
-  if ok and type(r) == "string" then return r end
+  if ok and type(r) == "string" then
+    return r
+  end
   return "NONE"
 end
 
 local function name(unit)
-  local ok, n = pcall(function() return UnitName(unit) .. "" end)
+  local ok, n = pcall(function()
+    return UnitName(unit) .. ""
+  end)
   return ok and n or unit
 end
 
@@ -70,8 +96,10 @@ function ns.readRoster()
     for i = 1, GetNumGroupMembers() do
       local unit = "raid" .. i
       local _, _, group = GetRaidRosterInfo(i)
-      table.insert(members, { unit = unit, role = role(unit), name = name(unit), group = group or 1,
-        me = UnitIsUnit(unit, "player") })
+      table.insert(
+        members,
+        { unit = unit, role = role(unit), name = name(unit), group = group or 1, me = UnitIsUnit(unit, "player") }
+      )
     end
     return members, false
   end

@@ -15,4 +15,4 @@ your character as a diamond, aim, let go.
   they do what you bound. A form or bar page with another spell on the button
   gives the button back too.
 
-Tests: `luajit addon/tests/run.lua`
+Checks: `scripts/check.sh` (format, lint, tests) and `scripts/wow-api.sh` (every API name against the client).

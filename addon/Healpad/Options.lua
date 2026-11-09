@@ -26,14 +26,18 @@ local rows = {} -- the Buttons list: { header = "Hold LT" } or { bind = b }
 
 local function text(parent, font, color)
   local t = parent:CreateFontString(nil, "OVERLAY", font or "GameFontHighlight")
-  if color then t:SetTextColor(unpack(color)) end
+  if color then
+    t:SetTextColor(unpack(color))
+  end
   return t
 end
 
 local function keyText(label)
   local last = (label or ""):match("([^+]+)$")
   local c = PAD_COLOR[last]
-  if not c then return label end
+  if not c then
+    return label
+  end
   return string.format("|cff%02x%02x%02x%s|r", c[1] * 255, c[2] * 255, c[3] * 255, label)
 end
 
@@ -45,9 +49,15 @@ local function redButton(parent, w, h, label)
   return b
 end
 local function setChosen(b, on)
-  if on then b:LockHighlight() else b:UnlockHighlight() end
+  if on then
+    b:LockHighlight()
+  else
+    b:UnlockHighlight()
+  end
   local fs = b.GetFontString and b:GetFontString()
-  if fs then fs:SetTextColor(unpack(on and WHITE or GOLD)) end
+  if fs then
+    fs:SetTextColor(unpack(on and WHITE or GOLD))
+  end
   b.chosen = on
 end
 
@@ -61,10 +71,15 @@ local function buildRows()
     if group ~= last then
       last = group
       local label
-      if b.kb then label = "KeyBars · " .. b.layer
-      elseif group == "keys" then label = "Keys"
-      elseif group == "" then label = "Buttons"
-      else label = "Hold " .. group end
+      if b.kb then
+        label = "KeyBars · " .. b.layer
+      elseif group == "keys" then
+        label = "Keys"
+      elseif group == "" then
+        label = "Buttons"
+      else
+        label = "Hold " .. group
+      end
       table.insert(rows, { header = label })
     end
     table.insert(rows, { bind = b })
@@ -77,22 +92,34 @@ local function bindAt(li)
   for _, r in ipairs(rows) do
     if r.bind then
       n = n + 1
-      if n == li then return r.bind end
+      if n == li then
+        return r.bind
+      end
     end
   end
 end
 local function bindCount()
   local n = 0
-  for _, r in ipairs(rows) do if r.bind then n = n + 1 end end
+  for _, r in ipairs(rows) do
+    if r.bind then
+      n = n + 1
+    end
+  end
   return n
 end
 
-local function aimed(b) return ns.aimConf(b) ~= nil end
+local function aimed(b)
+  return ns.aimConf(b) ~= nil
+end
 
 local function setAim(b, on)
-  if not b or not b.heal or InCombatLockdown() then return end
+  if not b or not b.heal or InCombatLockdown() then
+    return
+  end
   local t, k = ns.db.aim, b.key
-  if b.kb then t, k = ns.db.aimSpell, b.cast end
+  if b.kb then
+    t, k = ns.db.aimSpell, b.cast
+  end
   if on then
     t[k] = t[k] or { tap = "player" }
   else
@@ -102,7 +129,9 @@ local function setAim(b, on)
 end
 
 -- Cancel can't be a plain pad button that holds to aim.
-local function cancelTaken(key) return ns.db.aim[key] ~= nil end
+local function cancelTaken(key)
+  return ns.db.aim[key] ~= nil
+end
 
 ---------------------------------------------------------------- drawing
 
@@ -112,7 +141,10 @@ local refresh
 -- button.
 local function ring(target)
   local r = ui.ring
-  if not target then r:Hide() return end
+  if not target then
+    r:Hide()
+    return
+  end
   local pad = target.ringInside and -1 or 3
   r:ClearAllPoints()
   r:SetPoint("TOPLEFT", target, "TOPLEFT", -pad, pad)
@@ -122,8 +154,14 @@ end
 
 local function drawTabs()
   local index = 1
-  for i, t in ipairs(TABS) do if t == st.tab then index = i end end
-  if PanelTemplates_SetTab then PanelTemplates_SetTab(panel, index) end
+  for i, t in ipairs(TABS) do
+    if t == st.tab then
+      index = i
+    end
+  end
+  if PanelTemplates_SetTab then
+    PanelTemplates_SetTab(panel, index)
+  end
   ui.buttons:SetShown(st.tab == "buttons")
   ui.aim:SetShown(st.tab == "aim")
   ui.frames:SetShown(st.tab == "frames")
@@ -131,9 +169,13 @@ local function drawTabs()
   ns.previewTap = nil
   for _, b in ipairs(ns.binds or {}) do
     local conf = ns.aimConf(b)
-    if conf and not ns.previewTap then ns.previewTap = conf.tap end
+    if conf and not ns.previewTap then
+      ns.previewTap = conf.tap
+    end
   end
-  if ns.preview then ns.preview(st.tab == "frames") end
+  if ns.preview then
+    ns.preview(st.tab == "frames")
+  end
   panel:ClearAllPoints()
   -- On Frames the window gets narrow and steps aside so the diamond shows.
   if st.tab == "frames" then
@@ -151,12 +193,18 @@ local function drawList()
   for i, r in ipairs(rows) do
     if r.bind then
       n = n + 1
-      if n == st.li then at = i end
+      if n == st.li then
+        at = i
+      end
     end
   end
   if at > 0 then
-    if at < st.top then st.top = math.max(1, at - 1) end
-    if at > st.top + visible - 1 then st.top = at - visible + 1 end
+    if at < st.top then
+      st.top = math.max(1, at - 1)
+    end
+    if at > st.top + visible - 1 then
+      st.top = at - visible + 1
+    end
   end
   local current = bindAt(st.li)
   local focus
@@ -183,7 +231,9 @@ local function drawList()
       f.check:SetShown(b.heal)
       f.check:SetChecked(aimed(b))
       f.selected:SetShown(b == current)
-      if b == current and st.zone == "list" then focus = f.line end
+      if b == current and st.zone == "list" then
+        focus = f.line
+      end
     end
   end
   ui.empty:SetShown(#rows == 0)
@@ -194,7 +244,9 @@ local function drawDetail()
   local b = bindAt(st.li)
   local d = ui.detail
   d:SetShown(b ~= nil)
-  if not b then return end
+  if not b then
+    return
+  end
   d.key:SetText(keyText(ns.keyLabel(b.key)) .. (b.kb and ("  |cff9a9a9a·  KeyBars " .. b.layer .. "|r") or ""))
   d.icon:SetTexture(ns.spellIcon(b.spell))
   d.name:SetText(ns.spellName(b.spell))
@@ -205,9 +257,13 @@ local function drawDetail()
   setChosen(d.hold, on)
   d.tapBox:SetShown(b.heal and on)
   local tap = on and ns.aimConf(b).tap or "player"
-  for i, t in ipairs(ns.TAPS) do setChosen(d.taps[i], tap == t) end
+  for i, t in ipairs(ns.TAPS) do
+    setChosen(d.taps[i], tap == t)
+  end
   if st.zone == "detail" then
-    if st.row == 0 then return st.col == 0 and d.cast or d.hold end
+    if st.row == 0 then
+      return st.col == 0 and d.cast or d.hold
+    end
     return d.taps[st.col + 1]
   end
 end
@@ -217,13 +273,17 @@ local function drawAim()
   local focus
   for i, k in ipairs(ns.AIMERS) do
     setChosen(a.aimers[i], ns.db.aimWith == k)
-    if st.row == 0 and ns.db.aimWith == k then focus = a.aimers[i] end
+    if st.row == 0 and ns.db.aimWith == k then
+      focus = a.aimers[i]
+    end
   end
   for i, key in ipairs(ns.CANCELS) do
     local b = a.cancels[i]
     b:SetEnabled(not cancelTaken(key))
     setChosen(b, ns.db.cancel == key)
-    if st.row == 1 and ns.db.cancel == key then focus = b end
+    if st.row == 1 and ns.db.cancel == key then
+      focus = b
+    end
   end
   return focus
 end
@@ -236,12 +296,16 @@ local function drawFrames()
   f.spread.value:SetText(tostring(spread))
   f.spread.bar:SetValue(spread)
   setChosen(f.move, st.moving)
-  if st.row == 2 then return st.col == 0 and f.move or f.reset end
+  if st.row == 2 then
+    return st.col == 0 and f.move or f.reset
+  end
   return st.row == 0 and f.size or f.spread
 end
 
 refresh = function()
-  if not panel or not panel:IsShown() then return end
+  if not panel or not panel:IsShown() then
+    return
+  end
   drawTabs()
   local focus
   if st.tab == "buttons" then
@@ -254,8 +318,14 @@ refresh = function()
     focus = drawFrames()
   end
   ring((st.keys or st.moving) and focus or nil)
-  if ns.showMoving then ns.showMoving(st.moving == true and st.tab == "frames") end
-  if ui.ring and st.moving then ui.ring:SetColor(1, 0.82, 0, 1) elseif ui.ring then ui.ring:SetColor(0.45, 0.8, 1, 1) end
+  if ns.showMoving then
+    ns.showMoving(st.moving == true and st.tab == "frames")
+  end
+  if ui.ring and st.moving then
+    ui.ring:SetColor(1, 0.82, 0, 1)
+  elseif ui.ring then
+    ui.ring:SetColor(0.45, 0.8, 1, 1)
+  end
 end
 
 -- After applyKeys: your bindings may have changed.
@@ -269,16 +339,24 @@ end
 
 ---------------------------------------------------------------- input
 
-local function clamp(v, lo, hi) return math.max(lo, math.min(hi, v)) end
+local function clamp(v, lo, hi)
+  return math.max(lo, math.min(hi, v))
+end
 
 -- fromKeys: a pad button or key, not the mouse. The focus line shows only
 -- while you drive with keys or the pad.
 local function nav(btn, fromKeys)
-  if InCombatLockdown() or not panel then return end
+  if InCombatLockdown() or not panel then
+    return
+  end
   st.keys = fromKeys == true
   if btn == "LB" or btn == "RB" then
     local i = 1
-    for n, t in ipairs(TABS) do if t == st.tab then i = n end end
+    for n, t in ipairs(TABS) do
+      if t == st.tab then
+        i = n
+      end
+    end
     i = (i + (btn == "RB" and 1 or -1) - 1) % #TABS + 1
     st.tab, st.zone, st.row, st.col = TABS[i], "list", 0, 0
     return refresh()
@@ -289,18 +367,32 @@ local function nav(btn, fromKeys)
   end
 
   if st.tab == "aim" then
-    if btn == "UP" or btn == "DOWN" then st.row = btn == "UP" and 0 or 1 end
+    if btn == "UP" or btn == "DOWN" then
+      st.row = btn == "UP" and 0 or 1
+    end
     local d = btn == "RIGHT" and 1 or btn == "LEFT" and -1 or 0
     if d ~= 0 and st.row == 0 then
       local i = 1
-      for n, k in ipairs(ns.AIMERS) do if k == ns.db.aimWith then i = n end end
+      for n, k in ipairs(ns.AIMERS) do
+        if k == ns.db.aimWith then
+          i = n
+        end
+      end
       ns.db.aimWith = ns.AIMERS[clamp(i + d, 1, #ns.AIMERS)]
       ns.applyKeys(true)
     elseif d ~= 0 then
       local free = {}
-      for _, key in ipairs(ns.CANCELS) do if not cancelTaken(key) then table.insert(free, key) end end
+      for _, key in ipairs(ns.CANCELS) do
+        if not cancelTaken(key) then
+          table.insert(free, key)
+        end
+      end
       local i = 1
-      for n, key in ipairs(free) do if key == ns.db.cancel then i = n end end
+      for n, key in ipairs(free) do
+        if key == ns.db.cancel then
+          i = n
+        end
+      end
       if free[1] then
         ns.db.cancel = free[clamp(i + d, 1, #free)]
         ns.applyKeys(true)
@@ -313,19 +405,31 @@ local function nav(btn, fromKeys)
     -- Moving: the d-pad or arrows nudge the diamond; A or B is done.
     if st.moving then
       local step = 20
-      if btn == "UP" then ns.db.y = ns.db.y + step
-      elseif btn == "DOWN" then ns.db.y = ns.db.y - step
-      elseif btn == "LEFT" then ns.db.x = ns.db.x - step
-      elseif btn == "RIGHT" then ns.db.x = ns.db.x + step
-      elseif btn == "A" or btn == "B" then st.moving = false end
+      if btn == "UP" then
+        ns.db.y = ns.db.y + step
+      elseif btn == "DOWN" then
+        ns.db.y = ns.db.y - step
+      elseif btn == "LEFT" then
+        ns.db.x = ns.db.x - step
+      elseif btn == "RIGHT" then
+        ns.db.x = ns.db.x + step
+      elseif btn == "A" or btn == "B" then
+        st.moving = false
+      end
       ns.layout()
       return refresh()
     end
-    if btn == "UP" then st.row, st.col = math.max(0, st.row - 1), 0 end
-    if btn == "DOWN" then st.row, st.col = math.min(2, st.row + 1), 0 end
+    if btn == "UP" then
+      st.row, st.col = math.max(0, st.row - 1), 0
+    end
+    if btn == "DOWN" then
+      st.row, st.col = math.min(2, st.row + 1), 0
+    end
     local d = btn == "RIGHT" and 1 or btn == "LEFT" and -1 or 0
     if st.row == 2 then
-      if d ~= 0 then st.col = clamp(st.col + d, 0, 1) end
+      if d ~= 0 then
+        st.col = clamp(st.col + d, 0, 1)
+      end
       if btn == "A" then
         if st.col == 0 then
           st.moving = true
@@ -341,15 +445,23 @@ local function nav(btn, fromKeys)
     elseif d ~= 0 then
       ns.db.distance = clamp(ns.db.distance + d, 1, 5)
     end
-    if d ~= 0 then ns.layout() end
+    if d ~= 0 then
+      ns.layout()
+    end
     return refresh()
   end
 
   local b = bindAt(st.li)
   if st.zone == "list" then
-    if btn == "UP" then st.li = math.max(1, st.li - 1) end
-    if btn == "DOWN" then st.li = math.max(1, math.min(bindCount(), st.li + 1)) end
-    if btn == "A" and b then setAim(b, not aimed(b)) end
+    if btn == "UP" then
+      st.li = math.max(1, st.li - 1)
+    end
+    if btn == "DOWN" then
+      st.li = math.max(1, math.min(bindCount(), st.li + 1))
+    end
+    if btn == "A" and b then
+      setAim(b, not aimed(b))
+    end
     if btn == "RIGHT" and b and b.heal then
       st.zone, st.row, st.col = "detail", 0, aimed(b) and 1 or 0
     end
@@ -359,15 +471,27 @@ local function nav(btn, fromKeys)
     st.zone = "list"
     return refresh()
   end
-  if btn == "UP" then st.row, st.col = 0, aimed(b) and 1 or 0 end
+  if btn == "UP" then
+    st.row, st.col = 0, aimed(b) and 1 or 0
+  end
   if btn == "DOWN" and aimed(b) then
     st.row = 1
-    for i, t in ipairs(ns.TAPS) do if t == ns.aimConf(b).tap then st.col = i - 1 end end
+    for i, t in ipairs(ns.TAPS) do
+      if t == ns.aimConf(b).tap then
+        st.col = i - 1
+      end
+    end
   end
   if btn == "LEFT" then
-    if st.col == 0 then st.zone = "list" else st.col = st.col - 1 end
+    if st.col == 0 then
+      st.zone = "list"
+    else
+      st.col = st.col - 1
+    end
   end
-  if btn == "RIGHT" then st.col = math.min(st.row == 0 and 1 or #ns.TAPS - 1, st.col + 1) end
+  if btn == "RIGHT" then
+    st.col = math.min(st.row == 0 and 1 or #ns.TAPS - 1, st.col + 1)
+  end
   if btn == "A" then
     if st.row == 0 then
       setAim(b, st.col == 1)
@@ -384,20 +508,32 @@ ns.optionsNav = nav
 local SPEED = 700 -- screen units a second at full tilt
 local glide = CreateFrame("Frame")
 glide:SetScript("OnUpdate", function(_, elapsed)
-  if not st.moving or not panel or not panel:IsShown() then return end
+  if not st.moving or not panel or not panel:IsShown() then
+    return
+  end
   local ok, state = pcall(function()
     return C_GamePad.GetDeviceMappedState(C_GamePad.GetActiveDeviceID())
   end)
-  if not ok or type(state) ~= "table" or type(state.sticks) ~= "table" then return end
+  if not ok or type(state) ~= "table" or type(state.sticks) ~= "table" then
+    return
+  end
   local dx, dy = 0, 0
   for _, stick in ipairs(state.sticks) do
     local x, y = tonumber(stick.x) or 0, tonumber(stick.y) or 0
-    if math.abs(x) > math.abs(dx) then dx = x end
-    if math.abs(y) > math.abs(dy) then dy = y end
+    if math.abs(x) > math.abs(dx) then
+      dx = x
+    end
+    if math.abs(y) > math.abs(dy) then
+      dy = y
+    end
   end
-  local function dead(v) return math.abs(v) < 0.2 and 0 or v end
+  local function dead(v)
+    return math.abs(v) < 0.2 and 0 or v
+  end
   dx, dy = dead(dx), dead(dy)
-  if dx == 0 and dy == 0 then return end
+  if dx == 0 and dy == 0 then
+    return
+  end
   ns.db.x = ns.db.x + dx * SPEED * elapsed
   ns.db.y = ns.db.y + dy * SPEED * elapsed
   ns.layout()
@@ -405,24 +541,43 @@ end)
 
 -- While the panel is open these keys drive it; they go back when it closes.
 local NAV_KEYS = {
-  PADDUP = "UP", PADDDOWN = "DOWN", PADDLEFT = "LEFT", PADDRIGHT = "RIGHT",
-  UP = "UP", DOWN = "DOWN", LEFT = "LEFT", RIGHT = "RIGHT",
-  PAD1 = "A", ENTER = "A", SPACE = "A", PAD2 = "B",
-  PADLSHOULDER = "LB", PADRSHOULDER = "RB", Q = "LB", E = "RB", ESCAPE = "ESC",
+  PADDUP = "UP",
+  PADDDOWN = "DOWN",
+  PADDLEFT = "LEFT",
+  PADDRIGHT = "RIGHT",
+  UP = "UP",
+  DOWN = "DOWN",
+  LEFT = "LEFT",
+  RIGHT = "RIGHT",
+  PAD1 = "A",
+  ENTER = "A",
+  SPACE = "A",
+  PAD2 = "B",
+  PADLSHOULDER = "LB",
+  PADRSHOULDER = "RB",
+  Q = "LB",
+  E = "RB",
+  ESCAPE = "ESC",
 }
 for _, btn in ipairs({ "UP", "DOWN", "LEFT", "RIGHT", "A", "B", "LB", "RB", "ESC" }) do
   local f = CreateFrame("Button", "HealpadNav" .. btn, UIParent)
-  f:SetScript("OnClick", function() nav(btn, true) end)
+  f:SetScript("OnClick", function()
+    nav(btn, true)
+  end)
 end
 
 local function takeKeys()
-  if InCombatLockdown() then return end
+  if InCombatLockdown() then
+    return
+  end
   for key, btn in pairs(NAV_KEYS) do
     SetOverrideBindingClick(panel, true, key, "HealpadNav" .. btn)
   end
 end
 local function giveKeys()
-  if InCombatLockdown() then return end
+  if InCombatLockdown() then
+    return
+  end
   ClearOverrideBindings(panel)
 end
 
@@ -434,7 +589,9 @@ local function liOf(entry)
   for _, r in ipairs(rows) do
     if r.bind then
       n = n + 1
-      if r == entry then return n end
+      if r == entry then
+        return n
+      end
     end
   end
 end
@@ -487,13 +644,21 @@ local function buildButtonsTab(parent)
     f.check:SetSize(24, 24)
     f.check:SetPoint("RIGHT", -8, 0)
     local function pick(flip)
-      if InCombatLockdown() or not f.entry or not f.entry.bind then return end
+      if InCombatLockdown() or not f.entry or not f.entry.bind then
+        return
+      end
       st.li, st.zone = liOf(f.entry) or st.li, "list"
-      if flip then setAim(f.entry.bind, not aimed(f.entry.bind)) end
+      if flip then
+        setAim(f.entry.bind, not aimed(f.entry.bind))
+      end
       refresh()
     end
-    line:SetScript("OnClick", function() pick(false) end)
-    f.check:SetScript("OnClick", function() pick(true) end)
+    line:SetScript("OnClick", function()
+      pick(false)
+    end)
+    f.check:SetScript("OnClick", function()
+      pick(true)
+    end)
     ui.rows[i] = f
   end
   ui.empty = text(list, "GameFontDisable")
@@ -524,8 +689,14 @@ local function buildButtonsTab(parent)
   d.cast:SetPoint("TOPLEFT")
   d.hold = redButton(d.modes, half, 34, "Hold to Aim")
   d.hold:SetPoint("TOPLEFT", d.cast, "TOPRIGHT", 8, 0)
-  d.cast:SetScript("OnClick", function() st.zone, st.row, st.col = "detail", 0, 0 ns.optionsNav("A") end)
-  d.hold:SetScript("OnClick", function() st.zone, st.row, st.col = "detail", 0, 1 ns.optionsNav("A") end)
+  d.cast:SetScript("OnClick", function()
+    st.zone, st.row, st.col = "detail", 0, 0
+    ns.optionsNav("A")
+  end)
+  d.hold:SetScript("OnClick", function()
+    st.zone, st.row, st.col = "detail", 0, 1
+    ns.optionsNav("A")
+  end)
 
   d.tapBox = CreateFrame("Frame", nil, d)
   d.tapBox:SetPoint("TOPLEFT", d.modes, "BOTTOMLEFT", 0, -24)
@@ -539,7 +710,10 @@ local function buildButtonsTab(parent)
   for i, tap in ipairs(ns.TAPS) do
     local b = redButton(d.tapBox, tw, 28, ns.TAP_LABEL[tap])
     b:SetPoint("TOPLEFT", (i - 1) * (tw + 6), -20)
-    b:SetScript("OnClick", function() st.zone, st.row, st.col = "detail", 1, i - 1 ns.optionsNav("A") end)
+    b:SetScript("OnClick", function()
+      st.zone, st.row, st.col = "detail", 1, i - 1
+      ns.optionsNav("A")
+    end)
     d.taps[i] = b
   end
   return t
@@ -557,7 +731,9 @@ local function buildAimTab(parent)
     local b = redButton(t, w, 44, ns.AIMER_LABEL[k])
     b:SetPoint("TOPLEFT", PAD + (i - 1) * (w + 12), -PAD - 30)
     b:SetScript("OnClick", function()
-      if InCombatLockdown() then return end
+      if InCombatLockdown() then
+        return
+      end
       st.row = 0
       ns.db.aimWith = k
       ns.applyKeys(true)
@@ -574,7 +750,9 @@ local function buildAimTab(parent)
     local b = redButton(t, 60, 34, keyText(NAMES[key]))
     b:SetPoint("TOPLEFT", PAD + (i - 1) * 68, -PAD - 140)
     b:SetScript("OnClick", function()
-      if InCombatLockdown() or cancelTaken(key) then return end
+      if InCombatLockdown() or cancelTaken(key) then
+        return
+      end
       st.row = 1
       ns.db.cancel = key
       ns.applyKeys(true)
@@ -603,17 +781,29 @@ local function slider(parent, label, y, row, lo, hi)
   frame:SetPoint("LEFT", minus, "RIGHT", 8, 0)
   frame:SetPoint("RIGHT", plus, "LEFT", -8, 0)
   frame:SetHeight(20)
-  frame:SetBackdrop({ bgFile = "Interface\\Buttons\\UI-SliderBar-Background",
-    edgeFile = "Interface\\Buttons\\UI-SliderBar-Border", tile = true, tileEdge = true,
-    tileSize = 8, edgeSize = 8, insets = { left = 3, right = 3, top = 6, bottom = 6 } })
+  frame:SetBackdrop({
+    bgFile = "Interface\\Buttons\\UI-SliderBar-Background",
+    edgeFile = "Interface\\Buttons\\UI-SliderBar-Border",
+    tile = true,
+    tileEdge = true,
+    tileSize = 8,
+    edgeSize = 8,
+    insets = { left = 3, right = 3, top = 6, bottom = 6 },
+  })
   s.bar = CreateFrame("StatusBar", nil, frame)
   s.bar:SetPoint("TOPLEFT", 4, -6)
   s.bar:SetPoint("BOTTOMRIGHT", -4, 6)
   s.bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
   s.bar:SetStatusBarColor(1, 0.82, 0)
   s.bar:SetMinMaxValues(lo, hi)
-  minus:SetScript("OnClick", function() st.row = row ns.optionsNav("LEFT") end)
-  plus:SetScript("OnClick", function() st.row = row ns.optionsNav("RIGHT") end)
+  minus:SetScript("OnClick", function()
+    st.row = row
+    ns.optionsNav("LEFT")
+  end)
+  plus:SetScript("OnClick", function()
+    st.row = row
+    ns.optionsNav("RIGHT")
+  end)
   return s
 end
 
@@ -630,8 +820,14 @@ local function buildFramesTab(parent)
   t.move:SetPoint("TOPLEFT", PAD, -PAD - 224)
   t.reset = redButton(t, 120, 30, "Reset")
   t.reset:SetPoint("LEFT", t.move, "RIGHT", 10, 0)
-  t.move:SetScript("OnClick", function() st.row, st.col = 2, 0 nav("A") end)
-  t.reset:SetScript("OnClick", function() st.row, st.col = 2, 1 nav("A") end)
+  t.move:SetScript("OnClick", function()
+    st.row, st.col = 2, 0
+    nav("A")
+  end)
+  t.reset:SetScript("OnClick", function()
+    st.row, st.col = 2, 1
+    nav("A")
+  end)
   return t
 end
 
@@ -644,9 +840,15 @@ local function build()
   panel:EnableMouse(true)
   panel:SetClampedToScreen(true)
   panel:Hide()
-  if ButtonFrameTemplate_HideButtonBar then ButtonFrameTemplate_HideButtonBar(panel) end
-  if panel.SetTitle then panel:SetTitle("Healpad") end
-  if panel.SetPortraitToUnit then panel:SetPortraitToUnit("player") end
+  if ButtonFrameTemplate_HideButtonBar then
+    ButtonFrameTemplate_HideButtonBar(panel)
+  end
+  if panel.SetTitle then
+    panel:SetTitle("Healpad")
+  end
+  if panel.SetPortraitToUnit then
+    panel:SetPortraitToUnit("player")
+  end
   local inset = type(panel.Inset) == "table" and panel.Inset or nil
   local body = inset or panel
   if inset then
@@ -661,17 +863,27 @@ local function build()
     local tab = CreateFrame("Button", "HealpadOptionsTab" .. i, panel, "PanelTabButtonTemplate")
     tab:SetID(i)
     tab:SetText(TAB_LABEL[t])
-    if PanelTemplates_TabResize then PanelTemplates_TabResize(tab, 0) end
-    if i == 1 then tab:SetPoint("TOPLEFT", panel, "BOTTOMLEFT", 12, 2) end
+    if PanelTemplates_TabResize then
+      PanelTemplates_TabResize(tab, 0)
+    end
+    if i == 1 then
+      tab:SetPoint("TOPLEFT", panel, "BOTTOMLEFT", 12, 2)
+    end
     tab:SetScript("OnClick", function()
-      if InCombatLockdown() then return end
+      if InCombatLockdown() then
+        return
+      end
       st.tab, st.zone, st.row, st.col = t, "list", 0, 0
-      if PlaySound and SOUNDKIT then pcall(PlaySound, SOUNDKIT.IG_CHARACTER_INFO_TAB) end
+      if PlaySound and SOUNDKIT then
+        pcall(PlaySound, SOUNDKIT.IG_CHARACTER_INFO_TAB)
+      end
       refresh()
     end)
     ui.tabs[i] = tab
   end
-  if PanelTemplates_SetNumTabs then PanelTemplates_SetNumTabs(panel, #TABS) end
+  if PanelTemplates_SetNumTabs then
+    PanelTemplates_SetNumTabs(panel, #TABS)
+  end
 
   ui.buttons = buildButtonsTab(body)
   ui.aim = buildAimTab(body)
@@ -687,46 +899,73 @@ local function build()
   end)
   panel:SetScript("OnHide", function()
     giveKeys()
-    if ns.preview then ns.preview(false) end
+    if ns.preview then
+      ns.preview(false)
+    end
     st.moving = false
-    if ns.showMoving then ns.showMoving(false) end
-    if ns.db then ns.db.x, ns.db.y = math.floor(ns.db.x + 0.5), math.floor(ns.db.y + 0.5) end
+    if ns.showMoving then
+      ns.showMoving(false)
+    end
+    if ns.db then
+      ns.db.x, ns.db.y = math.floor(ns.db.x + 0.5), math.floor(ns.db.y + 0.5)
+    end
   end)
   table.insert(UISpecialFrames, "HealpadOptions")
 end
 
 function ns.openOptions()
-  if InCombatLockdown() then ns.say("after combat.") return end
-  if not panel then build() end
+  if InCombatLockdown() then
+    ns.say("after combat.")
+    return
+  end
+  if not panel then
+    build()
+  end
   ns.binds = ns.readBinds()
   buildRows()
   st.li = math.max(1, math.min(st.li, bindCount()))
   panel:Show()
   refresh()
 end
-function ns.optionsPanel() return panel end
+function ns.optionsPanel()
+  return panel
+end
 -- For /hp test: the parts and the focus.
-function ns.optionsDebug() return { panel = panel, ui = ui, st = st, rows = rows } end
+function ns.optionsDebug()
+  return { panel = panel, ui = ui, st = st, rows = rows }
+end
 
 SLASH_HEALPAD1 = "/healpad"
 SLASH_HEALPAD2 = "/hp"
 SlashCmdList.HEALPAD = function(msg)
   local cmd = (msg or ""):lower():match("^%s*(%S*)")
   if cmd == "test" then
-    if ns.selfTest then ns.selfTest() end
+    if ns.selfTest then
+      ns.selfTest()
+    end
     return
   end
   if cmd == "shots" then
-    if ns.showcase then ns.showcase() end
+    if ns.showcase then
+      ns.showcase()
+    end
     return
   end
-  if panel and panel:IsShown() then panel:Hide() else ns.openOptions() end
+  if panel and panel:IsShown() then
+    panel:Hide()
+  else
+    ns.openOptions()
+  end
 end
 
 ns.on("PLAYER_REGEN_DISABLED", function()
-  if panel and panel:IsShown() then panel:Hide() end
+  if panel and panel:IsShown() then
+    panel:Hide()
+  end
 end)
 
 ns.on("PLAYER_LOGIN", function()
-  if next(ns.db.aim) == nil then ns.say("type /hp to choose which heals hold to aim.") end
+  if next(ns.db.aim) == nil then
+    ns.say("type /hp to choose which heals hold to aim.")
+  end
 end)
