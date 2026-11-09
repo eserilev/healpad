@@ -52,8 +52,8 @@ function M.new()
   end
 
   function Frame:GetName() return self.name end
-  function Frame:GetFrameLevel() return self.level or 1 end
-  function Frame:SetFrameLevel(l) self.level = l end
+  function Frame:GetFrameLevel() return self._level or 1 end
+  function Frame:SetFrameLevel(l) self._level = l end
   function Frame:CreateMaskTexture() return newRegion(self) end
   function Frame:SetFormattedText(fmt, ...)
     local args = {}

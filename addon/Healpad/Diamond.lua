@@ -22,12 +22,6 @@ ns.diamond = root
 local title = root:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
 local pageText = root:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 
--- The gold arrow over the aimed person.
-local aimArrow = root:CreateTexture(nil, "OVERLAY")
-aimArrow:SetSize(22, 22)
-aimArrow:SetTexture("Interface\\Buttons\\Arrow-Up-Up")
-pcall(aimArrow.SetRotation, aimArrow, math.pi)
-aimArrow:SetVertexColor(1, 0.82, 0)
 
 local MASK = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
 local function disc(f, anchor, size, layer, sub)
@@ -134,14 +128,16 @@ end
 for _, d in ipairs(ns.DIRS) do makeSpot(d) end
 ns.spots = spots
 
--- Around your character: you just below, the others up, right, down, left.
+-- A diamond: you in the middle, the others up, right, down and left of you,
+-- a little below your character so it stays in sight.
+local CENTER_Y = -70
 function ns.layout()
   local d = ns.db and ns.db.distance or 3
-  local v, h = 90 + 30 * d, 150 + 40 * d
-  local at = { UP = { 0, v }, RIGHT = { h, 0 }, DOWN = { 0, -v }, LEFT = { -h, 0 }, SELF = { 0, -80 } }
+  local v, h = 62 + 14 * d, 214 + 24 * d
+  local at = { UP = { 0, v }, RIGHT = { h, 0 }, DOWN = { 0, -v }, LEFT = { -h, 0 }, SELF = { 0, 0 } }
   for dir, f in pairs(spots) do
     f:ClearAllPoints()
-    f:SetPoint("CENTER", root, "CENTER", at[dir][1], at[dir][2])
+    f:SetPoint("CENTER", root, "CENTER", at[dir][1], at[dir][2] + CENTER_Y)
   end
   title:ClearAllPoints()
   title:SetPoint("BOTTOM", spots.UP, "TOP", 0, 26)
@@ -285,10 +281,10 @@ end
 
 -- Example people for the Frames tab when you're not in a group.
 local SAMPLE = {
-  UP = { name = "Brakka", class = "WARRIOR", level = 60, hp = 0.82, power = 0.35, color = { 1, 0, 0 } },
-  RIGHT = { name = "Ysolde", class = "PRIEST", level = 60, hp = 0.41, inc = 0.22, power = 0.64, color = { 0, 0, 1 } },
-  DOWN = { name = "Tomas", class = "ROGUE", level = 59, hp = 1, power = 0.8, color = { 1, 1, 0 } },
-  LEFT = { name = "Kira", class = "MAGE", level = 60, hp = 0.63, power = 0.5, color = { 0, 0, 1 },
+  UP = { name = "Party Member", class = "WARRIOR", level = 60, hp = 0.82, power = 0.35, color = { 1, 0, 0 } },
+  RIGHT = { name = "Party Member", class = "PRIEST", level = 60, hp = 0.41, inc = 0.22, power = 0.64, color = { 0, 0, 1 } },
+  DOWN = { name = "Party Member", class = "ROGUE", level = 59, hp = 1, power = 0.8, color = { 1, 1, 0 } },
+  LEFT = { name = "Party Member", class = "MAGE", level = 60, hp = 0.63, power = 0.5, color = { 0, 0, 1 },
     dispel = { 0.2, 0.6, 1, 1 } },
 }
 
@@ -363,10 +359,12 @@ function ns.redraw()
       drawSpot(spots[d], d, ctl:GetAttribute("u" .. page .. "-" .. d), sel, spell)
     end
   end
-  local at = spots[sel]
-  aimArrow:ClearAllPoints()
-  aimArrow:SetPoint("BOTTOM", at, "TOP", FACE / 4, -2)
-  aimArrow:SetShown(at:IsShown())
+  -- The aimed person stands out: a gold glow, a touch larger, on top.
+  for _, d in ipairs(ns.DIRS) do
+    local f = spots[d]
+    f:SetScale(d == sel and 1.12 or 1)
+    f:SetFrameLevel(d == sel and 20 or 5)
+  end
 end
 
 -- The name of the person a cast went to, shown for a moment where they sit.
