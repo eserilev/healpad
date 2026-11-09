@@ -94,7 +94,11 @@ ns.DIR_SNIPPET = [[
   local c = self:GetFrameRef("ctl")
   if c:GetAttribute("held") then
     local d = self:GetAttribute("dir")
-    if c:GetAttribute("u" .. (c:GetAttribute("page") or 1) .. "-" .. d) then
+    local cur = c:GetAttribute("sel")
+    local back = (d == "UP" and "DOWN") or (d == "DOWN" and "UP") or (d == "LEFT" and "RIGHT") or (d == "RIGHT" and "LEFT")
+    if cur and cur == back then
+      c:SetAttribute("sel", "SELF")
+    elseif c:GetAttribute("u" .. (c:GetAttribute("page") or 1) .. "-" .. d) then
       c:SetAttribute("sel", d)
     end
   end

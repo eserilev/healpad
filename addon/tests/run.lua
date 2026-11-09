@@ -107,6 +107,24 @@ test("press casts nothing, aim, release casts the locked spell on the aimed one"
   clean(W)
 end)
 
+test("the opposite way comes back to you", function()
+  local W, ns = game({ party = false })
+  W.units.target = { name = "Friend", hp = 1, max = 2, friendly = true }
+  W.combat = true
+  W.key("PAD3", true) W.tap("UP") W.tap("DOWN")
+  eq(ns.ctl:GetAttribute("sel"), "SELF")
+  W.key("PAD3", false)
+  eq(last(W).unit, "player")
+  local W2, ns2 = game()
+  W2.combat = true
+  W2.key("PAD3", true) W2.tap("PADDLEFT") W2.tap("PADDRIGHT")
+  eq(ns2.ctl:GetAttribute("sel"), "SELF")
+  W2.tap("PADDRIGHT")
+  eq(ns2.ctl:GetAttribute("sel"), "RIGHT", "a second press goes on")
+  W2.key("PAD3", false)
+  clean(W2)
+end)
+
 test("arrow keys aim too", function()
   local W = game()
   W.combat = true
