@@ -127,6 +127,12 @@ local function drawTabs()
   ui.buttons:SetShown(st.tab == "buttons")
   ui.aim:SetShown(st.tab == "aim")
   ui.frames:SetShown(st.tab == "frames")
+  -- The preview puts the first Hold to Aim button's tap target in the middle.
+  ns.previewTap = nil
+  for _, b in ipairs(ns.binds or {}) do
+    local conf = ns.aimConf(b)
+    if conf and not ns.previewTap then ns.previewTap = conf.tap end
+  end
   if ns.preview then ns.preview(st.tab == "frames") end
   panel:ClearAllPoints()
   -- On Frames the window gets narrow and steps aside so the diamond shows.

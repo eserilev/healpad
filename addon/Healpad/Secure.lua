@@ -27,6 +27,25 @@ ns.HEAL_SNIPPET = [[
       return false
     end
     owner:SetAttribute("held", name)
+    -- The middle of the diamond is whoever a tap heals: when that's someone
+    -- in it, they trade places with you for this hold.
+    local tap = self:GetAttribute("hp-tap")
+    local tu
+    if tap == "tank" then
+      tu = owner:GetAttribute("tank")
+    elseif tap == "last" then
+      tu = owner:GetAttribute("last")
+    elseif tap == "focus" then
+      tu = "focus"
+    end
+    local swap
+    if tu and tu ~= "player" then
+      if owner:GetAttribute("u1-UP") == tu then swap = "UP"
+      elseif owner:GetAttribute("u1-RIGHT") == tu then swap = "RIGHT"
+      elseif owner:GetAttribute("u1-DOWN") == tu then swap = "DOWN"
+      elseif owner:GetAttribute("u1-LEFT") == tu then swap = "LEFT" end
+    end
+    owner:SetAttribute("swap", swap)
     owner:SetAttribute("sel", nil)
     owner:SetAttribute("page", 1)
     owner:ClearBindings()
@@ -52,7 +71,19 @@ ns.HEAL_SNIPPET = [[
   end
   local unit
   local sel = owner:GetAttribute("sel")
-  if sel then
+  local swap = owner:GetAttribute("swap")
+  owner:SetAttribute("swap", nil)
+  if sel and swap and (owner:GetAttribute("page") or 1) == 1 then
+    if sel == swap then
+      sel = nil
+      unit = "player"
+    elseif sel == "SELF" then
+      sel = nil
+    end
+  end
+  if unit then
+    -- you, from your traded place
+  elseif sel then
     unit = owner:GetAttribute("u" .. (owner:GetAttribute("page") or 1) .. "-" .. sel)
   else
     local tap = self:GetAttribute("hp-tap")
@@ -99,6 +130,25 @@ ns.KB_PRE = [[
       return false
     end
     owner:SetAttribute("held", name)
+    -- The middle of the diamond is whoever a tap heals: when that's someone
+    -- in it, they trade places with you for this hold.
+    local tap = self:GetAttribute("hp-tap")
+    local tu
+    if tap == "tank" then
+      tu = owner:GetAttribute("tank")
+    elseif tap == "last" then
+      tu = owner:GetAttribute("last")
+    elseif tap == "focus" then
+      tu = "focus"
+    end
+    local swap
+    if tu and tu ~= "player" then
+      if owner:GetAttribute("u1-UP") == tu then swap = "UP"
+      elseif owner:GetAttribute("u1-RIGHT") == tu then swap = "RIGHT"
+      elseif owner:GetAttribute("u1-DOWN") == tu then swap = "DOWN"
+      elseif owner:GetAttribute("u1-LEFT") == tu then swap = "LEFT" end
+    end
+    owner:SetAttribute("swap", swap)
     owner:SetAttribute("sel", nil)
     owner:SetAttribute("page", 1)
     owner:ClearBindings()
@@ -124,7 +174,19 @@ ns.KB_PRE = [[
   end
   local unit
   local sel = owner:GetAttribute("sel")
-  if sel then
+  local swap = owner:GetAttribute("swap")
+  owner:SetAttribute("swap", nil)
+  if sel and swap and (owner:GetAttribute("page") or 1) == 1 then
+    if sel == swap then
+      sel = nil
+      unit = "player"
+    elseif sel == "SELF" then
+      sel = nil
+    end
+  end
+  if unit then
+    -- you, from your traded place
+  elseif sel then
     unit = owner:GetAttribute("u" .. (owner:GetAttribute("page") or 1) .. "-" .. sel)
   else
     local tap = self:GetAttribute("hp-tap")
@@ -179,6 +241,7 @@ ns.CANCEL_SNIPPET = [[
   c:ClearBindings()
   c:SetAttribute("held", nil)
   c:SetAttribute("sel", nil)
+  c:SetAttribute("swap", nil)
   c:SetAttribute("state", "idle")
 ]]
 

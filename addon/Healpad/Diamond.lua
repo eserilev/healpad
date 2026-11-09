@@ -344,7 +344,7 @@ end
 local SAMPLE = {
   UP = { name = "Party Member", class = "WARRIOR", level = 60, hp = 0.82, power = 0.35, color = { 1, 0, 0 } },
   RIGHT = { name = "Party Member", class = "PRIEST", level = 60, hp = 0.41, inc = 0.22, power = 0.64, color = { 0, 0, 1 } },
-  DOWN = { name = "Party Member", class = "ROGUE", level = 59, hp = 1, power = 0.8, color = { 1, 1, 0 } },
+  DOWN = { name = "Party Member", class = "ROGUE", level = 60, hp = 1, power = 0.8, color = { 1, 1, 0 } },
   LEFT = { name = "Party Member", class = "MAGE", level = 60, hp = 0.63, power = 0.5, color = { 0, 0, 1 },
     dispel = { 0.2, 0.6, 1, 1 } },
 }
@@ -359,8 +359,8 @@ local function classFace(tex, class)
   if not ok then tex:SetColorTexture(0.25, 0.22, 0.18, 1) end
 end
 
-local function drawSample(f, dir, sel)
-  local p = SAMPLE[dir]
+local function drawSample(f, dir, sel, from)
+  local p = SAMPLE[from or dir]
   f:Show()
   f:SetAlpha(1)
   classFace(f.face, p.class)
@@ -408,16 +408,24 @@ function ns.redraw()
   if not root:IsShown() then return end
   local page = ctl:GetAttribute("page") or 1
   local pages = ctl:GetAttribute("pages") or 1
-  local sel = (ns.stage and ns.stage.sel) or ctl:GetAttribute("sel") or tapPlace(page)
+  -- Who sits where: the tap target in the middle, you in their place.
+  local swap = page == 1 and ctl:GetAttribute("swap") or nil
+  local sample0 = previewing and ctl:GetAttribute("state") ~= "aim" and (not IsInGroup() or ns.stage ~= nil)
+  if sample0 and not ns.stage and ns.previewTap == "tank" then swap = "UP" end
+  local sel = (ns.stage and ns.stage.sel) or ctl:GetAttribute("sel") or (swap and "SELF") or tapPlace(page)
   local spell = heldSpell() or ns.previewSpell
   title:SetText(spell and ns.spellLabel(spell) or "")
   pageText:SetText(pages > 1 and ("Group " .. page .. " / " .. pages) or "")
   local sample = previewing and ctl:GetAttribute("state") ~= "aim" and (not IsInGroup() or ns.stage ~= nil)
   for _, d in ipairs(ns.DIRS) do
-    if sample and SAMPLE[d] then
-      drawSample(spots[d], d, sel)
+    local from = d
+    if swap and d == "SELF" then from = swap elseif swap and d == swap then from = "SELF" end
+    if sample and SAMPLE[from] then
+      drawSample(spots[d], d, sel, from)
     else
-      drawSpot(spots[d], d, ctl:GetAttribute("u" .. page .. "-" .. d), sel, spell)
+      local unit = ctl:GetAttribute("u" .. page .. "-" .. from)
+      if from == "SELF" and swap then unit = "player" end
+      drawSpot(spots[d], d, unit, sel, spell)
     end
   end
   -- The aimed person stands out: a gold glow, a touch larger, on top.
