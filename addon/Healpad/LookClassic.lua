@@ -103,6 +103,8 @@ function look.build(stage)
   c:SetAllPoints()
   c:Hide()
   look.frame = c
+  -- every look takes about the same room on screen at the same Size
+  c:SetScale(1.15)
   look.spots = {}
   for _, d in ipairs(ns.DIRS) do
     look.spots[d] = makeFrame(c)
@@ -113,7 +115,7 @@ end
 function look.layout(spread)
   -- the middle frame is bigger; the gaps grow with Spread and never close
   local hx = W * 1.15 / 2 + W / 2 + 14 + spread * 6
-  local vy = H * 1.15 / 2 + H / 2 + 10 + spread * 5
+  local vy = H * 1.15 / 2 + H / 2 + 30 + spread * 5
   local off = { UP = { 0, vy }, RIGHT = { hx, 0 }, DOWN = { 0, -vy }, LEFT = { -hx, 0 }, SELF = { 0, 0 } }
   for d, f in pairs(look.spots) do
     f.at = off[d]

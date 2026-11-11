@@ -194,6 +194,8 @@ function look.build(stage, fx)
   c:SetAllPoints()
   c:Hide()
   look.frame = c
+  -- every look takes about the same room on screen at the same Size
+  c:SetScale(0.88)
   look.spots = {}
   for _, d in ipairs({ "UP", "RIGHT", "DOWN", "LEFT" }) do
     look.spots[d] = makeCard(c)
