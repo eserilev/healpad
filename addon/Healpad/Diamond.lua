@@ -154,7 +154,15 @@ function ns.layout()
   if ns.shotsCentered then
     x, y = 0, 0 -- /hp shots page: the middle of the screen
   end
-  root:SetScale(scale)
+  -- lifted onto WorldFrame for screenshots: the same size as on UIParent
+  local lift = 1
+  if root:GetParent() == WorldFrame then
+    local ok, k = pcall(function()
+      return UIParent:GetEffectiveScale() / WorldFrame:GetEffectiveScale()
+    end)
+    lift = (ok and type(k) == "number" and k > 0) and k or 1
+  end
+  root:SetScale(scale * lift)
   root:ClearAllPoints()
   root:SetPoint("CENTER", UIParent, "CENTER", x, y)
   fx:SetScale(scale)
