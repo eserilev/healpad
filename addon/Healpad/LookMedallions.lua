@@ -116,7 +116,7 @@ function look.build(stage, fx)
   c:Hide()
   look.frame = c
   -- every look takes about the same room on screen at the same Size
-  c:SetScale(1.0)
+  c:SetScale(0.85)
   look.spots = {}
   for _, d in ipairs(ns.DIRS) do
     look.spots[d] = makeSpot(c, d)

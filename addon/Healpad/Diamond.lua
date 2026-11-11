@@ -151,6 +151,9 @@ end
 function ns.layout()
   local scale = ns.db and ns.db.scale or 1
   local x, y = (ns.db and ns.db.x or 0) / scale, (ns.db and ns.db.y or 0) / scale
+  if ns.shotsCentered then
+    x, y = 0, 0 -- /hp shots page: the middle of the screen
+  end
   root:SetScale(scale)
   root:ClearAllPoints()
   root:SetPoint("CENTER", UIParent, "CENTER", x, y)

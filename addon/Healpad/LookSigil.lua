@@ -90,7 +90,7 @@ function look.build(stage, fx)
   c:Hide()
   look.frame = c
   -- every look takes about the same room on screen at the same Size
-  c:SetScale(0.95)
+  c:SetScale(0.82)
   -- the rune circle: two rings turning opposite ways, a ring of dots, four
   -- points at the compass marks
   look.runes = CreateFrame("Frame", nil, c)

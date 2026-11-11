@@ -36,6 +36,10 @@ local function restore()
     ns.preview(false)
   end
   UIParent:Show()
+  ns.shotsCentered = nil
+  if ns.layout then
+    ns.layout()
+  end
 end
 
 function ns.showcase()
@@ -61,6 +65,9 @@ function ns.showcase()
       lift(ns.diamond)
       lift(ns.optionsPanel())
       UIParent:Hide()
+      -- the menu in the middle of the screen, wherever you keep it
+      ns.shotsCentered = true
+      ns.layout()
       ns.previewSpell = spell
       ns.preview(true)
     end,
