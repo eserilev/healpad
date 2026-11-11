@@ -39,6 +39,53 @@ local function report()
   )
   local ok, n = pcall(GetNumBindings)
   ns.log("REPORT bindings in the game: " .. tostring(ok and n))
+  -- Every controller button: what it does, plain and with overrides.
+  for _, m in ipairs({ "", "SHIFT-", "CTRL-", "ALT-" }) do
+    for _, base in ipairs(ns.PAD_ORDER) do
+      local key = m .. base
+      local ok1, plain = pcall(GetBindingAction, key)
+      local ok2, over = pcall(GetBindingAction, key, true)
+      plain, over = ok1 and plain or "?", ok2 and over or "?"
+      if plain ~= "" or over ~= "" then
+        local r = ns.resolve(over ~= "" and over or plain)
+        ns.log(
+          string.format(
+            "REPORT pad %s = %s | override %s -> %s",
+            key,
+            plain,
+            over,
+            r and ns.spellLabel(r.spell) or "no spell"
+          )
+        )
+      end
+    end
+  end
+  for _, cv in ipairs({ "GamePadEnable", "GamePadEmulateShift", "GamePadEmulateCtrl", "GamePadEmulateAlt" }) do
+    local okc, v = pcall(C_CVar.GetCVar, cv)
+    ns.log("REPORT cvar " .. cv .. " = " .. tostring(okc and v))
+  end
+  -- Any game API about controllers or bindings, in case this client keeps
+  -- controller bindings apart from the key bindings.
+  local apis = {}
+  for name, t in pairs(_G) do
+    if type(name) == "string" and type(t) == "table" and name:match("^C_") then
+      local low = name:lower()
+      if low:find("pad") or low:find("controller") or low:find("bind") or low:find("console") then
+        local fns = {}
+        for fname, f in pairs(t) do
+          if type(f) == "function" then
+            table.insert(fns, fname)
+          end
+        end
+        table.sort(fns)
+        table.insert(apis, name .. "{" .. table.concat(fns, ",") .. "}")
+      end
+    end
+  end
+  table.sort(apis)
+  for _, a in ipairs(apis) do
+    ns.log("REPORT api " .. a)
+  end
   for _, b in ipairs(ns.binds or {}) do
     local states = {}
     for _, s in ipairs(ns.BAR_STATES) do

@@ -212,6 +212,7 @@ local PAD_ORDER = {
   "PADFORWARD",
   "PADBACK",
 }
+ns.PAD_ORDER = PAD_ORDER
 local PAD_RANK = {}
 for i, k in ipairs(PAD_ORDER) do
   PAD_RANK[k] = i
