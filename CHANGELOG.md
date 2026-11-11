@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Gamepad Mode: the d-pad picks who to heal while you aim, even where the game's own controller
+  bindings take the d-pad.
+- Aim with a stick turns on the game's stick buttons (GamePadStickAxisButtons); without it the
+  sticks sent nothing.
+
 ## 0.2.2
 
 - The game's Gamepad Mode: Buttons lists the controller bar (A, LT+A, RT+X, the d-pad...) with

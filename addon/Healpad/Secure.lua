@@ -186,6 +186,31 @@ ns.GP_PRE = [[
   local name = self:GetName() or ""
   local gen = owner:GetAttribute("gen") or 0
   local n = strmatch(name, "ActionButton(%d)$")
+  -- While aiming, the d-pad picks a person even when Gamepad Mode's own
+  -- bindings beat Healpad's: its press reaches this button, and the press
+  -- and its release cast nothing.
+  local held = owner:GetAttribute("held")
+  if owner:GetAttribute("gpflip-" .. name) then
+    if not down then
+      owner:SetAttribute("gpflip-" .. name, nil)
+    end
+    return false
+  end
+  if held and held ~= name and down and owner:GetAttribute("gpdpad") then
+    local d
+    if n == "1" then d = "LEFT" elseif n == "2" then d = "UP" elseif n == "3" then d = "RIGHT" elseif n == "4" then d = "DOWN" end
+    if d then
+      owner:SetAttribute("gpflip-" .. name, true)
+      local cur = owner:GetAttribute("sel")
+      local back = (d == "UP" and "DOWN") or (d == "DOWN" and "UP") or (d == "LEFT" and "RIGHT") or (d == "RIGHT" and "LEFT")
+      if cur and cur == back then
+        owner:SetAttribute("sel", "SELF")
+      elseif owner:GetAttribute("u" .. (owner:GetAttribute("page") or 1) .. "-" .. d) then
+        owner:SetAttribute("sel", d)
+      end
+      return false
+    end
+  end
   local skip = n and ("gpskip" .. n .. "-")
   local spell
   local id = self:GetID() or 0
@@ -443,6 +468,7 @@ local function applyGamepad()
       end
     end
   end
+  set("gpdpad", (ns.db.aimWith or "dpad") == "dpad" or nil)
   for spell, conf in pairs(ns.db.aimPad) do
     set("gpaim-" .. tostring(spell), conf.tap or "player")
   end
@@ -538,6 +564,14 @@ function ns.applyKeys(force)
       ctl:SetAttribute("ab" .. i, k[2])
     end
     ctl:SetAttribute("ak-n", #aim)
+    -- The sticks send Up, Down, Left and Right only with this game setting.
+    if ns.db.aimWith == "rstick" or ns.db.aimWith == "lstick" then
+      local okc, v = pcall(C_CVar.GetCVar, "GamePadStickAxisButtons")
+      if okc and v ~= "1" then
+        pcall(C_CVar.SetCVar, "GamePadStickAxisButtons", "1")
+        ns.log("turned on GamePadStickAxisButtons for stick aiming")
+      end
+    end
     SecureHandlerExecute(keys, ns.KEYS_SNIPPET)
     if ns.refreshOptions then
       ns.refreshOptions()

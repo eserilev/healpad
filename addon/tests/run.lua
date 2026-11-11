@@ -951,6 +951,41 @@ test(
   end
 )
 
+test("Gamepad Mode: the d-pad aims even when Gamepad Mode's bindings beat Healpad's", function()
+  local W, ns = gamepad()
+  W.contextFirst = true
+  W.actions[W.gpStorage(1, 10)] = { "spell", 5176 } -- LT+Up: Wrath
+  W.combat = true
+  W.key("PADLTRIGGER", true)
+  W.key("SHIFT-PAD1", true)
+  eq(ns.diamond:IsShown(), true)
+  W.tap("SHIFT-PADDUP")
+  eq(ns.ctl:GetAttribute("sel"), "UP", "up picked through the game's button")
+  W.tap("SHIFT-PADDDOWN")
+  eq(ns.ctl:GetAttribute("sel"), "SELF", "the opposite way comes back to you")
+  W.tap("SHIFT-PADDRIGHT")
+  eq(#W.casts, 0, "the d-pad's own spells cast nothing")
+  W.key("PADLTRIGGER", false)
+  W.key("SHIFT-PAD1", false)
+  eq(#W.casts, 1)
+  eq(last(W).spell, 5186)
+  eq(last(W).unit, "party4")
+  W.key("PADDUP", true)
+  eq(last(W).spell, 774, "after the hold the d-pad is the game's again")
+  W.key("PADDUP", false)
+  clean(W)
+end)
+
+test("stick aiming turns on the game's stick buttons", function()
+  local W = Wow.new()
+  setup(W)
+  party(W)
+  W.cvars.GamePadStickAxisButtons = "0"
+  W.load(DIR, FILES, { aimWith = "rstick", aim = { PAD3 = { tap = "player" } } })
+  eq(W.cvars.GamePadStickAxisButtons, "1")
+  clean(W)
+end)
+
 test("Gamepad Mode: a d-pad heal leaves its own button alone and aims with the others", function()
   local W, ns = gamepad({ aim = {}, aimPad = { [774] = { tap = "player" } } })
   W.combat = true

@@ -445,6 +445,10 @@ function M.new()
   -- What a key press runs: an override binding, Gamepad Mode's binding,
   -- then yours. A chord with nothing bound runs the key without modifiers.
   local function lookup(key)
+    -- contextFirst: Gamepad Mode's bindings beat override bindings.
+    if W.contextFirst and W.gamepadMode and W.contextBinds[key] then
+      return { context = W.contextBinds[key] }
+    end
     local b = W.secureBinds[key] or W.overrides[key]
     if b then
       return b.target
@@ -557,6 +561,10 @@ function M.new()
   G.C_CVar = {
     GetCVar = function(k)
       return W.cvars[k]
+    end,
+    SetCVar = function(k, v)
+      W.cvars[k] = tostring(v)
+      return true
     end,
   }
   W.actionBarPage = 1
