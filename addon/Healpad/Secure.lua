@@ -9,6 +9,9 @@
 --
 -- A heal button owns its key only in the bar states where that key casts
 -- the same spell: shift into cat form and the key is Claw again.
+--
+-- In the game's Gamepad Mode the controller presses the game's own
+-- controller bar, so Healpad sits in that bar's buttons instead (GP_PRE).
 local _, ns = ...
 
 local ctl = CreateFrame("Frame", "HealpadCtl", UIParent, "SecureHandlerBaseTemplate")
@@ -16,20 +19,18 @@ ns.ctl = ctl
 local keys = CreateFrame("Frame", "HealpadKeys", UIParent, "SecureHandlerStateTemplate")
 ns.keys = keys
 
-ns.HEAL_SNIPPET = [[
-  local name = self:GetName()
-  local gen = owner:GetAttribute("gen") or 0
-  if down then
+-- The press of a Hold to Aim heal, shared by every kind of heal button. It
+-- runs with self (the button), owner (the controller), name (self's name),
+-- tap (who a tap heals) and skip (a prefix of keys this hold leaves alone:
+-- the heal's own button) set.
+local OPEN = [[
     local held = owner:GetAttribute("held")
-    self:SetAttribute("hp-lock", self:GetAttribute("hp-spell"))
-    self:SetAttribute("hp-gen", gen)
     if held and held ~= name then
       return false
     end
     owner:SetAttribute("held", name)
     -- The middle of the diamond is whoever a tap heals: when that's someone
     -- in it, they trade places with you for this hold.
-    local tap = self:GetAttribute("hp-tap")
     local tu
     if tap == "tank" then
       tu = owner:GetAttribute("tank")
@@ -51,24 +52,24 @@ ns.HEAL_SNIPPET = [[
     owner:ClearBindings()
     for i = 1, owner:GetAttribute("ak-n") or 0 do
       local k = owner:GetAttribute("ak" .. i)
-      if not owner:GetAttribute("skip-" .. k) then
+      if not owner:GetAttribute("skip-" .. k) and not (skip and owner:GetAttribute(skip .. k)) then
         owner:SetBindingClick(true, k, owner:GetAttribute("ab" .. i))
       end
     end
     owner:SetAttribute("state", "aim")
     return false
-  end
-  local lock = self:GetAttribute("hp-lock")
-  local mygen = self:GetAttribute("hp-gen")
-  self:SetAttribute("hp-lock", nil)
+]]
+
+-- The release closes the diamond when this button opened it.
+local CLOSE = [[
   if owner:GetAttribute("held") == name then
     owner:ClearBindings()
     owner:SetAttribute("held", nil)
     owner:SetAttribute("state", "idle")
   end
-  if not lock or mygen ~= gen then
-    return false
-  end
+]]
+-- Then who the locked spell heals: sets unit, or returns false.
+local PICK = [[
   local unit
   local sel = owner:GetAttribute("sel")
   local swap = owner:GetAttribute("swap")
@@ -86,7 +87,6 @@ ns.HEAL_SNIPPET = [[
   elseif sel then
     unit = owner:GetAttribute("u" .. (owner:GetAttribute("page") or 1) .. "-" .. sel)
   else
-    local tap = self:GetAttribute("hp-tap")
     if tap == "last" then
       unit = owner:GetAttribute("last")
     elseif tap == "tank" then
@@ -109,12 +109,33 @@ ns.HEAL_SNIPPET = [[
   if unit == "target" and SecureCmdOptionParse("[@target,help,nodead] yes; no") ~= "yes" then
     return false
   end
-  self:SetAttribute("spell", lock)
-  self:SetAttribute("unit", unit)
   -- "Last healed" is a person: your target changes, so it's never "target".
   if unit ~= "target" then owner:SetAttribute("last", unit) end
   owner:SetAttribute("castunit", unit)
   owner:SetAttribute("castn", (owner:GetAttribute("castn") or 0) + 1)
+]]
+
+-- A Healpad heal button: the key is Healpad's while its bar state casts it.
+ns.HEAL_SNIPPET = [[
+  local name = self:GetName()
+  local gen = owner:GetAttribute("gen") or 0
+  local tap = self:GetAttribute("hp-tap")
+  local skip
+  if down then
+    self:SetAttribute("hp-lock", self:GetAttribute("hp-spell"))
+    self:SetAttribute("hp-gen", gen)
+]] .. OPEN .. [[
+  end
+  local lock = self:GetAttribute("hp-lock")
+  local mygen = self:GetAttribute("hp-gen")
+  self:SetAttribute("hp-lock", nil)
+]] .. CLOSE .. [[
+  if not lock or mygen ~= gen then
+    return false
+  end
+]] .. PICK .. [[
+  self:SetAttribute("spell", lock)
+  self:SetAttribute("unit", unit)
 ]]
 
 -- The same hold, aim and release, inside a KeyBars button. KeyBars keeps its
@@ -124,6 +145,7 @@ ns.HEAL_SNIPPET = [[
 ns.KB_PRE = [[
   local name = self:GetName()
   local gen = owner:GetAttribute("gen") or 0
+  local skip
   if down then
     local spell = self:GetAttribute("spell")
     local tap = spell and owner:GetAttribute("aimspell-" .. spell)
@@ -131,97 +153,17 @@ ns.KB_PRE = [[
     self:SetAttribute("hp-lock", spell)
     self:SetAttribute("hp-gen", gen)
     self:SetAttribute("hp-tap", tap)
-    local held = owner:GetAttribute("held")
-    if held and held ~= name then
-      return false
-    end
-    owner:SetAttribute("held", name)
-    -- The middle of the diamond is whoever a tap heals: when that's someone
-    -- in it, they trade places with you for this hold.
-    local tap = self:GetAttribute("hp-tap")
-    local tu
-    if tap == "tank" then
-      tu = owner:GetAttribute("tank")
-    elseif tap == "last" then
-      tu = owner:GetAttribute("last")
-    elseif tap == "focus" then
-      tu = "focus"
-    end
-    local swap
-    if tu and tu ~= "player" then
-      if owner:GetAttribute("u1-UP") == tu then swap = "UP"
-      elseif owner:GetAttribute("u1-RIGHT") == tu then swap = "RIGHT"
-      elseif owner:GetAttribute("u1-DOWN") == tu then swap = "DOWN"
-      elseif owner:GetAttribute("u1-LEFT") == tu then swap = "LEFT" end
-    end
-    owner:SetAttribute("swap", swap)
-    owner:SetAttribute("sel", nil)
-    owner:SetAttribute("page", 1)
-    owner:ClearBindings()
-    for i = 1, owner:GetAttribute("ak-n") or 0 do
-      local k = owner:GetAttribute("ak" .. i)
-      if not owner:GetAttribute("skip-" .. k) then
-        owner:SetBindingClick(true, k, owner:GetAttribute("ab" .. i))
-      end
-    end
-    owner:SetAttribute("state", "aim")
-    return false
+]] .. OPEN .. [[
   end
   local lock = self:GetAttribute("hp-lock")
   if not lock then return end
+  local tap = self:GetAttribute("hp-tap")
   self:SetAttribute("hp-lock", nil)
-  if owner:GetAttribute("held") == name then
-    owner:ClearBindings()
-    owner:SetAttribute("held", nil)
-    owner:SetAttribute("state", "idle")
-  end
+]] .. CLOSE .. [[
   if self:GetAttribute("hp-gen") ~= gen or self:GetAttribute("spell") ~= lock then
     return false
   end
-  local unit
-  local sel = owner:GetAttribute("sel")
-  local swap = owner:GetAttribute("swap")
-  owner:SetAttribute("swap", nil)
-  if sel and swap and (owner:GetAttribute("page") or 1) == 1 then
-    if sel == swap then
-      sel = nil
-      unit = "player"
-    elseif sel == "SELF" then
-      sel = nil
-    end
-  end
-  if unit then
-    -- you, from your traded place
-  elseif sel then
-    unit = owner:GetAttribute("u" .. (owner:GetAttribute("page") or 1) .. "-" .. sel)
-  else
-    local tap = self:GetAttribute("hp-tap")
-    if tap == "last" then
-      unit = owner:GetAttribute("last")
-    elseif tap == "tank" then
-      unit = owner:GetAttribute("tank")
-    elseif tap == "focus" then
-      unit = "focus"
-    end
-    -- A tap only heals a friend who's alive: an enemy focus, or nobody
-    -- there, and it's you.
-    if unit and unit ~= "player" and SecureCmdOptionParse("[@" .. unit .. ",help,nodead] yes; no") ~= "yes" then
-      unit = nil
-    end
-    if not unit or not UnitExists(unit) then
-      unit = "player"
-    end
-  end
-  if not unit or not UnitExists(unit) then
-    return false
-  end
-  if unit == "target" and SecureCmdOptionParse("[@target,help,nodead] yes; no") ~= "yes" then
-    return false
-  end
-  -- "Last healed" is a person: your target changes, so it's never "target".
-  if unit ~= "target" then owner:SetAttribute("last", unit) end
-  owner:SetAttribute("castunit", unit)
-  owner:SetAttribute("castn", (owner:GetAttribute("castn") or 0) + 1)
+]] .. PICK .. [[
   self:SetAttribute("useOnKeyDown", false)
   self:SetAttribute("unit", unit)
   return nil, "hp"
@@ -231,6 +173,55 @@ ns.KB_PRE = [[
 ns.KB_POST = [[
   self:SetAttribute("useOnKeyDown", nil)
   self:SetAttribute("unit", nil)
+]]
+
+-- The same again, inside a button of the game's controller bar (Gamepad
+-- Mode). The game picks the bar (the triggers), the page and the stance and
+-- clicks the button; Healpad reads the spell its action slot holds, the way
+-- the button itself does (its id, then the bar page). When that spell is a
+-- Hold to Aim heal the press opens the diamond, and the release (the game
+-- sends it to the same button) casts it on the aimed person. What Healpad
+-- keeps for the hold sits on the controller, not on the game's button.
+ns.GP_PRE = [[
+  local name = self:GetName() or ""
+  local gen = owner:GetAttribute("gen") or 0
+  local n = strmatch(name, "ActionButton(%d)$")
+  local skip = n and ("gpskip" .. n .. "-")
+  local spell
+  local id = self:GetID() or 0
+  if id > 0 and self:GetAttribute("type") == "action" then
+    local page = self:GetAttribute("actionpage") or GetActionBarPage() or 1
+    local kind, sid = GetActionInfo(id + (page - 1) * 12)
+    if kind == "spell" then
+      spell = sid
+    end
+  end
+  if down then
+    local tap = spell and owner:GetAttribute("gpaim-" .. spell)
+    if not tap then return end
+    owner:SetAttribute("gplock-" .. name, spell)
+    owner:SetAttribute("gpgen-" .. name, gen)
+    owner:SetAttribute("gptap-" .. name, tap)
+]] .. OPEN .. [[
+  end
+  local lock = owner:GetAttribute("gplock-" .. name)
+  if not lock then return end
+  local tap = owner:GetAttribute("gptap-" .. name)
+  owner:SetAttribute("gplock-" .. name, nil)
+]] .. CLOSE .. [[
+  if owner:GetAttribute("gpgen-" .. name) ~= gen or spell ~= lock then
+    return false
+  end
+]] .. PICK .. [[
+  self:SetAttribute("useOnKeyDown", false)
+  self:SetAttribute("unit", unit)
+  return nil, "hp"
+]]
+
+-- After a Healpad cast from the game's button: as the game set it up.
+ns.GP_POST = [[
+  self:SetAttribute("unit", nil)
+  self:SetAttribute("useOnKeyDown", true)
 ]]
 
 ns.DIR_SNIPPET = [[
@@ -318,6 +309,10 @@ RegisterStateDriver(keys, "bar", ns.BAR_DRIVER)
 
 ---------------------------------------------------------------- setup, out of combat
 
+-- A key as it comes with modifiers held. A controller's triggers can hold
+-- Shift and Ctrl; Gamepad Mode's bottom bar is both triggers (Ctrl-Shift).
+ns.MODS = { "SHIFT-", "CTRL-", "ALT-", "CTRL-SHIFT-" }
+
 -- The buttons the controller takes while you aim, and what each one clicks.
 function ns.aimKeys()
   local db = ns.db
@@ -325,7 +320,7 @@ function ns.aimKeys()
   local function add(key, target, mods)
     table.insert(list, { key, target })
     if mods then
-      for _, m in ipairs({ "SHIFT-", "CTRL-", "ALT-" }) do
+      for _, m in ipairs(ns.MODS) do
         table.insert(list, { m .. key, target })
       end
     end
@@ -377,6 +372,9 @@ function ns.aimConf(b)
   if b.kb then
     return ns.db.aimSpell[b.cast]
   end
+  if b.gp then
+    return ns.db.aimPad[b.spell]
+  end
   return ns.db.aim[b.key]
 end
 
@@ -407,9 +405,73 @@ local function applyKeyBars(binds)
   end
 end
 
+-- Gamepad Mode: sit in each of the controller bar's buttons once (never in
+-- combat), and tell the controller which spells hold to aim there and which
+-- keys press each button. Healpad never sets anything on the game's buttons
+-- from addon code: that would taint them.
+local gpWrapped = {}
+local gpAttrs = {}
+local function applyGamepad()
+  for _, a in ipairs(gpAttrs) do
+    ctl:SetAttribute(a, nil)
+  end
+  wipe(gpAttrs)
+  if not ns.gamepadMode() then
+    return
+  end
+  local function set(a, v)
+    ctl:SetAttribute(a, v)
+    table.insert(gpAttrs, a)
+  end
+  local bars = {}
+  for _, bar in ipairs(ns.GP_BARS) do
+    table.insert(bars, bar)
+  end
+  table.insert(bars, { id = "stance", frame = "stanceBar", offset = 32 })
+  for _, bar in ipairs(bars) do
+    for n = 1, 8 do
+      -- The top bar's face buttons are the game's own (interact, jump...).
+      local own = bar.id == "top" and n >= 5
+      local f, name = ns.gamepadButton(bar, n)
+      if f and name and not own and not gpWrapped[f] then
+        local ok, err = pcall(SecureHandlerWrapScript, f, "OnClick", ctl, ns.GP_PRE, ns.GP_POST)
+        if ok then
+          gpWrapped[f] = true
+        else
+          ns.log("gamepad wrap " .. name .. ": " .. tostring(err))
+        end
+      end
+    end
+  end
+  for spell, conf in pairs(ns.db.aimPad) do
+    set("gpaim-" .. tostring(spell), conf.tap or "player")
+  end
+  -- A hold leaves the button it came from alone: you can't press it again,
+  -- and its release must reach the game.
+  for n = 1, 8 do
+    for _, k in ipairs(ns.keysOf("GAMEPADACTIONBUTTON" .. n)) do
+      set("gpskip" .. n .. "-" .. k, true)
+      for _, m in ipairs(ns.MODS) do
+        set("gpskip" .. n .. "-" .. m .. k, true)
+      end
+    end
+  end
+end
+
 local function signature(binds)
   local db = ns.db
-  local parts = { db.aimWith or "", db.cancel or "" }
+  local parts = { db.aimWith or "", db.cancel or "", tostring(ns.gamepadMode()) }
+  if ns.gamepadMode() then
+    local pad = {}
+    for spell, conf in pairs(db.aimPad) do
+      table.insert(pad, tostring(spell) .. "=" .. tostring(conf.tap))
+    end
+    for n = 1, 8 do
+      table.insert(pad, n .. "=" .. table.concat(ns.keysOf("GAMEPADACTIONBUTTON" .. n), ","))
+    end
+    table.sort(pad)
+    table.insert(parts, table.concat(pad, ","))
+  end
   for _, b in ipairs(binds) do
     local conf = ns.aimConf(b)
     local states = {}
@@ -421,6 +483,7 @@ local function signature(binds)
     table.insert(
       parts,
       (b.kb and ("kb:" .. b.button .. ":" .. b.layer .. ":" .. b.cast .. "=") or "")
+        .. (b.gp and ("gp:" .. b.gp .. b.n .. "=") or "")
         .. b.key
         .. "="
         .. tostring(b.spell)
@@ -445,6 +508,7 @@ function ns.applyKeys(force)
     lastSig = sig
     local used = 0
     applyKeyBars(ns.binds)
+    applyGamepad()
     for _, bind in ipairs(ns.binds) do
       local conf = not bind.kb and ns.db.aim[bind.key]
       if conf and bind.heal and used < ns.HEALS then
@@ -495,6 +559,8 @@ ns.on("PLAYER_ROLES_ASSIGNED", ns.applyRoster)
 ns.on("PLAYER_REGEN_ENABLED", ns.applyRoster)
 for _, e in ipairs({
   "UPDATE_BINDINGS",
+  "INPUT_DEVICE_INTERFACE_TRANSITION",
+  "PLAYER_ENTERING_WORLD",
   "ACTIONBAR_SLOT_CHANGED",
   "UPDATE_BONUS_ACTIONBAR",
   "ACTIONBAR_PAGE_CHANGED",

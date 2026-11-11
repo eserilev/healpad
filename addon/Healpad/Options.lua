@@ -67,12 +67,16 @@ local function buildRows()
   wipe(rows)
   local last
   for _, b in ipairs(ns.binds or {}) do
-    local group = b.kb and ("kb:" .. b.layer) or (b.pad and ns.keyGroup(b.key) or "keys")
+    local group = b.kb and ("kb:" .. b.layer)
+      or (b.gp and ("gp:" .. b.group))
+      or (b.pad and ns.keyGroup(b.key) or "keys")
     if group ~= last then
       last = group
       local label
       if b.kb then
         label = "KeyBars · " .. b.layer
+      elseif b.gp then
+        label = b.group == "" and "Buttons" or ("Hold " .. b.group)
       elseif group == "keys" then
         label = "Keys"
       elseif group == "" then
@@ -119,6 +123,8 @@ local function setAim(b, on)
   local t, k = ns.db.aim, b.key
   if b.kb then
     t, k = ns.db.aimSpell, b.cast
+  elseif b.gp then
+    t, k = ns.db.aimPad, b.spell
   end
   if on then
     t[k] = t[k] or { tap = "player" }
@@ -223,7 +229,7 @@ local function drawList()
       f.header:Hide()
       f.line:Show()
       local b = r.bind
-      f.key:SetText(keyText(ns.keyLabel(b.key)))
+      f.key:SetText(keyText(ns.bindLabel(b)))
       f.icon:SetTexture(ns.spellIcon(b.spell))
       f.icon:SetDesaturated(not b.heal)
       f.name:SetText(ns.spellName(b.spell))
@@ -247,7 +253,7 @@ local function drawDetail()
   if not b then
     return
   end
-  d.key:SetText(keyText(ns.keyLabel(b.key)) .. (b.kb and ("  |cff9a9a9a·  KeyBars " .. b.layer .. "|r") or ""))
+  d.key:SetText(keyText(ns.bindLabel(b)) .. (b.kb and ("  |cff9a9a9a·  KeyBars " .. b.layer .. "|r") or ""))
   d.icon:SetTexture(ns.spellIcon(b.spell))
   d.name:SetText(ns.spellName(b.spell))
   d.rank:SetText(ns.spellRank(b.spell))
@@ -965,7 +971,7 @@ ns.on("PLAYER_REGEN_DISABLED", function()
 end)
 
 ns.on("PLAYER_LOGIN", function()
-  if next(ns.db.aim) == nil then
+  if next(ns.db.aim) == nil and next(ns.db.aimSpell) == nil and next(ns.db.aimPad) == nil then
     ns.say("type /hp to choose which heals hold to aim.")
   end
 end)

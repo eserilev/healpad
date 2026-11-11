@@ -407,10 +407,23 @@ local ctl = ns.ctl
 
 local previewing = false
 
-local function heldSpell()
+-- What the held button keeps for the hold: on itself, or for one of the
+-- game's controller bar buttons on the controller.
+local function heldAttr(what)
   local held = ctl:GetAttribute("held")
-  local b = held and _G[held]
-  return b and b:GetAttribute("hp-lock")
+  if not held then
+    return nil
+  end
+  local v = ctl:GetAttribute("gp" .. what .. "-" .. held)
+  if v ~= nil then
+    return v
+  end
+  local b = _G[held]
+  return b and b.GetAttribute and b:GetAttribute("hp-" .. what)
+end
+
+local function heldSpell()
+  return heldAttr("lock")
 end
 
 -- Example people for the Frames tab when you're not in a group.
@@ -484,9 +497,7 @@ end
 -- Before you aim, the gold is on whoever letting go now would heal: you, or
 -- the held button's Tap to heal choice when that person is in the diamond.
 local function tapPlace(page)
-  local held = ctl:GetAttribute("held")
-  local b = held and _G[held]
-  local tap = b and b:GetAttribute("hp-tap")
+  local tap = heldAttr("tap")
   local unit
   if tap == "tank" then
     unit = ctl:GetAttribute("tank")

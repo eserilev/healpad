@@ -72,6 +72,7 @@ function ns.setupDB()
   end
   db.aim = db.aim or {} -- [binding key] = { tap = "player" }: that key holds to aim
   db.aimSpell = db.aimSpell or {} -- [KeyBars cast value] = { tap }: that spell holds to aim on KeyBars keys
+  db.aimPad = db.aimPad or {} -- [spell id] = { tap }: that spell holds to aim on the controller bar (Gamepad Mode)
   ns.db = db
   for _, line in ipairs(early) do
     ns.log(line)

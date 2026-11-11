@@ -845,5 +845,223 @@ test("/hp shots stages the diamond and each tab, takes 5 screenshots, puts the U
   clean(W)
 end)
 
+-- Gamepad Mode, as the friend plays it: the game's controller bar, on an
+-- Xbox pad. The heal is on action bar slot 3 (key 3) and on the controller
+-- bar's left bar (LT) under A.
+--   Up        top bar, slot 2:   Rejuvenation
+--   LT+A      left bar, slot 16: Healing Touch r2 on pages 1 and 2, Wrath on 3
+--   RT+X      right bar, slot 21: Wrath
+local function gamepad(saved, opts)
+  opts = opts or {}
+  local W = Wow.new()
+  setup(W)
+  party(W)
+  W.bind("ACTIONBUTTON3", "3")
+  W.bind("SPELL Rejuvenation", "F")
+  W.gamepad()
+  if opts.off then
+    W.gamepadMode = false
+  end
+  W.actions[W.gpStorage(1, 2)] = { "spell", 774 }
+  W.actions[W.gpStorage(1, 16)] = { "spell", 5186 }
+  W.actions[W.gpStorage(2, 16)] = { "spell", 5186 }
+  W.actions[W.gpStorage(3, 16)] = { "spell", 5176 }
+  W.actions[W.gpStorage(1, 21)] = { "spell", 5176 }
+  local ns = W.load(DIR, FILES, saved or { aim = {}, aimPad = { [5186] = { tap = "player" } } })
+  return W, ns
+end
+local function leftA(W)
+  return W.G.GamepadMainActionBarFrame.PageUnit.actionBars.leftBar.actionButtons[8]
+end
+
+test("Gamepad Mode: the controller bar is listed with its triggers; the action bars' keys are not", function()
+  local W, ns = gamepad()
+  local got = {}
+  for _, b in ipairs(ns.binds) do
+    got[#got + 1] = ns.bindLabel(b) .. "=" .. tostring(b.spell)
+    eq(b.command:match("^ACTIONBUTTON") or b.command:match("^MULTIACTIONBAR"), nil, "action bar key " .. b.key)
+  end
+  eq(table.concat(got, " "), "Up=774 LT+A=5186 RT+X=5176 F=774")
+  local lt = ns.binds[2]
+  eq(lt.gp, "left")
+  eq(lt.key, "PAD1")
+  eq(lt.group, "LT")
+  eq(lt.heal, true)
+  eq(lt.pages[1] and lt.pages[2] and not lt.pages[3], true, "Healing Touch on pages 1 and 2")
+  eq(ns.binds[3].heal, false, "Wrath is no heal")
+  ns.openOptions()
+  local headers = {}
+  for _, r in ipairs(ns.optionsDebug().rows) do
+    if r.header then
+      headers[#headers + 1] = r.header
+    end
+  end
+  eq(table.concat(headers, ","), "Buttons,Hold LT,Hold RT,Keys")
+  W.G.HealpadOptions:Hide()
+  clean(W)
+end)
+
+test("Gamepad Mode: hold LT+A, aim, let go: the heal casts on the aimed one in combat", function()
+  local W, ns = gamepad()
+  local b = leftA(W)
+  eq(b.wrap ~= nil, true, "Healpad sits in the game's button")
+  W.combat = true
+  W.key("PADLTRIGGER", true)
+  W.key("SHIFT-PAD1", true) -- LT holds Shift: the game's binding for A runs
+  eq(#W.casts, 0, "the press casts nothing")
+  eq(ns.diamond:IsShown(), true, "diamond open")
+  W.update(0.3) -- the diamond draws the held spell
+  W.tap("SHIFT-PADDUP")
+  eq(ns.ctl:GetAttribute("sel"), "UP", "the d-pad aims, not the controller bar")
+  W.key("PADLTRIGGER", false) -- LT let go first: the release still reaches A's button
+  W.key("SHIFT-PAD1", false)
+  eq(#W.casts, 1)
+  eq(last(W).spell, 5186)
+  eq(last(W).unit, "party2")
+  eq(last(W).combat, true)
+  eq(ns.diamond:IsShown(), false)
+  eq(W.secureBinds.PADDUP, nil, "d-pad given back")
+  eq(b.attrs.unit, nil, "the button as the game set it")
+  eq(b.attrs.useOnKeyDown, true)
+  clean(W)
+end)
+
+test(
+  "Gamepad Mode: a tap heals the tap choice; B cancels; a spell not set to aim casts as the game casts it",
+  function()
+    local W, ns = gamepad({ aim = {}, aimPad = { [5186] = { tap = "tank" } } })
+    W.combat = true
+    W.key("PADLTRIGGER", true)
+    W.tap("SHIFT-PAD1")
+    eq(last(W).unit, "party2", "the tank")
+    eq(last(W).spell, 5186)
+    W.key("SHIFT-PAD1", true)
+    W.tap("SHIFT-PADDLEFT")
+    W.tap("SHIFT-PAD2")
+    W.key("SHIFT-PAD1", false)
+    eq(#W.casts, 1, "B cancelled")
+    W.key("PADLTRIGGER", false)
+    W.key("PADDUP", true)
+    eq(#W.casts, 2, "Rejuvenation casts on the press")
+    eq(last(W).spell, 774)
+    eq(last(W).unit, nil, "on whoever the game picks")
+    eq(ns.diamond:IsShown(), false)
+    W.key("PADDUP", false)
+    clean(W)
+  end
+)
+
+test("Gamepad Mode: a d-pad heal leaves its own button alone and aims with the others", function()
+  local W, ns = gamepad({ aim = {}, aimPad = { [774] = { tap = "player" } } })
+  W.combat = true
+  W.key("PADDUP", true)
+  eq(ns.diamond:IsShown(), true)
+  eq(W.secureBinds.PADDUP, nil, "up stays the game's")
+  eq(W.secureBinds.PADDRIGHT and W.secureBinds.PADDRIGHT.target, "HealpadDirRIGHT")
+  W.tap("PADDRIGHT")
+  W.key("PADDUP", false)
+  eq(last(W).spell, 774)
+  eq(last(W).unit, "party4")
+  clean(W)
+end)
+
+test("Gamepad Mode: the page and the stance decide what a button casts", function()
+  local W, ns = gamepad()
+  W.combat = true
+  W.setGamepadPage(3)
+  W.key("PADLTRIGGER", true)
+  W.key("SHIFT-PAD1", true)
+  eq(last(W).spell, 5176, "page 3: Wrath, cast on the press")
+  eq(ns.diamond:IsShown(), false)
+  W.key("SHIFT-PAD1", false)
+  W.setGamepadPage(2)
+  W.key("SHIFT-PAD1", true)
+  W.tap("SHIFT-PADDRIGHT")
+  W.key("SHIFT-PAD1", false)
+  eq(last(W).spell, 5186, "page 2 has the heal too")
+  eq(last(W).unit, "party4")
+  W.setGamepadPage(1)
+  W.actions[507] = { "spell", 6807 }
+  W.setGamepadStance(500, 1, "leftBar", "2") -- bear form's bar on page 1's LT bar
+  W.key("SHIFT-PAD1", true)
+  eq(last(W).spell, 6807, "Maul")
+  eq(ns.diamond:IsShown(), false)
+  W.key("SHIFT-PAD1", false)
+  W.key("PADLTRIGGER", false)
+  W.combat = false
+  ns.applyKeys(true)
+  eq(ns.binds[2].label .. "=" .. ns.binds[2].spell, "LT+A=6807", "the list shows the stance's spell")
+  clean(W)
+end)
+
+test("Gamepad Mode: Hold to Aim set in the settings reaches the controller bar", function()
+  local W, ns = gamepad({ aim = {} })
+  ns.openOptions()
+  local dbg = ns.optionsDebug()
+  dbg.st.li = 2 -- LT+A
+  ns.optionsNav("A")
+  eq(ns.db.aimPad[5186] ~= nil, true)
+  eq(ns.ctl:GetAttribute("gpaim-5186"), "player")
+  W.G.HealpadOptions:Hide()
+  W.combat = true
+  W.key("PADLTRIGGER", true)
+  W.key("SHIFT-PAD1", true)
+  W.tap("SHIFT-PADDDOWN")
+  W.key("SHIFT-PAD1", false)
+  eq(last(W).unit, "party3")
+  clean(W)
+end)
+
+test("out of Gamepad Mode the controller bar is left alone and your keys work as before", function()
+  local W, ns = gamepad(
+    { aim = { PAD3 = { tap = "player" } }, aimPad = { [5186] = { tap = "player" } } },
+    { off = true }
+  )
+  local keys = {}
+  for _, b in ipairs(ns.binds) do
+    keys[#keys + 1] = b.key
+    eq(b.gp, nil)
+  end
+  eq(table.concat(keys, " "), "PAD1 PAD2 PAD3 PAD4 SHIFT-PAD3 1 F")
+  eq(leftA(W).wrap, nil, "the game's button is untouched")
+  W.combat = true
+  W.key("PAD3", true)
+  W.tap("PADDUP")
+  W.key("PAD3", false)
+  eq(last(W).spell, 5186)
+  eq(last(W).unit, "party2")
+  -- Gamepad Mode turned on: the controller bar instead
+  W.combat = false
+  W.gamepadMode = true
+  W.fire("INPUT_DEVICE_INTERFACE_TRANSITION")
+  eq(ns.binds[1].gp, "top", "the controller bar now")
+  eq(ns.heals[1]:GetAttribute("hp-key"), nil, "X is the controller bar's again")
+  eq(W.secureBinds.PAD3, nil)
+  W.combat = true
+  W.key("PADLTRIGGER", true)
+  W.key("SHIFT-PAD1", true)
+  W.tap("SHIFT-PADDLEFT")
+  W.key("SHIFT-PAD1", false)
+  eq(last(W).unit, "party1")
+  clean(W)
+end)
+
+test("/hp test in Gamepad Mode reports the controller bar", function()
+  local W, ns = gamepad()
+  W.G.SlashCmdList.HEALPAD("test")
+  W.runTimers()
+  local log = table.concat(ns.db.log, "\n")
+  eq(log:find("TEST FAIL") == nil, true, log)
+  eq(log:find("LUA ERROR") == nil, true, log)
+  eq(log:find("REPORT gamepad mode on, page 1") ~= nil, true, log)
+  eq(
+    log:find("REPORT bind PAD1 = left bar 8 -> Healing Touch (Rank 2) heal=true pages=1,2 AIM", 1, true) ~= nil,
+    true,
+    log
+  )
+  eq(#W.casts, 0, "nothing cast")
+  clean(W)
+end)
+
 print(("%d passed, %d failed"):format(passed, failed))
 os.exit(failed == 0 and 0 or 1)

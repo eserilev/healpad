@@ -4,6 +4,8 @@ base: lua51
 globals:
   ButtonFrameTemplate_HideButtonBar:
     any: true
+  C_ActionBar:
+    any: true
   C_AddOns:
     any: true
   C_CurveUtil:
@@ -11,6 +13,10 @@ globals:
   C_CVar:
     any: true
   C_GamePad:
+    any: true
+  C_GamepadUI:
+    any: true
+  C_KeyBindings:
     any: true
   C_Spell:
     any: true
@@ -30,11 +36,15 @@ globals:
     any: true
   Enum:
     any: true
+  GamepadMainActionBarFrame:
+    any: true
   GetActionInfo:
     any: true
   GetBinding:
     any: true
   GetBindingAction:
+    any: true
+  GetBindingKey:
     any: true
   GetBindingText:
     any: true

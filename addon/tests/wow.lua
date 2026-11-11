@@ -98,6 +98,12 @@ function M.new()
   function Frame:GetName()
     return self.name
   end
+  function Frame:GetID()
+    return self.id or 0
+  end
+  function Frame:SetID(id)
+    self.id = id
+  end
   function Frame:GetFrameLevel()
     return self._level or 1
   end
@@ -222,6 +228,11 @@ function M.new()
   end
   function Frame:SetAttribute(k, v)
     protectedChange(self, "SetAttribute " .. tostring(k))
+    -- The game's own buttons run its code when an attribute changes: addon
+    -- code setting one taints them, in combat or not.
+    if self.blizzard and not W.inSecure then
+      table.insert(W.blocked, "taint " .. (self.name or "?") .. ":" .. tostring(k))
+    end
     self.attrs[k] = v
     self:RunScript("OnAttributeChanged", k, v)
   end
@@ -276,6 +287,13 @@ function M.new()
     tostring = tostring,
     tonumber = tonumber,
     type = type,
+    strmatch = string.match,
+    GetActionInfo = function(slot)
+      return G.GetActionInfo(slot)
+    end,
+    GetActionBarPage = function()
+      return G.C_ActionBar.GetActionBarPage()
+    end,
     UnitExists = function(u)
       return G.UnitExists(u)
     end,
@@ -392,7 +410,14 @@ function M.new()
         if unit and unit ~= "none" and not G.UnitExists(unit) then
           return
         end
-        table.insert(W.casts, { spell = f.attrs.spell, unit = unit, combat = W.combat })
+        local spell = f.attrs.spell
+        if f.attrs.type == "action" then -- the spell in its slot; an empty slot casts nothing
+          local a = W.actions[f:GetID() + (G.C_ActionBar.GetActionBarPage() - 1) * 12]
+          spell = a and a[2]
+        end
+        if spell then
+          table.insert(W.casts, { spell = spell, unit = unit, combat = W.combat })
+        end
       end
     elseif f.template:find("SecureHandlerClickTemplate") and down then
       runSnippet(f.attrs._onclick, {}, f, "LeftButton", down)
@@ -417,22 +442,40 @@ function M.new()
 
   -- A key press: the controller's bindings first, then the override bindings.
   -- The release goes where the press went.
+  -- What a key press runs: an override binding, Gamepad Mode's binding,
+  -- then yours. A chord with nothing bound runs the key without modifiers.
+  local function lookup(key)
+    local b = W.secureBinds[key] or W.overrides[key]
+    if b then
+      return b.target
+    end
+    if W.gamepadMode and W.contextBinds[key] then
+      return { context = W.contextBinds[key] }
+    end
+    if W.normalBinds[key] then
+      return { normal = W.normalBinds[key] }
+    end
+  end
   function W.key(key, down)
     local target
     if down then
-      local b = W.secureBinds[key] or W.overrides[key]
-      target = b and b.target
+      target = lookup(key)
+      if target == nil then
+        target = lookup((key:gsub("^.*%-", "")))
+      end
       W.downTarget[key] = target
     else
       target = W.downTarget[key]
       W.downTarget[key] = nil
     end
-    if target then
+    if type(target) == "string" then
       W.click(G[target], down)
-    elseif down and W.normalBinds[key] then
-      table.insert(W.barPresses, { key = key, command = W.normalBinds[key] })
+    elseif target and target.context then
+      W.runContext(target.context, down)
+    elseif target and down then
+      table.insert(W.barPresses, { key = key, command = target.normal })
     end
-    return target
+    return type(target) == "string" and target or nil
   end
   function W.tap(key)
     W.key(key, true)
@@ -456,6 +499,28 @@ function M.new()
     end
   end
   W.normalBinds = {}
+  W.contextBinds = {} -- Gamepad Mode's bindings (GamepadModeInGameCore): key -> command
+  G.GetBindingKey = function(command)
+    local keys = {}
+    for _, b in ipairs(W.bindList) do
+      if b[1] == command then
+        for i = 2, #b do
+          table.insert(keys, b[i])
+        end
+      end
+    end
+    local ctx = {}
+    for k, c in pairs(W.contextBinds) do
+      if c == command then
+        table.insert(ctx, k)
+      end
+    end
+    table.sort(ctx)
+    for _, k in ipairs(ctx) do
+      table.insert(keys, k)
+    end
+    return unpack(keys)
+  end
   G.GetBindingAction = function(key, override)
     local o = override and (W.secureBinds[key] or W.overrides[key])
     if o then
@@ -494,6 +559,161 @@ function M.new()
       return W.cvars[k]
     end,
   }
+  W.actionBarPage = 1
+  W.bonusBar = false
+  G.C_ActionBar = {
+    GetActionBarPage = function()
+      return W.actionBarPage
+    end,
+    HasBonusActionBar = function()
+      return W.bonusBar
+    end,
+  }
+  G.C_KeyBindings = {
+    IsBindingContextActive = function(ctx)
+      return ctx == G.Enum.BindingContext.GamepadModeInGameCore and W.gamepadMode == true
+    end,
+  }
+
+  -- Gamepad Mode ---------------------------------------------------------------
+  -- The game's controller bar (Blizzard_GamepadActionBars): four bars of 8
+  -- buttons, 3 pages, its own action slots from W.gpFirst; the triggers
+  -- pick the bar; GAMEPADACTIONBUTTONn presses button n of the bar in front.
+  W.gpFirst = 361
+  W.gpPage = 1
+  W.gpMods = { left = false, right = false }
+  G.C_GamepadUI = {
+    GetFirstGamepadActionStorageSlotIndex = function()
+      return W.gpFirst
+    end,
+    GetFirstGamepadActionBarStorageSlotIndexForActiveStance = function()
+      return W.gpStanceFirst
+    end,
+  }
+  -- ActionBindingUtil.GetGamepadStorageSlotIndexFromPageAndPageUnitSlotID
+  local function storage(page, slotID)
+    if slotID >= 5 and slotID < 9 then
+      return nil
+    end
+    local id = (32 * (page - 1)) + W.gpFirst + (slotID - 1) - 4 * (page - 1)
+    if slotID >= 5 then
+      id = id - 4
+    end
+    return id
+  end
+  W.gpStorage = storage
+  local BARS = { "topBar", "leftBar", "rightBar", "bottomBar" }
+  local function refreshIds()
+    local pu = G.GamepadMainActionBarFrame.PageUnit
+    for bi, key in ipairs(BARS) do
+      for n, b in ipairs(pu.actionBars[key].actionButtons) do
+        b:SetID(storage(W.gpPage, (bi - 1) * 8 + n) or 0)
+      end
+    end
+    for n, b in ipairs(pu.actionBars.stanceBar.actionButtons) do
+      b:SetID(W.gpStanceFirst and (W.gpStanceFirst + n - 1) or 0)
+    end
+  end
+  -- Turns on Gamepad Mode: the bar, and its bindings on an Xbox pad.
+  function W.gamepad()
+    W.gamepadMode = true
+    local main = G.CreateFrame("Frame", "GamepadMainActionBarFrame", G.UIParent)
+    local pu = G.CreateFrame("Frame", "GamepadMainActionBarFramePageUnit", main)
+    main.PageUnit = pu
+    main.buttonOwners = {}
+    pu.actionBars = {}
+    local anchors = {
+      topBar = "TopCenteredAnchorTopBar",
+      leftBar = "LeftCenteredAnchorLeftBar",
+      rightBar = "RightCenteredAnchorRightBar",
+      bottomBar = "BottomCenteredAnchorBottomBar",
+      stanceBar = "TopCenteredAnchorStanceBar",
+    }
+    for key, path in pairs(anchors) do
+      local bar = { actionButtons = {} }
+      for n = 1, 8 do
+        local b = G.CreateFrame(
+          "CheckButton",
+          "GamepadMainActionBarFramePageUnit" .. path .. "ActionButton" .. n,
+          pu,
+          "SecureActionButtonTemplate, GamepadActionBarButtonTemplate"
+        )
+        b.blizzard = true
+        b.attrs.type = "action"
+        b.attrs.useOnKeyDown = true
+        bar.actionButtons[n] = b
+      end
+      pu.actionBars[key] = bar
+    end
+    function pu.GetCurrentPage()
+      return W.gpPage
+    end
+    refreshIds()
+    -- MainActionBarFrame.lua PressActionButton, with PageUnit's bar choice.
+    function main.PressActionButton(self, n, button, down)
+      local owners = self.buttonOwners
+      if down then
+        local bar = "topBar"
+        if W.gpMods.left and W.gpMods.right then
+          bar = "bottomBar"
+        elseif W.gpMods.left then
+          bar = "leftBar"
+        elseif W.gpMods.right then
+          bar = "rightBar"
+        end
+        if W.gpStanceOver and W.gpStanceOver[1] == W.gpPage and W.gpStanceOver[2] == bar then
+          bar = "stanceBar"
+        end
+        local b = pu.actionBars[bar].actionButtons[n]
+        if owners[n] then
+          self:PressActionButton(n, button, false)
+        end
+        owners[n] = b
+        b:Click(button, true)
+      elseif owners[n] then
+        local b = owners[n]
+        owners[n] = nil
+        b:Click(button, false)
+      end
+    end
+    local keys = { "PADDLEFT", "PADDUP", "PADDRIGHT", "PADDDOWN", "PAD3", "PAD4", "PAD2", "PAD1" }
+    for n, k in ipairs(keys) do
+      W.contextBinds[k] = "GAMEPADACTIONBUTTON" .. n
+    end
+    W.contextBinds.PADLTRIGGER = "GAMEPADLEFTMOD"
+    W.contextBinds.PADRTRIGGER = "GAMEPADRIGHTMOD"
+    W.contextBinds.PADLSHOULDER = "GAMEPADLEFTTARGETMODIFIER"
+    W.contextBinds.PADRSHOULDER = "GAMEPADRIGHTTARGETMODIFIER"
+    return main
+  end
+  -- A Gamepad Mode binding runs.
+  W.gpRan = {}
+  function W.runContext(command, down)
+    local n = tonumber(command:match("^GAMEPADACTIONBUTTON(%d)$"))
+    if n then
+      G.GamepadMainActionBarFrame:PressActionButton(n, "LeftButton", down)
+    elseif command == "GAMEPADLEFTMOD" then
+      W.gpMods.left = down
+    elseif command == "GAMEPADRIGHTMOD" then
+      W.gpMods.right = down
+    elseif down then
+      table.insert(W.gpRan, command)
+    end
+  end
+  -- Page n of the controller bar (the game's page tracker).
+  function W.setGamepadPage(p)
+    W.gpPage = p
+    refreshIds()
+  end
+  -- A stance whose controller bar starts at slot first takes the place of
+  -- bar on page.
+  function W.setGamepadStance(first, page, bar, override)
+    W.gpStanceFirst = first
+    W.bonusBar = first ~= nil
+    W.gpStanceOver = first and { page, bar } or nil
+    W.cvars.GamepadStanceBarOverride = override
+    refreshIds()
+  end
 
   -- Units ---------------------------------------------------------------
   local function hidden(v)
@@ -573,8 +793,12 @@ function M.new()
   end
 
   -- Spells ----------------------------------------------------------------
-  G.Enum =
-    { SpellBookSpellBank = { Player = 0 }, SpellBookItemType = { Spell = 1, Flyout = 4 }, LuaCurveType = { Step = 1 } }
+  G.Enum = {
+    SpellBookSpellBank = { Player = 0 },
+    SpellBookItemType = { Spell = 1, Flyout = 4 },
+    LuaCurveType = { Step = 1 },
+    BindingContext = { None = 0, GamepadModeInGameCore = 9 },
+  }
   G.C_SpellBook = {
     GetNumSpellBookSkillLines = function()
       return 1

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- The game's Gamepad Mode: Buttons lists the controller bar (A, LT+A, RT+X, the d-pad...) with
+  the spell each button casts on the page in front, and leaves out the action bars' keys, which
+  the controller doesn't press there. Hold to Aim works on those buttons, in combat too: Healpad
+  sits in the game's own controller bar buttons, so the triggers, pages and stances stay the game's.
+- /hp test logs Gamepad Mode and the controller bar's buttons.
+
 ## 0.2.1
 
 - Buttons lists heals bound straight to a key or pad button (for example a heal on LB from the

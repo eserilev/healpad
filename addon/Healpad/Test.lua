@@ -39,6 +39,27 @@ local function report()
   )
   local ok, n = pcall(GetNumBindings)
   ns.log("REPORT bindings in the game: " .. tostring(ok and n))
+  -- Gamepad Mode: the controller bar's keys, triggers, page and slots.
+  local gp = ns.gamepadMode()
+  local keys = {}
+  for i = 1, 8 do
+    table.insert(keys, i .. "=" .. table.concat(ns.keysOf("GAMEPADACTIONBUTTON" .. i), "/"))
+  end
+  for _, c in ipairs({ "GAMEPADLEFTMOD", "GAMEPADRIGHTMOD" }) do
+    table.insert(keys, c:sub(8) .. "=" .. table.concat(ns.keysOf(c), "/"))
+  end
+  local okf, first = pcall(function()
+    return C_GamepadUI.GetFirstGamepadActionStorageSlotIndex()
+  end)
+  ns.log(
+    string.format(
+      "REPORT gamepad mode %s, page %s, slots from %s, %s",
+      gp and "on" or "off",
+      tostring(gp and ns.gamepadPage()),
+      tostring(okf and first),
+      table.concat(keys, " ")
+    )
+  )
   -- Every controller button: what it does, plain and with overrides.
   for _, m in ipairs({ "", "SHIFT-", "CTRL-", "ALT-" }) do
     for _, base in ipairs(ns.PAD_ORDER) do
@@ -88,6 +109,13 @@ local function report()
   end
   for _, b in ipairs(ns.binds or {}) do
     local states = {}
+    if b.gp then
+      for p = 1, 3 do
+        if b.pages[p] then
+          table.insert(states, p)
+        end
+      end
+    end
     for _, s in ipairs(ns.BAR_STATES) do
       if b.states[s] then
         table.insert(states, s)
@@ -95,12 +123,12 @@ local function report()
     end
     ns.log(
       string.format(
-        "REPORT bind %s = %s -> %s%s heal=%s states=%s%s",
+        "REPORT bind %s = %s -> %s heal=%s %s=%s%s",
         b.key,
-        b.kb and ("KeyBars " .. b.layer) or b.command,
+        (b.kb and ("KeyBars " .. b.layer)) or (b.gp and (b.gp .. " bar " .. b.n)) or b.command,
         ns.spellLabel(b.spell),
-        "",
         tostring(b.heal),
+        b.gp and "pages" or "states",
         table.concat(states, ","),
         ns.aimConf(b) and (" AIM tap=" .. tostring(ns.aimConf(b).tap)) or ""
       )
@@ -194,7 +222,7 @@ local function steps()
       end
     end
     for _, b in ipairs(ns.binds or {}) do
-      if not heal and b.kb and ns.aimConf(b) then
+      if not heal and (b.kb or b.gp) and b.button and ns.aimConf(b) then
         heal = _G[b.button]
       end
     end
