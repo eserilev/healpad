@@ -744,10 +744,23 @@ local function buildButtonsTab(parent)
   tapLabel:SetText("Tap to heal")
   tapLabel:SetPoint("TOPLEFT")
   d.taps = {}
-  local tw = (detailW - 24) / #ns.TAPS
+  -- each button as wide as its word, the row filling the pane
+  local widths, total = {}, 0
   for i, tap in ipairs(ns.TAPS) do
-    local b = redButton(d.tapBox, tw, 28, ns.TAP_LABEL[tap])
-    b:SetPoint("TOPLEFT", (i - 1) * (tw + 6), -20)
+    local probe = redButton(d.tapBox, 10, 28, ns.TAP_LABEL[tap])
+    local fs = probe:GetFontString()
+    widths[i] = (fs and fs:GetStringWidth() or 40) + 24
+    total = total + widths[i]
+    probe:Hide()
+  end
+  local gap = 6
+  local extra = (detailW - total - gap * (#ns.TAPS - 1)) / #ns.TAPS
+  local x = 0
+  for i, tap in ipairs(ns.TAPS) do
+    local w = widths[i] + math.max(0, extra)
+    local b = redButton(d.tapBox, w, 28, ns.TAP_LABEL[tap])
+    b:SetPoint("TOPLEFT", x, -20)
+    x = x + w + gap
     b:SetScript("OnClick", function()
       st.zone, st.row, st.col = "detail", 1, i - 1
       ns.optionsNav("A")
