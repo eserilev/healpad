@@ -79,6 +79,9 @@ function ns.setupDB()
       db[k] = v
     end
   end
+  if db.look == "glass" then
+    db.look = "classic" -- Glass became Classic
+  end
   if ns.looks and not ns.looks[db.look] then
     db.look = DEFAULTS.look
   end

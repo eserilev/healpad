@@ -16,7 +16,7 @@ Looks.lua
 LookMedallions.lua
 LookSigil.lua
 LookCompass.lua
-LookGlass.lua
+LookClassic.lua
 Diamond.lua
 Options.lua
 Test.lua

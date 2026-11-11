@@ -11,7 +11,7 @@ local FILES = {
   "LookMedallions.lua",
   "LookSigil.lua",
   "LookCompass.lua",
-  "LookGlass.lua",
+  "LookClassic.lua",
   "Diamond.lua",
   "Options.lua",
   "Test.lua",
@@ -445,7 +445,7 @@ end
 
 test("looks: four in the registry, Medallions by default, each with its parts", function()
   local W, ns = game()
-  eq(lookNames(ns), "medallions sigil compass glass")
+  eq(lookNames(ns), "medallions sigil compass classic")
   eq(ns.db.look, "medallions", "default")
   eq(ns.look.name, "medallions")
   eq(ns.spots, ns.looks.medallions.spots)
@@ -482,15 +482,15 @@ test("looks: switching shows the new one at once; in combat it waits for the fig
   eq(ns.db.look, "sigil")
   W.combat = true
   W.key("PAD3", true)
-  eq(ns.setLook("glass"), false, "not in combat")
-  eq(ns.db.look, "glass", "saved")
+  eq(ns.setLook("classic"), false, "not in combat")
+  eq(ns.db.look, "classic", "saved")
   eq(ns.look.name, "sigil", "still the old look")
-  eq(ns.looks.glass.frame, nil, "nothing built in combat")
+  eq(ns.looks.classic.frame, nil, "nothing built in combat")
   W.tap("PADDUP")
   W.key("PAD3", false)
   W.combat = false
   W.fire("PLAYER_REGEN_ENABLED")
-  eq(ns.look.name, "glass", "after the fight")
+  eq(ns.look.name, "classic", "after the fight")
   eq(ns.looks.sigil.frame:IsShown(), false)
   clean(W)
 end)
@@ -522,7 +522,7 @@ local function aimAround(W, ns, combat)
   W.combat = false
 end
 
-for _, name in ipairs({ "medallions", "sigil", "compass", "glass" }) do
+for _, name in ipairs({ "medallions", "sigil", "compass", "classic" }) do
   test("look " .. name .. ": draws everyone in every state, in and out of combat", function()
     local W, ns = game()
     troubled(W)
@@ -597,7 +597,7 @@ test("Frames tab: Look picks one of four, the chosen one in gold, the preview fo
   local looks = d.ui.frames.looks
   eq(#looks, 4)
   eq(looks[1].text, "Medallions")
-  eq(looks[4].text, "Glass")
+  eq(looks[4].text, "Classic")
   eq(looks[1].gold:IsShown(), true, "Medallions chosen")
   eq(looks[2].gold:IsShown(), false)
   for _ = 1, 3 do
@@ -613,7 +613,7 @@ test("Frames tab: Look picks one of four, the chosen one in gold, the preview fo
   W.tap("PADDRIGHT")
   W.tap("PADDRIGHT")
   W.tap("PADDRIGHT")
-  eq(ns.db.look, "glass", "stops at the last")
+  eq(ns.db.look, "classic", "stops at the last")
   looks[3]:GetScript("OnClick")(looks[3])
   eq(ns.db.look, "compass", "a click picks too")
   eq(ns.spots.UP.name.text, "Party Member", "sample people in the new look")

@@ -9,15 +9,14 @@
     around it; a beam of light turns to whoever you aim at.
   - Compass: parchment cards with a class-color stripe and the missing health in big numbers; the
     needle of the compass rose in the middle swings to your aim.
-  - Glass: slim see-through bars in class colors; the aimed one gets a gold border and small gold
-    arrows light up toward it.
+  - Classic: the game's own party frames, portrait, health and mana, in a plus with you in the
+    middle. The aimed one glows gold and grows a little.
 - In every look: health is colored green to yellow to red, and pulses red under a quarter. Your
   own heal over time shows as a small icon, a debuff you can remove as a small colored gem (no
   longer the outline). Out of range is faded and grey; dead shows a skull, offline a cable.
 - The menu slides open. Nothing flashes when a heal goes off.
 - Tap to heal has a new choice, Target: a tap heals your target when it's a friend, else you.
 - Sigil: cleaner rune circle, no blurry glows, names clear of the middle.
-- Glass: space between the bars at every Spread.
 - The preview's heal-over-time icon no longer shows a question mark.
 - Size, Spread and Position work for every look.
 

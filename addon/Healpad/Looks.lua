@@ -16,8 +16,8 @@ local _, ns = ...
 local K = {}
 ns.kit = K
 ns.looks = {}
-ns.LOOKS = { "medallions", "sigil", "compass", "glass" }
-ns.LOOK_LABEL = { medallions = "Medallions", sigil = "Sigil", compass = "Compass", glass = "Glass" }
+ns.LOOKS = { "medallions", "sigil", "compass", "classic" }
+ns.LOOK_LABEL = { medallions = "Medallions", sigil = "Sigil", compass = "Compass", classic = "Classic" }
 
 function ns.registerLook(name, look)
   look.name = name
