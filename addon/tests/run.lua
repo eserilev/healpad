@@ -104,6 +104,29 @@ test("your bindings: pad buttons with spells, keyboard heals only, LT combos nam
   clean(W)
 end)
 
+test("a heal bound straight to a button (no bar slot) shows and aims", function()
+  local W = Wow.new()
+  setup(W)
+  party(W)
+  W.bind("SPELL Rejuvenation", "PADLSHOULDER")
+  W.bind("SPELL Healing Touch(Rank 2)", "SHIFT-PADLSHOULDER")
+  local ns = W.load(DIR, FILES, { aim = { PADLSHOULDER = { tap = "player" } } })
+  local found = {}
+  for _, b in ipairs(ns.binds) do
+    found[b.key] = b
+  end
+  eq(found.PADLSHOULDER and found.PADLSHOULDER.spell, 774, "LB listed")
+  eq(found.PADLSHOULDER.heal, true)
+  eq(found["SHIFT-PADLSHOULDER"] and found["SHIFT-PADLSHOULDER"].spell, 5185, "rank text dropped")
+  W.combat = true
+  W.key("PADLSHOULDER", true)
+  W.tap("PADDUP")
+  W.key("PADLSHOULDER", false)
+  eq(last(W).spell, 774, "LB cast its heal")
+  eq(last(W).unit, "party2")
+  clean(W)
+end)
+
 test("roster: tank up, you in the middle, then by role and name", function()
   local W, ns = game()
   local c = ns.ctl

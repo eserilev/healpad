@@ -123,6 +123,17 @@ function ns.resolve(command)
     local spell = spellOfSlot(slot)
     return spell and { spell = spell, states = allStates() } or nil
   end
+  -- A spell bound straight to a key or button (no bar slot): every state.
+  local spellName = command:match("^SPELL (.+)$")
+  if spellName then
+    local spell = spellId(spellName) or spellId(spellName:gsub("%s*%(.-%)%s*$", ""))
+    return spell and { spell = spell, states = allStates() } or nil
+  end
+  local macro = command:match("^MACRO (.+)$")
+  if macro then
+    local ok, spell = pcall(GetMacroSpell, tonumber(macro) or macro)
+    return (ok and spell) and { spell = spell, states = allStates() } or nil
+  end
   local name = command:match("^CLICK (.-):") or command:match("^CLICK (.+)$")
   if name then
     local spell = spellOfButton(_G[name])
