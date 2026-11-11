@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- New settings window. Buttons: your heals in a list, the one you're on shown beside it with
+  one Enable button (off, the button casts as it always did) and Tap to heal as a column: You,
+  Target, Focus, Tank, Last healed. Not enabled, Tap to heal is dimmed and skipped.
+- The list shows heals only, one row each, with On beside the enabled ones.
+- The Aim tab is now Controls: Select with D-pad, Left stick or Right stick; Cancel with A, B, X or Y.
+- Frames: Size and Spread are sliders you can drag, with - and + beside them.
+- One way to move around the settings: the d-pad goes to what's next to it on screen, A picks,
+  B goes back a step (then closes), LB and RB switch tabs. Left and Right change only a slider.
+- Choices are dark buttons, the chosen one edged in gold; red buttons are for Move and Reset.
+- The window fits each tab, with no portrait or empty band under the title.
 - Four looks for the aim menu, picked under Frames > Look; the preview changes as you pick.
   - Classic (the default): the game's own party frames, portrait, health and mana, in a plus
     with you in the middle. The aimed one glows gold and grows a little.

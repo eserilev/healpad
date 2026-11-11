@@ -170,10 +170,10 @@ local function steps()
     )
   end)
   add(function()
-    check("Buttons tab shows", dbg.ui.buttons:IsShown() and not dbg.ui.aim:IsShown(), "rows " .. #dbg.rows)
+    check("Buttons tab shows", dbg.ui.buttons:IsShown() and not dbg.ui.controls:IsShown(), "rows " .. #dbg.rows)
     snap("buttons")
   end)
-  for _, tab in ipairs({ "aim", "frames" }) do
+  for _, tab in ipairs({ "controls", "frames" }) do
     add(function()
       ns.optionsNav("RB")
       check(

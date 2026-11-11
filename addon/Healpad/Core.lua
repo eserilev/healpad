@@ -8,7 +8,7 @@
 local ADDON, ns = ...
 
 ns.HEALS = 12 -- buttons that can hold to aim at once
-ns.TAPS = { "player", "target", "last", "tank", "focus" } -- who a tap with no aim heals
+ns.TAPS = { "player", "target", "focus", "tank", "last" } -- who a tap with no aim heals, in the settings' order
 ns.TAP_LABEL = { player = "You", target = "Target", last = "Last healed", tank = "Tank", focus = "Focus" }
 ns.DIRS = { "UP", "RIGHT", "DOWN", "LEFT", "SELF" }
 ns.AIMERS = { "dpad", "lstick", "rstick" }

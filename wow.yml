@@ -4,7 +4,11 @@ base: lua51
 globals:
   BreakUpLargeNumbers:
     any: true
+  ButtonFrameTemplate_HideAttic:
+    any: true
   ButtonFrameTemplate_HideButtonBar:
+    any: true
+  ButtonFrameTemplate_HidePortrait:
     any: true
   C_ActionBar:
     any: true

@@ -74,7 +74,7 @@ function ns.showcase()
       ns.preview(false)
       ns.openOptions()
       local d = ns.optionsDebug()
-      d.st.tab, d.st.zone = "buttons", "list"
+      d.st.tab, d.st.focus.buttons = "buttons", "row"
       ns.refreshOptions()
     end,
     shot,

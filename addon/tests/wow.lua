@@ -51,6 +51,7 @@ function M.new()
     overrides = {},
     downTarget = {},
     frames = {},
+    fontStrings = {},
     mods = { shift = false, ctrl = false, alt = false },
     units = {},
     raid = nil,
@@ -202,6 +203,33 @@ function M.new()
   function Frame:GetText()
     return self.text
   end
+  -- Sizes are kept as set. A font string's text is 6 wide a letter, 8 in a
+  -- large font; color codes take no room.
+  function Frame:SetWidth(w)
+    self.width = w
+  end
+  function Frame:SetHeight(h)
+    self.height = h
+  end
+  function Frame:SetSize(w, h)
+    self.width, self.height = w, h
+  end
+  function Frame:GetWidth()
+    return self.width or 0
+  end
+  function Frame:GetHeight()
+    return self.height or 0
+  end
+  function Frame:GetStringWidth()
+    local s = tostring(self.text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+    return #s * ((self.font or ""):find("Large") and 8 or 6)
+  end
+  function Frame:SetEnabled(v)
+    self.enabled = v and true or false
+  end
+  function Frame:IsEnabled()
+    return self.enabled ~= false
+  end
   function Frame:SetChecked(v)
     self.checked = v
   end
@@ -230,8 +258,11 @@ function M.new()
     self.tex = self.tex or newRegion(self)
     return self.tex
   end
-  function Frame:CreateFontString()
-    return newRegion(self)
+  function Frame:CreateFontString(_, _, font)
+    local fs = newRegion(self)
+    fs.font = font
+    table.insert(W.fontStrings, fs)
+    return fs
   end
   function Frame:CreateTexture()
     return newRegion(self)
@@ -318,6 +349,12 @@ function M.new()
     return self.scale or 1
   end
   G.UISpecialFrames = {}
+  G.ButtonFrameTemplate_HidePortrait = function(f)
+    f.noPortrait = true
+  end
+  G.ButtonFrameTemplate_HideAttic = function(f)
+    f.noAttic = true
+  end
   G.SlashCmdList = {}
 
   -- Snippets -------------------------------------------------------------
