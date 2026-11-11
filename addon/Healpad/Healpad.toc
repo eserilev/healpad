@@ -2,7 +2,7 @@
 ## Title: Healpad
 ## Notes: Hold a heal button, aim at a party member, let go. Made for controllers. /hp
 ## Author: Eitan Seri-Levi
-## Version: 0.2.3
+## Version: 0.3.0
 ## SavedVariablesPerCharacter: HealpadDB
 ## OptionalDeps: KeyBars
 ## X-License: MIT

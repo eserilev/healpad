@@ -1,44 +1,47 @@
 # Changelog
 
-## Unreleased
+## 0.3.0
 
-- /hp shots now takes screenshots while you play: one as the menu opens and one for each person
-  you pick, with the rest of the interface hidden out of combat. /hp shots page stages a named example party in every look, aimed two ways, plus each settings tab.
-- The preview shows your own name in the middle and an example party with names (Thrain,
-  Mirelle, Kesh, Brannoc), the same in every look. Nothing flashes in it: no opening animation.
-- Nothing flashes or spins in any look: no red pulse for low health (the bar turns red), no
-  turning ring in Medallions, no shine on Compass cards.
-- All four looks take about the same room on screen at the same Size; Classic is bigger and
-  its rows further apart.
-- New settings window. Buttons: your heals in a list, the one you're on shown beside it with
-  one Enable button (off, the button casts as it always did) and Tap to heal as a column: You,
-  Target, Focus, Tank, Last healed. Not enabled, Tap to heal is dimmed and skipped.
-- The list shows heals only, one row each, with On beside the enabled ones.
-- The Aim tab is now Controls: Select with D-pad, Left stick or Right stick; Cancel with A, B, X or Y.
-- Frames: Size and Spread are sliders you can drag, with - and + beside them.
-- One way to move around the settings: the d-pad goes to what's next to it on screen, A picks,
-  B goes back a step (then closes), LB and RB switch tabs. Left and Right change only a slider.
-- Choices are dark buttons, the chosen one edged in gold; red buttons are for Move and Reset.
-- The window fits each tab, with no portrait or empty band under the title.
-- Four looks for the aim menu, picked under Frames > Look; the preview changes as you pick.
-  - Classic (the default): the game's own party frames, portrait, health and mana, in a plus
-    with you in the middle. The aimed one glows gold and grows a little.
-  - Medallions: round gold-rimmed portraits on a circle. The one you aim at grows
-    inside a turning gold ring, a gold spoke points to them, and the others dim.
-  - Sigil: a slowly turning blue rune circle; each person a gem with their health as a ring
-    around it; a beam of light turns to whoever you aim at.
-  - Compass: parchment cards with a class-color stripe and the missing health in big numbers; the
+Four looks for the menu:
+
+- Pick one under Frames > Look; the preview changes as you pick. All four take about the same
+  room on screen at the same Size.
+  - Classic (the default): the game's own party frames, with portrait, health and mana, in a
+    plus with you in the middle. The aimed one glows gold and grows a little.
+  - Medallions: round gold-rimmed portraits on a circle. The aimed one grows inside a gold ring,
+    a gold spoke points to them, and the others dim.
+  - Sigil: a blue rune circle with each person as a gem, their health a ring around it. A beam of
+    light turns to whoever you aim at.
+  - Compass: parchment cards with a class-color stripe and the missing health in big numbers. The
     needle of the compass rose in the middle swings to your aim.
-- In every look: health is colored green to yellow to red,. Your
-  own heal over time shows as a small icon, a debuff you can remove as a small colored gem (no
-  longer the outline). Out of range is faded and grey; dead shows a skull, offline a cable.
-- The menu slides open. Nothing flashes when a heal goes off.
-- Tap to heal has a new choice, Target: a tap heals your target when it's a friend, else you.
-- Tap to heal set to Focus heals your target when you have no friendly focus.
-- The chosen button in the settings is edged in gold.
-- Sigil: cleaner rune circle, no blurry glows, names clear of the middle.
-- The preview's heal-over-time icon no longer shows a question mark.
-- Size, Spread and Position work for every look.
+- Every look shows the same things:
+  - Health goes green, yellow, red.
+  - Your heal over time is a small icon, and a debuff you can remove is a small colored gem.
+  - Out of range is faded and grey. Dead shows a skull, and offline shows a cable.
+- Nothing flashes or spins.
+
+New settings window:
+
+- Buttons: your heals in a list, with On beside the enabled ones. The heal you're on is shown
+  beside the list with one Enable button and Tap to heal. When it's off, the button casts as it
+  always did.
+- Controls (was Aim): Select with D-pad, Left stick or Right stick; Cancel with A, B, X or Y.
+- Frames: Size and Spread are sliders, with - and + beside them, then Look, Move and Reset.
+- One way to move around: the d-pad goes to what's next to it on screen, A picks, B goes back a
+  step (then closes), and LB and RB switch tabs.
+- Chosen options are edged in gold, and red buttons are only for Move and Reset.
+- The preview shows an example party with names, and you in the middle.
+
+Tap to heal:
+
+- New choice, Target: heals your target when it's a friend, else you.
+- Focus heals your target when you have no friendly focus.
+
+Screenshots:
+
+- /hp shots takes screenshots while you play: one as the menu opens and one for each person you
+  pick.
+- /hp shots page stages the example party in every look, plus each settings tab.
 
 ## 0.2.3
 
