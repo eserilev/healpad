@@ -1,5 +1,6 @@
 -- /hp test: checks Healpad inside the real game, out of combat.
--- Opens each settings tab and the diamond and takes a screenshot of each,
+-- Opens each settings tab, with the menu as its preview, and takes a
+-- screenshot of each,
 -- runs a hold, an aim and a cancel through the real secure snippets (nothing
 -- is cast), and records what it found and any Lua error in the saved log.
 -- The game writes the log on /reload; an addon can't reload by itself.
@@ -170,24 +171,32 @@ local function steps()
     )
   end)
   add(function()
-    check("Buttons tab shows", dbg.ui.buttons:IsShown() and not dbg.ui.controls:IsShown(), "rows " .. #dbg.rows)
-    snap("buttons")
+    check("Heals tab shows", dbg.ui.heals:IsShown() and not dbg.ui.menu:IsShown(), "rows " .. #dbg.rows)
+    check("the menu shows as the preview", ns.diamond:IsShown())
+    snap("heals")
   end)
-  for _, tab in ipairs({ "controls", "frames" }) do
-    add(function()
-      ns.optionsNav("RB")
-      check(
-        tab .. " tab after RB",
-        dbg.st.tab == tab and dbg.ui[tab]:IsShown() and not dbg.ui.buttons:IsShown(),
-        "tab=" .. tostring(dbg.st.tab)
-      )
-    end)
-    add(function()
-      snap(tab)
-    end)
-  end
   add(function()
-    check("diamond shows on Frames", ns.diamond:IsShown())
+    ns.optionsNav("RB")
+    check(
+      "Menu tab after RB",
+      dbg.st.tab == "menu" and dbg.ui.menu:IsShown() and not dbg.ui.heals:IsShown(),
+      "tab=" .. tostring(dbg.st.tab)
+    )
+  end)
+  add(function()
+    snap("menu")
+  end)
+  add(function()
+    check("the menu shows on Menu", ns.diamond:IsShown() and ns.diamond:GetAlpha() == 1)
+    local l, r = ns.menuBox()
+    ns.log(
+      "REPORT settings window on the "
+        .. tostring(dbg.st.side)
+        .. ", menu from "
+        .. tostring(l)
+        .. " to "
+        .. tostring(r)
+    )
     for _, d in ipairs(ns.DIRS) do
       local f = ns.spots[d]
       local x, y = f:GetCenter()
@@ -207,8 +216,8 @@ local function steps()
     end
   end)
   add(function()
-    ns.optionsNav("RB")
-    check("back to Buttons", dbg.st.tab == "buttons" and dbg.ui.buttons:IsShown())
+    ns.optionsNav("LB")
+    check("back to Heals", dbg.st.tab == "heals" and dbg.ui.heals:IsShown())
     dbg.panel:Hide()
     check("closing gives the pad and arrows back", not bound("DOWN"):find("HealpadNav"), bound("DOWN"))
   end)
@@ -227,7 +236,7 @@ local function steps()
       end
     end
     if not heal then
-      ns.log("TEST skip: no Hold to Aim spell set up, so no hold was tried (set one in /hp)")
+      ns.log("TEST skip: no heal holds for the menu, so no hold was tried (tick one in /hp)")
       return
     end
     local ctl = ns.ctl

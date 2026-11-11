@@ -220,9 +220,30 @@ function M.new()
   function Frame:GetHeight()
     return self.height or 0
   end
+  -- A font's size comes from its name (Large 16, Small 10, else 12) until
+  -- SetFont; a letter is half the size wide.
+  local function fontSize(f)
+    if f.fontSize then
+      return f.fontSize
+    end
+    local name = f.font or ""
+    return name:find("Large") and 16 or name:find("Small") and 10 or 12
+  end
   function Frame:GetStringWidth()
     local s = tostring(self.text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-    return #s * ((self.font or ""):find("Large") and 8 or 6)
+    return #s * fontSize(self) / 2
+  end
+  function Frame:GetFont()
+    return "Fonts\\FRIZQT__.TTF", fontSize(self), ""
+  end
+  function Frame:SetFont(_, size)
+    self.fontSize = size
+  end
+  function Frame:SetDesaturated(v)
+    self.desaturated = v and true or false
+  end
+  function Frame:IsDesaturated()
+    return self.desaturated == true
   end
   function Frame:SetEnabled(v)
     self.enabled = v and true or false
@@ -349,6 +370,10 @@ function M.new()
     return self.scale or 1
   end
   G.UISpecialFrames = {}
+  W.cursor = { 0, 0 }
+  G.GetCursorPosition = function()
+    return W.cursor[1], W.cursor[2]
+  end
   G.ButtonFrameTemplate_HidePortrait = function(f)
     f.noPortrait = true
   end

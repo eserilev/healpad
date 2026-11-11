@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+A new settings window, smaller and simpler:
+
+- Two tabs, Heals and Menu. LB and RB switch them.
+- While the window is open, the menu itself shows beside it, where it will be, as big and in the look
+  you picked. The window moves to the side of the screen the menu leaves free.
+- Heals: every heal on your buttons in one list, each with a checkbox, its icon with the key in the
+  corner, and its name and rank. Tick a heal to hold it for the menu; untick it and the button casts
+  as it always did.
+- Beside each ticked heal, who a quick tap heals: You, Target, Focus, Tank or Last healed. Left and
+  Right change it.
+- The menu shows the heal you're on with that person in gold, and fades out on a heal that isn't
+  ticked.
+- Menu: Style, Size, Spacing, Select person with and Cancel heal with, each changed with Left and
+  Right; then Move and Reset for its position. Reset is greyed out when the menu is already in the
+  middle.
+- Spread is now Spacing, from 60% to 140%. Your old Spread carries over.
+- Up and Down pick a row, A ticks or steps on, B closes. The gold edge shows only while you use the
+  pad or the keys; the mouse lights the row it's on.
+- Long names get a smaller font instead of being cut off.
+- The gold box around the menu while you move it no longer pulses.
+
 ## 0.3.0
 
 Four looks for the menu:

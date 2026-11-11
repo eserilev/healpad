@@ -2,7 +2,8 @@
 -- table registered here and built the first time it is chosen:
 --   build(root, fx)     makes its frames: look.frame holds them, look.spots[dir]
 --                       the people (each with .name, and .med, the part that grows)
---   layout(spread)      puts the people in place (spread 1 to 5)
+--   layout(spacing)     puts the people in place; spacing (0.6 to 1.4, 1 the
+--                       usual) scales the room between them, never below 0
 --   draw(f, src, ctx)   one person; src is a unit, a sample or the empty Target
 --   aim(sel, ctx)       who is aimed: sizes, dimming, pointers
 --   open()              the menu opens
@@ -18,6 +19,12 @@ ns.kit = K
 ns.looks = {}
 ns.LOOKS = { "classic", "medallions", "sigil", "compass" }
 ns.LOOK_LABEL = { medallions = "Medallions", sigil = "Sigil", compass = "Compass", classic = "Classic" }
+
+-- Where a person sits with that spacing: touch is the distance at which
+-- they would touch the middle one, at the usual one; spacing scales the gap.
+function K.space(at, touch, spacing)
+  return touch + (at - touch) * spacing
+end
 
 function ns.registerLook(name, look)
   look.name = name

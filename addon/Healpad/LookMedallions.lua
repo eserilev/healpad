@@ -122,8 +122,9 @@ function look.build(stage, fx)
   look.float = K.floater(layer)
 end
 
-function look.layout(spread)
-  local r = R * (1 + (spread - 3) * 0.12)
+function look.layout(spacing)
+  -- you are 76 across, the others 84
+  local r = K.space(R, (76 + 84) / 2, spacing)
   look.r = r
   for d, f in pairs(look.spots) do
     local v = K.DIR_VEC[d]

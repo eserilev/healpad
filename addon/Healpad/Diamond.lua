@@ -29,15 +29,17 @@ local pageText = root:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 
 local look -- the look in use
 local previewing = false
+local moving = false -- the settings' Move: the menu can be dragged
+local dimmed = false -- the settings are on a heal that doesn't hold for the menu
 local opening = false -- the entrance plays at the next redraw
 
 ---------------------------------------------------------------- the look
 
--- Dragging the menu while the Frames tab shows it.
+-- Dragging the menu while the settings' Move is on.
 root:SetMovable(true)
 root:SetClampedToScreen(false)
 local function startDrag()
-  if not ns.previewing() or InCombatLockdown() then
+  if not previewing or not moving or InCombatLockdown() then
     return
   end
   root:StartMoving()
@@ -67,7 +69,7 @@ local function draggable(f)
   end)
   f:SetScript("OnMouseUp", stopDrag)
   f:SetScript("OnEnter", function()
-    if ns.previewing() then
+    if previewing and moving then
       pcall(SetCursor, "UI_MOVE_CURSOR")
     end
   end)
@@ -76,19 +78,35 @@ local function draggable(f)
   end)
 end
 
--- Move mode: a pulsing gold box around the whole menu, with the move icon.
+-- Move mode: a thin gold edge around the whole menu, and it can be dragged.
 local bounds = CreateFrame("Frame", nil, root)
-local box = ns.outline(bounds, bounds, 0, 3)
+local box = ns.outline(bounds, bounds, 0, 1)
 box:SetColor(1, 0.82, 0, 1)
-local moveIcon = bounds:CreateTexture(nil, "OVERLAY")
-moveIcon:SetSize(40, 40)
-moveIcon:SetPoint("CENTER", bounds, "TOP", 0, 0)
-moveIcon:SetTexture("Interface\\CURSOR\\UI-Cursor-Move")
-moveIcon:Hide()
-ns.kit.pulse(box, 0.55, 1, 0.5)
+local function grabbable()
+  for _, f in pairs(ns.spots or {}) do
+    f:EnableMouse(previewing and moving)
+  end
+end
 function ns.showMoving(on)
-  box:SetShown(on)
-  moveIcon:SetShown(on)
+  moving = on == true
+  box:SetShown(moving)
+  grabbable()
+end
+
+-- Where the menu is on the screen, in UIParent's units: left, right, top,
+-- bottom; nil when the game can't tell yet.
+function ns.menuBox()
+  local ok, l, r, t, b = pcall(function()
+    return bounds:GetLeft(), bounds:GetRight(), bounds:GetTop(), bounds:GetBottom()
+  end)
+  if not ok or type(l) ~= "number" or type(r) ~= "number" then
+    return nil
+  end
+  local k = 1
+  pcall(function()
+    k = bounds:GetEffectiveScale() / UIParent:GetEffectiveScale()
+  end)
+  return l * k, r * k, (t or 0) * k, (b or 0) * k
 end
 
 local function anchorAround(spots)
@@ -121,9 +139,7 @@ local function applyLook()
   look = want
   ns.look = want
   ns.spots = want.spots
-  for _, f in pairs(want.spots) do
-    f:EnableMouse(previewing)
-  end
+  grabbable()
   anchorAround(want.spots)
   want.frame:Show()
   -- the entrance is for a real hold; the settings' preview just shows it
@@ -170,7 +186,7 @@ function ns.layout()
   fx:ClearAllPoints()
   fx:SetPoint("CENTER", UIParent, "CENTER", x, y)
   if look then
-    look.layout(ns.db and ns.db.distance or 3)
+    look.layout(ns.db and ns.db.spacing or 1)
   end
 end
 
@@ -197,7 +213,7 @@ local function heldSpell()
   return heldAttr("lock")
 end
 
--- Example people for the Frames tab when you're not in a group: one of each
+-- Example people for the settings' preview when you're not in a group: one of each
 -- state the looks show.
 local SAMPLE = {
   UP = { name = "Thrain", class = "WARRIOR", hp = 0.46, inc = 0.14, miss = 1620, hot = true },
@@ -210,10 +226,20 @@ for _, p in pairs(SAMPLE) do
   p.kind = "sample"
 end
 
+-- Where each tap choice sits among the example people.
+local SAMPLE_TAP = { player = "SELF", target = "RIGHT", focus = "LEFT", tank = "UP", last = "DOWN" }
+
 -- Before you aim, the gold is on whoever letting go now would heal: you, or
--- the held button's Tap to heal choice when that person is in the menu.
-local function tapPlace(page)
+-- the held button's tap choice when that person is in the menu. In the
+-- settings' preview: the tap choice of the heal the settings are on.
+local function tapPlace(page, sample)
   local tap = heldAttr("tap")
+  if not tap and previewing then
+    tap = ns.previewTap
+    if sample then
+      return SAMPLE_TAP[tap] or "SELF"
+    end
+  end
   local unit
   if tap == "tank" then
     unit = ctl:GetAttribute("tank")
@@ -259,12 +285,12 @@ function ns.redraw()
   local pages = ctl:GetAttribute("pages") or 1
   -- Who sits where: the tap target in the middle, you in their place.
   local swap = page == 1 and ctl:GetAttribute("swap") or nil
-  local sel = (ns.stage and ns.stage.sel) or ctl:GetAttribute("sel") or (swap and "SELF") or tapPlace(page)
+  local sample = previewing and ctl:GetAttribute("state") ~= "aim" and (not IsInGroup() or ns.stage ~= nil)
+  local sel = (ns.stage and ns.stage.sel) or ctl:GetAttribute("sel") or (swap and "SELF") or tapPlace(page, sample)
   local spell = heldSpell() or ns.previewSpell
   lastSpell = spell or lastSpell
   title:SetText(spell and ns.spellLabel(spell) or "")
   pageText:SetText(pages > 1 and ("Group " .. page .. " / " .. pages) or "")
-  local sample = previewing and ctl:GetAttribute("state") ~= "aim" and (not IsInGroup() or ns.stage ~= nil)
   local ctx = { spell = spell, sel = sel }
   for _, d in ipairs(ns.DIRS) do
     local from = d
@@ -353,22 +379,38 @@ root:SetScript("OnShow", function()
   opening = not previewing
 end)
 
--- The settings' Frames tab shows the menu where it will be, out of combat;
--- then it can be dragged.
+-- While the settings are open the menu shows where it will be, out of
+-- combat, as their preview.
 function ns.previewing()
   return previewing
 end
+
+-- Faded out while the settings are on a heal that doesn't open the menu; a
+-- real hold always shows it.
+local function fade(seconds)
+  local out = previewing and dimmed and ctl:GetAttribute("state") ~= "aim"
+  ns.kit.fadeTo(root, out and 0 or 1, seconds)
+end
+function ns.previewDim(on)
+  dimmed = on == true
+  fade(0.2)
+end
+
 function ns.preview(on)
   previewing = on and not InCombatLockdown()
-  for _, f in pairs(ns.spots or {}) do
-    f:EnableMouse(previewing)
+  if not previewing then
+    moving, dimmed = false, false
+    box:Hide()
   end
+  grabbable()
+  fade(0)
   root:SetShown(previewing or ctl:GetAttribute("state") == "aim")
   ns.redraw()
 end
 
 ctl:HookScript("OnAttributeChanged", function(_, name, value)
   if name == "state" then
+    fade(0)
     root:SetShown(value == "aim" or previewing)
     ns.redraw()
   elseif name == "sel" or name == "page" then

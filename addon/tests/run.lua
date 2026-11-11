@@ -566,7 +566,7 @@ for _, name in ipairs({ "medallions", "sigil", "compass", "classic" }) do
     clean(W)
   end)
 
-  test("look " .. name .. ": alone, the Target spot; the Frames tab's sample people", function()
+  test("look " .. name .. ": alone, the Target spot; the settings' example people", function()
     local W, ns = game({ party = false })
     ns.setLook(name)
     W.key("PAD3", true)
@@ -577,8 +577,6 @@ for _, name in ipairs({ "medallions", "sigil", "compass", "classic" }) do
     W.tap("PADDUP")
     W.key("PAD3", false)
     ns.openOptions()
-    W.tap("PADRSHOULDER")
-    W.tap("PADRSHOULDER")
     eq(ns.diamond:IsShown(), true, "preview")
     eq(ns.spots.UP.hot:IsShown(), true, "sample HoT")
     eq(ns.spots.RIGHT.dispel:IsShown(), true, "sample dispel")
@@ -588,53 +586,6 @@ for _, name in ipairs({ "medallions", "sigil", "compass", "classic" }) do
     clean(W)
   end)
 end
-
-test("Frames tab: Look picks one of four with A, the chosen one in gold, the preview follows", function()
-  local W, ns = game({ party = false })
-  ns.openOptions()
-  W.tap("PADRSHOULDER")
-  W.tap("PADRSHOULDER")
-  local d = ns.optionsDebug()
-  eq(d.st.tab, "frames")
-  local looks = d.ui.frames.looks
-  eq(#looks, 4)
-  eq(looks[1].label:GetText(), "Classic")
-  eq(looks[4].label:GetText(), "Compass")
-  eq(looks[1].gold:IsShown(), true, "Classic chosen")
-  eq(looks[2].gold:IsShown(), false)
-  eq(d.focus(), "size", "the focus starts on Size")
-  W.tap("PADDDOWN")
-  W.tap("PADDDOWN")
-  eq(d.focus(), "look1", "down to the looks")
-  W.tap("PADDRIGHT")
-  eq(d.focus(), "look2", "right moves the focus")
-  eq(ns.db.look, "classic", "and picks nothing")
-  W.tap("ENTER")
-  eq(ns.db.look, "medallions", "A picks")
-  eq(ns.look.name, "medallions", "the preview shows it")
-  eq(ns.diamond:IsShown(), true)
-  eq(looks[2].gold:IsShown(), true)
-  eq(looks[1].gold:IsShown(), false)
-  W.tap("PADDRIGHT")
-  W.tap("PADDRIGHT")
-  W.tap("PADDRIGHT")
-  eq(d.focus(), "look4", "stops at the last")
-  W.tap("ENTER")
-  eq(ns.db.look, "compass")
-  looks[3]:GetScript("OnClick")(looks[3])
-  eq(ns.db.look, "sigil", "a click picks too")
-  eq(d.focus(), "look3", "the focus goes where you clicked")
-  eq(ns.spots.UP.name.text, "Thrain", "sample people in the new look")
-  W.tap("PADDUP")
-  eq(d.focus(), "spread")
-  W.tap("PADDRIGHT")
-  eq(ns.db.distance, 4, "Spread still works")
-  W.tap("PADDUP")
-  W.tap("PADDRIGHT")
-  eq(ns.db.scale, 1.1, "Size still works")
-  eq(ns.looks.sigil.spots.UP.at[2] > 180, true, "spread moves the gems out")
-  clean(W)
-end)
 
 test("a heal you didn't set to aim, and a non-heal, cast as you bound them", function()
   local W = game()
@@ -893,36 +844,57 @@ local function rowKeys(ns)
   return table.concat(got, " ")
 end
 
-test("settings: the window: no portrait or band under the title; three tabs; height fits each tab", function()
+local function tabNames(d)
+  local tabs = {}
+  for _, t in ipairs(d.ui.tabs) do
+    tabs[#tabs + 1] = t.text
+  end
+  return table.concat(tabs, ",")
+end
+-- The title over the menu.
+local function menuTitle(W, ns)
+  for _, fs in ipairs(W.fontStrings) do
+    if fs.parent == ns.diamond and fs.font == "GameFontNormalLarge" then
+      return fs.text
+    end
+  end
+end
+local function click(f)
+  f:GetScript("OnClick")(f)
+end
+
+test("settings: a narrow window, no portrait or band; Heals and Menu tabs; LB and RB switch", function()
   local W, ns = game()
   ns.openOptions()
   local p = W.G.HealpadOptions
   local d = ns.optionsDebug()
   eq(p.noPortrait, true, "portrait hidden")
   eq(p.noAttic, true, "no band under the title")
-  local tabs = {}
-  for _, t in ipairs(d.ui.tabs) do
-    tabs[#tabs + 1] = t.text
-  end
-  eq(table.concat(tabs, ","), "Buttons,Controls,Frames")
-  eq(p:GetWidth(), 620)
-  local hButtons = p:GetHeight()
+  eq(tabNames(d), "Heals,Menu")
+  eq(p:GetWidth(), 392)
+  eq(d.st.tab, "heals")
+  eq(d.ui.heals:IsShown() and not d.ui.menu:IsShown(), true, "Heals first")
+  local h = p:GetHeight()
   W.tap("PADRSHOULDER")
-  local hControls = p:GetHeight()
+  eq(d.st.tab, "menu", "RB")
+  eq(d.ui.menu:IsShown() and not d.ui.heals:IsShown(), true)
+  eq(p:GetHeight(), h, "the same height on both tabs")
   W.tap("PADRSHOULDER")
-  local hFrames = p:GetWidth() < 620 and p:GetHeight()
-  eq(
-    hControls < hFrames and hFrames < hButtons,
-    true,
-    "heights " .. hButtons .. " " .. hControls .. " " .. tostring(hFrames)
-  )
+  eq(d.st.tab, "menu", "RB stays on the last tab")
   W.tap("PADLSHOULDER")
-  W.tap("PADLSHOULDER")
-  eq(d.st.tab, "buttons", "LB goes back")
+  eq(d.st.tab, "heals", "LB")
+  W.tap("E")
+  eq(d.st.tab, "menu", "E")
+  W.tap("Q")
+  eq(d.st.tab, "heals", "Q")
+  click(d.ui.tabs[2])
+  eq(d.st.tab, "menu", "a click on a tab")
+  click(d.ui.tabs[1])
+  eq(d.st.tab, "heals")
   clean(W)
 end)
 
-test("settings: the list shows heals only, no KeyBars and no layer names", function()
+test("settings: no word with aim or KeyBars, and no layer names", function()
   local W = Wow.new()
   setup(W)
   party(W)
@@ -941,322 +913,439 @@ test("settings: the list shows heals only, no KeyBars and no layer names", funct
     end
   end
   eq(kb, 1, "the KeyBars key is listed once")
-  -- every tab drawn, then every word in the window
+  -- every tab drawn, Move on, every tap choice shown; then every word
   W.tap("PADRSHOULDER")
-  W.tap("PADRSHOULDER")
-  W.tap("PADRSHOULDER")
-  for _, t in ipairs(panelTexts(W)) do
+  for _ = 1, 5 do
+    W.tap("PADDDOWN")
+  end
+  W.tap("PAD1")
+  W.tap("PAD1")
+  W.tap("PADLSHOULDER")
+  local words = panelTexts(W)
+  for _ = 1, 5 do
+    W.tap("PADDRIGHT")
+    for _, t in ipairs(panelTexts(W)) do
+      table.insert(words, t)
+    end
+  end
+  for _, t in ipairs(words) do
     eq(t:find("KeyBars") == nil, true, "no KeyBars: " .. t)
     eq(t:find("Normal") == nil and t:find("Bear") == nil, true, "no layer name: " .. t)
     eq(t:lower():find("aim") == nil, true, "no aim: " .. t)
-    eq(t:find("Hold") == nil and t:find("Cast") == nil, true, "no old labels: " .. t)
   end
-  local row = d.ui.rows[1]
-  eq(row.check, nil, "no checkbox column")
   ns.optionsPanel():Hide()
   clean(W)
 end)
 
-test("settings: the detail follows the focus down the list; the key alone; On for enabled", function()
+test("settings: Heals: a checkbox, the icon with its key, name and rank, who a tap heals", function()
   local W, ns = game()
   ns.openOptions()
   local d = ns.optionsDebug()
-  local det = d.ui.detail
   eq(rowKeys(ns), "A B X LT+X 1", "heals, Wrath left out")
-  eq(d.focus(), "row")
-  eq(plainText(det.key:GetText()), "A")
-  eq(det.name:GetText(), "Rejuvenation")
-  eq(det.rank:GetText(), "Rank 1")
-  W.tap("PADDDOWN")
-  eq(d.st.li, 2)
-  eq(plainText(det.key:GetText()), "B", "the detail moved with the focus")
-  eq(det.name:GetText(), "Healing Touch")
-  eq(d.ui.rows[1].on:IsShown(), true, "A is enabled: On")
-  eq(d.ui.rows[2].on:IsShown(), false, "B is not: nothing")
-  eq(d.ui.rows[3].on:IsShown(), true)
-  eq(d.ui.rows[1].on:GetText(), "On")
-  W.tap("PADDDOWN")
-  W.tap("PADDDOWN")
-  W.tap("PADDDOWN")
-  W.tap("PADDDOWN")
-  eq(d.st.li, 5, "stops at the last")
-  eq(plainText(det.key:GetText()), "1")
-  local line = d.ui.rows[2].line
-  line:GetScript("OnClick")(line)
-  eq(d.st.li, 2, "a click picks a row")
-  eq(d.focus(), "row")
+  local words = table.concat(panelTexts(W), "|")
+  eq(words:find("Hold for menu", 1, true) ~= nil, true, "left heading")
+  eq(words:find("Quick tap heals", 1, true) ~= nil, true, "right heading")
+  local on, off = d.ui.rows[1], d.ui.rows[2]
+  eq(on.check:GetChecked(), true, "A holds for the menu: ticked")
+  eq(on.hotkey:GetText(), "A", "the key on the icon")
+  eq(on.icon.texture, ns.spellIcon(774), "the spell's icon")
+  eq(on.icon:IsDesaturated(), false)
+  eq(on.name:GetText(), "Rejuvenation")
+  eq(on.rank:GetText(), "Rank 1")
+  eq(on.name.textColor[1], 1, "gold name")
+  eq(on.cycler:IsShown(), true)
+  eq(on.cycler.value:GetText(), "You")
+  eq(off.check:GetChecked(), false, "B: not ticked")
+  eq(off.hotkey:GetText(), "B")
+  eq(off.name:GetText(), "Healing Touch")
+  eq(off.icon:IsDesaturated(), true, "grey icon")
+  eq(off.name.textColor[1] < 0.6, true, "grey name")
+  eq(off.cycler:IsShown(), false, "no tap choice while off")
+  eq(d.ui.rows[3].check:GetChecked(), true, "X")
+  eq(d.ui.rows[5].hotkey:GetText(), "1")
   clean(W)
 end)
 
-test("settings: Enable is Hold to Aim: on holds to aim, off casts as before", function()
+test("settings: A, a click on the row or on its checkbox: holds for the menu, or casts as before", function()
   local W, ns = game({ saved = { aim = {} } })
   ns.openOptions()
   local p = W.G.HealpadOptions
   local d = ns.optionsDebug()
-  eq(W.overrides.PADDDOWN.target, "HealpadNavDOWN", "pad drives the panel")
+  eq(W.overrides.PADDDOWN.target, "HealpadNavDOWN", "the pad drives the window")
   W.tap("PADDDOWN")
   W.tap("PADDDOWN") -- X
+  eq(d.focus(), 3)
   W.tap("PAD1")
-  eq(d.focus(), "enable", "A on a row goes to its Enable")
-  eq(ns.db.aim.PAD3, nil, "and changes nothing")
-  eq(d.ui.detail.enable.label:GetText(), "Enable")
-  W.tap("PAD1")
-  eq(ns.db.aim.PAD3 ~= nil, true, "X holds to aim")
+  eq(ns.db.aim.PAD3 ~= nil, true, "A ticks it: X holds for the menu")
   eq(ns.db.aim.PAD3.tap, "player")
   eq(ns.heals[1]:GetAttribute("hp-key"), "PAD3")
-  eq(d.ui.detail.enable.chosen, true, "Enable shows on")
-  eq(d.ui.rows[3].on:IsShown(), true)
-  W.tap("PAD1")
-  eq(ns.db.aim.PAD3, nil, "off again")
+  eq(d.ui.rows[3].check:GetChecked(), true)
+  eq(d.ui.rows[3].cycler:IsShown(), true, "the tap choice shows")
+  W.tap("ENTER")
+  eq(ns.db.aim.PAD3, nil, "Enter: off again")
   eq(ns.heals[1]:GetAttribute("hp-key"), nil)
-  eq(d.ui.detail.enable.chosen, false)
-  local e = d.ui.detail.enable
-  e:GetScript("OnClick")(e)
-  eq(ns.db.aim.PAD3 ~= nil, true, "a click on Enable")
+  eq(d.ui.rows[3].check:GetChecked(), false)
+  click(d.ui.rows[3])
+  eq(ns.db.aim.PAD3 ~= nil, true, "a click on the row")
+  click(d.ui.rows[3].check)
+  eq(ns.db.aim.PAD3, nil, "a click on the checkbox")
+  click(d.ui.rows[2].check)
+  eq(ns.db.aim.PAD2 ~= nil, true, "another row's checkbox")
+  eq(d.st.li, 2, "and the window is on it")
+  click(d.ui.rows[2])
+  click(d.ui.rows[3].check)
   p:Hide()
   W.combat = true
   W.key("PAD3", true)
   W.tap("PADDUP")
   W.key("PAD3", false)
   eq(last(W).spell, 5186)
-  eq(last(W).unit, "party2")
-  clean(W)
-end)
-
-test("settings: Tap to heal: You, Target, Focus, Tank, Last healed, one under the other; A picks", function()
-  local W, ns = game()
-  ns.openOptions()
-  local d = ns.optionsDebug()
-  local taps = d.ui.detail.taps
-  local labels = {}
-  for i, b in ipairs(taps) do
-    labels[i] = b.label:GetText()
-    eq(b.box.x, taps[1].box.x, "one column")
-    eq(b.box.w, d.layout.DET_W, "full width")
-    if i > 1 then
-      eq(b.box.y > taps[i - 1].box.y, true, "below the one before")
-    end
-  end
-  eq(table.concat(labels, ","), "You,Target,Focus,Tank,Last healed")
-  W.tap("PADDDOWN")
-  W.tap("PADDDOWN") -- X, enabled
-  W.tap("PADDRIGHT")
-  eq(d.focus(), "enable", "right from the row: Enable, the nearest")
-  W.tap("PADDDOWN")
-  eq(d.focus(), "tap1")
-  eq(taps[1].chosen, true, "You chosen")
-  W.tap("PADDDOWN")
-  W.tap("PADDDOWN")
-  W.tap("PADDDOWN")
-  eq(d.focus(), "tap4")
-  eq(ns.db.aim.PAD3.tap, "player", "moving picks nothing")
-  W.tap("ENTER")
-  eq(ns.db.aim.PAD3.tap, "tank", "A picks Tank")
-  eq(taps[4].chosen, true)
-  eq(taps[4].gold:IsShown(), true, "gold edge")
-  eq(taps[1].chosen, false)
-  W.tap("PADDDOWN")
-  W.tap("PADDDOWN")
-  eq(d.focus(), "tap5", "stops at the last")
-  W.tap("ENTER")
-  eq(ns.db.aim.PAD3.tap, "last")
-  taps[3]:GetScript("OnClick")(taps[3])
-  eq(ns.db.aim.PAD3.tap, "focus", "a click picks")
-  W.tap("PADDUP")
-  W.tap("PADDUP")
-  W.tap("PADDUP")
-  eq(d.focus(), "enable", "back up to Enable")
-  clean(W)
-end)
-
-test("settings: not enabled, Tap to heal is dimmed, stays put, and the focus skips it", function()
-  local W, ns = game()
-  ns.openOptions()
-  local d = ns.optionsDebug()
-  local det = d.ui.detail
-  local y = {}
-  for i, b in ipairs(det.taps) do
-    y[i] = b.box.y
-  end
-  W.tap("PADDDOWN") -- B: not enabled
-  eq(ns.aimConf(ns.optionsDebug().rows[2].bind), nil)
-  W.tap("ENTER")
-  eq(d.focus(), "enable")
-  eq(det.tapLabel:GetAlpha(), 0.35, "label dimmed")
-  for i, b in ipairs(det.taps) do
-    eq(b:IsShown(), true, "still there")
-    eq(b:GetAlpha(), 0.32, "dimmed")
-    eq(b:IsEnabled(), false)
-    eq(b.chosen, false)
-    eq(b.box.y, y[i], "nothing moved")
-  end
-  W.tap("PADDDOWN")
-  eq(d.focus(), "enable", "down skips the dimmed choices")
-  for _, it in ipairs(d.items) do
-    if it.key:match("^tap") then
-      eq(it.skip, true)
-    end
-  end
-  W.tap("ENTER") -- enable it
-  eq(det.taps[1]:GetAlpha(), 1)
-  W.tap("PADDDOWN")
-  eq(d.focus(), "tap1", "now the choices take the focus")
-  W.tap("PADDUP")
-  W.tap("ENTER") -- off again, from Enable
-  eq(det.taps[1].dim, true)
-  clean(W)
-end)
-
-test("settings: B goes back one step: the detail to its row, then closes; keys given back", function()
-  local W, ns = game()
-  ns.openOptions()
-  local p = W.G.HealpadOptions
-  local d = ns.optionsDebug()
-  W.tap("PADDDOWN")
-  W.tap("PADDDOWN")
-  W.tap("ENTER")
-  W.tap("PADDDOWN")
-  eq(d.focus(), "tap1")
+  eq(last(W).unit, "party2", "it holds for the menu")
   W.tap("PAD2")
-  eq(p:IsShown(), true, "B leaves the detail")
-  eq(d.focus(), "row")
-  eq(d.st.li, 3, "on its own row")
-  W.tap("PADDRIGHT")
+  eq(W.barPresses[#W.barPresses].command, "ACTIONBUTTON4", "B, off again, casts as bound")
+  clean(W)
+end)
+
+test("settings: Left and Right change who a quick tap heals, only on a ticked heal", function()
+  local W, ns = game()
+  ns.openOptions()
+  local d = ns.optionsDebug()
+  W.tap("PADDDOWN")
+  W.tap("PADDDOWN") -- X, ticked
+  local seen = {}
+  for _ = 1, 5 do
+    W.tap("PADDRIGHT")
+    seen[#seen + 1] = ns.db.aim.PAD3.tap .. "=" .. d.ui.rows[3].cycler.value:GetText()
+  end
+  eq(table.concat(seen, ","), "target=Target,focus=Focus,tank=Tank,last=Last healed,player=You")
+  eq(ns.heals[1]:GetAttribute("hp-tap") ~= nil, true)
   W.tap("PADDLEFT")
-  eq(d.focus(), "row", "left leaves the detail too")
-  eq(d.st.li, 3)
-  W.tap("PAD2")
-  eq(p:IsShown(), false, "B on the list closes")
-  eq(W.overrides.PADDDOWN, nil, "nav keys given back")
-  ns.openOptions()
-  W.tap("PADRSHOULDER")
-  W.tap("PAD2")
-  eq(p:IsShown(), false, "B on Controls closes")
+  eq(ns.db.aim.PAD3.tap, "last", "left goes back round")
+  eq(d.ui.rows[3].cycler.value:GetText(), "Last healed", "whole")
+  W.tap("PADDUP") -- B, off
+  W.tap("PADDRIGHT")
+  eq(ns.db.aim.PAD2, nil, "an off heal has no tap choice")
+  local c = d.ui.rows[1].cycler
+  click(c.right)
+  eq(ns.db.aim.PAD1.tap, "target", "a click on the right arrow")
+  click(c.mid)
+  eq(ns.db.aim.PAD1.tap, "focus", "a click on the value steps on")
+  click(c.left)
+  click(c.left)
+  eq(ns.db.aim.PAD1.tap, "player", "the left arrow steps back")
+  eq(d.st.li, 1)
   clean(W)
 end)
 
-test("settings: Controls: Select with D-pad, Left stick, Right stick; Cancel with A B X Y", function()
+test(
+  "settings: the real menu is the preview: titled with the heal, its tap person lit, gone for an off heal",
+  function()
+    local W, ns = game({ party = false })
+    ns.openOptions()
+    local d = ns.optionsDebug()
+    eq(ns.diamond:IsShown(), true, "the menu shows with the window")
+    eq(ns.diamond:GetAlpha(), 1)
+    eq(menuTitle(W, ns), "Rejuvenation (Rank 1)", "the heal the window is on")
+    eq(ns.spots.UP.name.text, "Thrain", "the example party")
+    eq(ns.spots.SELF.sel:IsShown(), true, "a tap heals you: you lit")
+    W.tap("PADDRIGHT")
+    eq(ns.spots.RIGHT.sel:IsShown(), true, "Target: the one on the right")
+    eq(ns.spots.SELF.sel:IsShown(), false)
+    W.tap("PADDRIGHT")
+    eq(ns.spots.LEFT.sel:IsShown(), true, "Focus")
+    W.tap("PADDRIGHT")
+    eq(ns.spots.UP.sel:IsShown(), true, "Tank")
+    W.tap("PADDRIGHT")
+    eq(ns.spots.DOWN.sel:IsShown(), true, "Last healed")
+    W.tap("PADDDOWN") -- B, off
+    eq(menuTitle(W, ns), "Healing Touch (Rank 1)")
+    eq(ns.diamond:GetAlpha(), 0, "faded out: B doesn't hold for the menu")
+    eq(ns.diamond:IsShown(), true)
+    W.tap("PADDDOWN") -- X
+    eq(ns.diamond:GetAlpha(), 1, "back")
+    eq(menuTitle(W, ns), "Healing Touch (Rank 2)")
+    W.tap("PADDUP")
+    W.tap("PADRSHOULDER")
+    eq(ns.diamond:GetAlpha(), 1, "on Menu it always shows")
+    eq(ns.spots.RIGHT.sel:IsShown(), true)
+    W.G.HealpadOptions:Hide()
+    eq(ns.diamond:IsShown(), false, "gone with the window")
+    eq(ns.diamond:GetAlpha(), 1)
+    clean(W)
+  end
+)
+
+test("settings: Menu: the labels; every control as wide, arrows in two columns", function()
   local W, ns = game()
   ns.openOptions()
   W.tap("PADRSHOULDER")
   local d = ns.optionsDebug()
-  eq(d.st.tab, "controls")
-  local c = d.ui.controls
-  local a, k = {}, {}
-  for i, b in ipairs(c.aimers) do
-    a[i] = b.label:GetText()
+  local labels, values = {}, {}
+  for i, f in ipairs(d.ui.mlist) do
+    labels[i] = f.label:GetText()
+    if f.ctl then
+      eq(f.ctl:GetWidth(), d.layout.CTL_W, f.key .. " as wide as the rest")
+      eq(f.ctl.left:GetWidth(), f.ctl.right:GetWidth())
+      values[#values + 1] = plainText(f.ctl.value:GetText())
+    end
   end
-  for i, b in ipairs(c.cancels) do
-    k[i] = plainText(b.label:GetText())
-  end
-  eq(table.concat(a, ","), "D-pad,Left stick,Right stick")
-  eq(table.concat(k, " "), "A B X Y")
-  local words = table.concat(panelTexts(W), "|")
-  eq(words:find("Select with", 1, true) ~= nil, true)
-  eq(words:find("Cancel with", 1, true) ~= nil, true)
-  eq(c.aimers[1].chosen, true, "D-pad chosen")
-  eq(c.cancels[2].chosen, true, "B chosen")
-  eq(c.cancels[1].dim and c.cancels[3].dim, true, "A and X hold to aim: dimmed")
-  eq(d.focus(), "aimer1")
+  eq(table.concat(labels, ","), "Style,Size,Spacing,Select person with,Cancel heal with,Menu position")
+  eq(table.concat(values, ","), "Classic,100%,100%,D-pad,B")
+  local pos = d.ui.mrows.pos
+  eq(pos.move:GetWidth() * 2 + 8, d.layout.CTL_W, "Move and Reset as wide as a control")
+  eq(pos.move:GetText(), "Move")
+  eq(pos.reset:GetText(), "Reset")
+  eq(pos.move.template, "UIPanelButtonTemplate", "red buttons")
+  eq(d.ui.rows[1].check.template, "UICheckButtonTemplate", "the game's checkbox")
+  eq(d.ui.mrows.cancel.ctl.value:GetText():find("|c") ~= nil, true, "B in its color")
+  clean(W)
+end)
+
+test("settings: Menu: Left and Right change each row, A steps on, clicks too", function()
+  local W, ns = game({ party = false })
+  ns.openOptions()
+  W.tap("PADRSHOULDER")
+  local d = ns.optionsDebug()
+  local m = d.ui.mrows
+  eq(d.focus(), "look")
   W.tap("PADDRIGHT")
-  eq(ns.db.aimWith, "dpad", "moving picks nothing")
+  eq(ns.db.look, "medallions", "Style")
+  eq(ns.look.name, "medallions", "the menu shows it")
+  eq(m.look.ctl.value:GetText(), "Medallions")
+  W.tap("PADDLEFT")
+  W.tap("PADDLEFT")
+  eq(ns.db.look, "compass", "round the end")
   W.tap("ENTER")
-  eq(ns.db.aimWith, "lstick")
+  eq(ns.db.look, "classic", "A steps on")
+  click(m.look.ctl.right)
+  eq(ns.db.look, "medallions", "a click")
+  eq(ns.spots.UP.name.text, "Thrain", "the example party in the new look")
+  W.tap("PADDDOWN")
+  eq(d.focus(), "size")
   W.tap("PADDRIGHT")
+  eq(ns.db.scale, 1.1, "Size")
+  eq(m.size.ctl.value:GetText(), "110%")
+  eq(ns.diamond.scale, 1.1, "the menu grows")
+  for _ = 1, 8 do
+    W.tap("PADDLEFT")
+  end
+  eq(ns.db.scale, 0.6, "stops at 60%")
+  eq(m.size.ctl.left:IsEnabled(), false, "no further left")
+  for _ = 1, 12 do
+    W.tap("ENTER")
+  end
+  eq(ns.db.scale, 1.6, "and at 160%")
+  eq(m.size.ctl.right:IsEnabled(), false)
+  W.tap("PADDDOWN")
+  eq(d.focus(), "spacing")
+  local r = ns.looks.medallions.r
+  W.tap("PADDRIGHT")
+  eq(ns.db.spacing, 1.1, "Spacing")
+  eq(m.spacing.ctl.value:GetText(), "110%")
+  eq(ns.looks.medallions.r > r, true, "the people move apart")
+  for _ = 1, 9 do
+    W.tap("PADDLEFT")
+  end
+  eq(ns.db.spacing, 0.6, "stops at 60%")
+  click(m.spacing.ctl.mid)
+  eq(ns.db.spacing, 0.7, "a click on the bar steps on")
+  W.tap("PADDDOWN")
+  eq(d.focus(), "pick")
+  W.tap("PADDRIGHT")
+  eq(ns.db.aimWith, "lstick")
+  eq(m.pick.ctl.value:GetText(), "Left stick")
   W.tap("ENTER")
   eq(ns.db.aimWith, "rstick")
-  eq(c.aimers[3].chosen and not c.aimers[1].chosen, true)
+  W.tap("PADDRIGHT")
+  eq(ns.db.aimWith, "dpad", "round the end")
   W.tap("PADDDOWN")
-  eq(d.focus(), "cancel4", "down to the nearest below")
-  W.tap("ENTER")
-  eq(ns.db.cancel, "PAD4", "cancel with Y")
-  W.tap("PADDLEFT")
-  eq(d.focus(), "cancel2", "left skips X, it holds to aim")
-  W.tap("ENTER")
-  eq(ns.db.cancel, "PAD2")
-  W.tap("PADDUP")
-  eq(d.focus():match("^aimer") ~= nil, true, "up to Select with")
-  c.aimers[1]:GetScript("OnClick")(c.aimers[1])
-  eq(ns.db.aimWith, "dpad", "a click picks")
+  eq(d.focus(), "cancel")
+  W.tap("PADDRIGHT")
+  eq(ns.db.cancel, "PAD4", "B to Y: X holds for the menu, skipped")
+  eq(plainText(m.cancel.ctl.value:GetText()), "Y")
+  W.tap("PADDRIGHT")
+  eq(ns.db.cancel, "PAD2", "A is skipped too")
+  click(m.cancel.ctl.left)
+  eq(ns.db.cancel, "PAD4")
   clean(W)
 end)
 
-test("settings: Frames: Size and Spread are sliders with - and +, the value at the right", function()
+test("settings: Spacing: a saved Spread becomes the nearest tenth once; every look uses it", function()
+  local want = { [1] = 0.8, [2] = 0.9, [3] = 1, [4] = 1.1, [5] = 1.2 }
+  for d, v in pairs(want) do
+    local W, ns = game({ saved = { distance = d, aim = {} } })
+    eq(ns.db.spacing, v, "Spread " .. d)
+    clean(W)
+  end
+  local W, ns = game({ saved = { aim = {} } })
+  eq(ns.db.spacing, 1, "new: the usual")
+  eq(ns.db.distance, nil)
+  clean(W)
+  W, ns = game({ saved = { spacing = 1.3, distance = 1, aim = {} } })
+  eq(ns.db.spacing, 1.3, "converted once, then kept")
+  clean(W)
+  -- the usual spacing is where the old Spread 3 put everyone
+  W, ns = game({ saved = { aim = {} } })
+  eq(math.abs(ns.looks.classic.spots.RIGHT.at[1] - (128 * 1.15 / 2 + 64 + 32)) < 0.01, true, "Classic as before")
+  for _, name in ipairs(ns.LOOKS) do
+    ns.setLook(name)
+    local at = {}
+    for _, v in ipairs({ 0.6, 1, 1.4 }) do
+      ns.db.spacing = v
+      ns.layout()
+      at[#at + 1] = ns.spots.RIGHT.at[1]
+    end
+    eq(at[1] < at[2] and at[2] < at[3], true, name .. ": farther apart as it grows")
+  end
+  ns.db.spacing = 1
+  ns.setLook("sigil")
+  eq(ns.looks.sigil.r, 180, "Sigil as before")
+  ns.setLook("medallions")
+  eq(ns.looks.medallions.r, 160, "Medallions as before")
+  ns.setLook("compass")
+  eq(ns.looks.compass.spots.UP.at[2], 158, "Compass as before")
+  ns.db.spacing = 1.4
+  ns.setLook("sigil")
+  eq(ns.looks.sigil.r, 92 + 88 * 1.4, "Sigil at 140%")
+  clean(W)
+end)
+
+test("settings: Menu position: Move becomes Done, the d-pad and sticks nudge, Reset puts it back", function()
   local W, ns = game({ saved = { aim = {} } })
   ns.openOptions()
   W.tap("PADRSHOULDER")
-  W.tap("PADRSHOULDER")
   local d = ns.optionsDebug()
-  local f = d.ui.frames
-  eq(f.size.minus.label:GetText(), "-")
-  eq(f.size.plus.label:GetText(), "+")
-  eq(f.size.value:GetText(), "100%")
-  eq(f.spread.value:GetText(), "3")
-  eq(d.focus(), "size")
+  local pos = d.ui.mrows.pos
+  -- not moving: the sticks and the d-pad never move it
+  W.G.C_GamePad = {
+    GetActiveDeviceID = function()
+      return 1
+    end,
+    GetDeviceMappedState = function()
+      return { sticks = { { x = 1, y = 0 }, { x = 0, y = 0 } } }
+    end,
+  }
+  W.update(0.5)
+  eq(ns.db.x, 0, "no Move, no moving")
+  for _ = 1, 5 do
+    W.tap("PADDDOWN")
+  end
+  eq(d.focus(), "move")
+  eq(pos.reset:IsEnabled(), false, "Reset off: already in the middle")
   W.tap("PADDRIGHT")
-  eq(ns.db.scale, 1.1, "right raises the slider")
-  eq(f.size.value:GetText(), "110%")
-  eq(f.size.bar.value, 1.1, "the slider shows it")
-  W.tap("PADDLEFT")
-  W.tap("PADDLEFT")
-  eq(ns.db.scale, 0.9)
-  W.tap("PADDDOWN")
-  eq(d.focus(), "spread")
+  eq(d.focus(), "move", "the focus skips Reset while it's off")
+  eq(d.ui.ring.target, pos.move, "the gold edge on Move")
+  W.tap("PAD1")
+  eq(pos.move:GetText(), "Done", "Move becomes Done")
+  W.update(0.5)
+  eq(ns.db.x, 350, "a stick glides it")
+  W.G.C_GamePad = nil
+  ns.db.x = 0
   W.tap("PADDRIGHT")
-  eq(ns.db.distance, 4)
-  f.spread.plus:GetScript("OnClick")(f.spread.plus)
-  eq(ns.db.distance, 5, "+ steps up")
-  f.spread.plus:GetScript("OnClick")(f.spread.plus)
-  eq(ns.db.distance, 5, "and stops")
-  f.spread.minus:GetScript("OnClick")(f.spread.minus)
-  eq(ns.db.distance, 4, "- steps down")
-  eq(f.spread.value:GetText(), "4")
-  f.size.bar:GetScript("OnValueChanged")(f.size.bar, 1.33)
-  eq(ns.db.scale, 1.3, "dragging the slider, to the step")
-  eq(d.focus(), "size")
-  eq(ns.diamond:IsShown(), true, "the preview shows while on Frames")
+  W.tap("PADDRIGHT")
+  W.tap("PADDUP")
+  eq(ns.db.x, 40, "the d-pad nudges")
+  eq(ns.db.y, 20)
   W.tap("PAD2")
-  eq(W.G.HealpadOptions:IsShown(), false, "B closes")
-  eq(ns.diamond:IsShown(), false)
+  eq(W.G.HealpadOptions:IsShown(), true, "B leaves Move, the window stays")
+  eq(pos.move:GetText(), "Move")
+  eq(pos.reset:IsEnabled(), true)
+  W.tap("PADDRIGHT")
+  eq(d.focus(), "reset")
+  eq(d.ui.ring.target, pos.reset)
+  W.tap("PAD1")
+  eq(ns.db.x, 0, "Reset")
+  eq(ns.db.y, 0)
+  eq(d.focus(), "move", "back to Move")
+  click(pos.move)
+  eq(pos.move:GetText(), "Done", "a click")
+  W.tap("PADDLEFT")
+  click(pos.move)
+  eq(pos.move:GetText(), "Move")
+  eq(ns.db.x, -20, "it is kept")
+  W.tap("PADLSHOULDER")
+  W.tap("PADRSHOULDER")
+  click(pos.reset)
+  eq(ns.db.x, 0, "Reset with a click")
   clean(W)
 end)
 
-test("settings: words fit their buttons; every row fits its window", function()
+test("settings: B closes, Esc too, from either tab; the keys and the menu go with it", function()
+  local W, ns = game()
+  local p = W.G.HealpadOptions
+  for _, key in ipairs({ "PAD2", "ESCAPE" }) do
+    for _, tab in ipairs({ "PADLSHOULDER", "PADRSHOULDER" }) do
+      ns.openOptions()
+      p = W.G.HealpadOptions
+      W.tap(tab)
+      eq(ns.diamond:IsShown(), true)
+      W.tap(key)
+      eq(p:IsShown(), false, key .. " closes")
+      eq(ns.diamond:IsShown(), false, "the menu goes too")
+      eq(W.overrides.PADDDOWN, nil, "nav keys given back")
+      eq(W.overrides.ESCAPE, nil, "Esc is the game's again")
+    end
+  end
+  clean(W)
+end)
+
+test("settings: the gold edge only while you drive with the pad; the mouse lights the row it is on", function()
   local W, ns = game()
   ns.openOptions()
   local d = ns.optionsDebug()
-  local L = d.layout
-  local function fits(b, what)
-    local fs = b.label
-    eq(b:GetWidth() >= fs:GetStringWidth() + 8, true, what .. " " .. tostring(fs:GetText()))
+  eq(d.ui.ring:IsShown(), false, "no edge at first")
+  W.tap("PADDDOWN")
+  eq(d.ui.ring:IsShown(), true, "the pad: an edge")
+  eq(d.ui.ring.target, d.ui.rows[2])
+  eq(d.ui.rows[2].lit:IsShown(), true, "and the row lit")
+  W.cursor = { 10, 10 }
+  W.update(0.1)
+  eq(d.ui.ring:IsShown(), false, "the mouse moved: no edge")
+  eq(d.ui.rows[2].lit:IsShown(), false)
+  local row = d.ui.rows[3]
+  row:GetScript("OnEnter")(row)
+  eq(d.st.li, 3, "the mouse over a heal: the menu shows it")
+  eq(row.hover:IsShown(), true)
+  eq(ns.previewSpell, 5186)
+  row:GetScript("OnLeave")(row)
+  eq(row.hover:IsShown(), false)
+  clean(W)
+end)
+
+test("settings: every label fits; a long one steps its font down; Last healed stays whole", function()
+  local W, ns = game({ saved = { aim = { PAD3 = { tap = "last" } } } })
+  W.book = {}
+  for i, b in ipairs(BOOK) do
+    W.book[i] = { id = b.id, name = b.name, sub = b.sub, helpful = b.helpful, selfOnly = b.selfOnly }
   end
-  local det = d.ui.detail
-  fits(det.enable, "Enable")
-  for _, b in ipairs(det.taps) do
-    fits(b, "tap")
+  W.book[2].name = "Healing Touch of the Ancient Grove"
+  ns.openOptions()
+  local d = ns.optionsDebug()
+  W.tap("PADRSHOULDER")
+  W.tap("PADLSHOULDER")
+  eq(#d.fitted > 10, true, "labels are fitted")
+  for _, f in ipairs(d.fitted) do
+    eq(f.fs:GetStringWidth() <= f.room, true, tostring(f.fs:GetText()) .. " fits " .. f.room)
   end
-  eq(det.taps[5].label:GetText(), "Last healed")
-  eq(L.DET_X + L.DET_W <= L.INSET_W, true, "the detail fits")
-  local c = d.ui.controls
-  for _, b in ipairs(c.aimers) do
-    fits(b, "aimer")
-  end
-  for _, b in ipairs(c.cancels) do
-    fits(b, "cancel")
-  end
-  eq(c.right <= L.INSET_W - 12, true, "Controls fit: " .. c.right)
-  local f = d.ui.frames
-  for _, b in ipairs(f.looks) do
-    fits(b, "look")
-  end
-  for _, s in ipairs({ f.size, f.spread }) do
-    fits(s.minus, "-")
-    fits(s.plus, "+")
-  end
-  for _, b in ipairs({ f.move, f.reset }) do
-    eq(b:GetWidth() >= #"Reset" * 6 + 24, true, "Move and Reset, and Done")
-  end
-  eq(f.right <= L.FRAMES_W - 10 - 12, true, "Frames fit: " .. f.right)
+  local x = d.ui.rows[3]
+  eq(x.name:GetText(), "Healing Touch of the Ancient Grove", "the whole name")
+  eq(x.name.fontSize < 14, true, "in a smaller font")
+  eq(d.ui.rows[1].name.fontSize, 14, "a short one keeps its size")
+  eq(x.cycler.value:GetText(), "Last healed")
+  eq(d.ui.mrows.pick.label:GetText(), "Select person with")
+  eq(d.layout.NAME_W > 100 and d.layout.LABEL_W > 100, true)
+  clean(W)
+end)
+
+test("settings: the window keeps to the side of the screen the menu leaves free", function()
+  local W, ns = game()
+  ns.openOptions()
+  local side = ns.optionsDebug().sideFor
+  eq(side(440, 840, 1280, "right"), "left", "menu in the middle: left")
+  eq(side(80, 500, 1280, "left"), "right", "menu on the left: right")
+  eq(side(300, 1100, 1280, "right"), "right", "no room either side: stays")
+  eq(side(300, 1100, 1280, "left"), "left")
+  eq(side(nil, nil, 1280, "left"), "left", "unknown: stays")
   clean(W)
 end)
 
@@ -1315,7 +1404,7 @@ test("KeyBars: a tap set to Target heals your friendly target, alone and in a pa
   end
 end)
 
-test("KeyBars: Enable in the settings reaches the button", function()
+test("KeyBars: ticking the heal in the settings reaches the button", function()
   local W = Wow.new()
   setup(W)
   party(W)
@@ -1323,110 +1412,26 @@ test("KeyBars: Enable in the settings reaches the button", function()
   local ns = W.load(DIR, FILES, { aim = {} })
   ns.openOptions()
   local dbg = ns.optionsDebug()
-  local li, n = nil, 0
-  for _, r in ipairs(dbg.rows) do
-    if r.bind then
-      n = n + 1
-      if r.bind.kb then
-        li = n
-      end
+  local li
+  for n, r in ipairs(dbg.rows) do
+    if r.bind.kb then
+      li = n
     end
   end
   dbg.st.li = li
-  dbg.st.focus.buttons = "enable"
   ns.optionsNav("A")
   eq(ns.db.aimSpell["Healing Touch"] ~= nil, true)
   eq(ns.ctl:GetAttribute("aimspell-Healing Touch"), "player")
+  ns.optionsNav("RIGHT")
+  eq(ns.db.aimSpell["Healing Touch"].tap, "target", "Right: the tap choice")
+  eq(ns.ctl:GetAttribute("aimspell-Healing Touch"), "target")
+  ns.optionsNav("LEFT")
   W.G.HealpadOptions:Hide()
   W.combat = true
   W.key("1", true)
   W.tap("UP")
   W.key("1", false)
   eq(last(W).unit, "party2")
-  clean(W)
-end)
-
-test("Esc closes the whole window from any tab, and the diamond preview with it", function()
-  local W, ns = game()
-  ns.openOptions()
-  W.tap("PADRSHOULDER")
-  W.tap("PADRSHOULDER") -- Frames: the diamond shows
-  eq(ns.diamond:IsShown(), true)
-  W.tap("ESCAPE")
-  eq(W.G.HealpadOptions:IsShown(), false, "closed")
-  eq(ns.diamond:IsShown(), false, "preview gone")
-  eq(W.overrides.ESCAPE, nil, "Esc is the game's again")
-  ns.openOptions()
-  W.tap("PADDRIGHT") -- into a heal's detail
-  W.tap("ESCAPE")
-  eq(W.G.HealpadOptions:IsShown(), false, "closed from the detail too")
-  clean(W)
-end)
-
-test("Frames: Move nudges the diamond with the pad, Reset puts it back; it is saved", function()
-  local W, ns = game({ saved = { aim = {} } })
-  ns.openOptions()
-  W.tap("PADRSHOULDER")
-  W.tap("PADRSHOULDER") -- Frames
-  W.tap("PADDDOWN")
-  W.tap("PADDDOWN")
-  W.tap("PADDDOWN") -- Position
-  local d = ns.optionsDebug()
-  eq(d.focus(), "move")
-  W.tap("PAD1") -- Move
-  eq(d.ui.frames.move:GetText(), "Done", "Move becomes Done")
-  eq(d.ui.ring.color[1], 1, "the ring is gold while moving")
-  -- a stick glides it too: right at full tilt for half a second
-  W.G.C_GamePad = {
-    GetActiveDeviceID = function()
-      return 1
-    end,
-    GetDeviceMappedState = function()
-      return { sticks = { { x = 1, y = 0 }, { x = 0, y = 0 } } }
-    end,
-  }
-  W.update(0.5)
-  eq(ns.db.x, 350, "the stick moved it")
-  W.G.C_GamePad = nil
-  ns.db.x = 0
-  W.tap("PADDRIGHT")
-  W.tap("PADDRIGHT")
-  W.tap("PADDUP")
-  W.tap("PAD1") -- done
-  eq(d.ui.frames.move:GetText(), "Move")
-  eq(d.ui.ring.color[3], 1, "blue again")
-  eq(ns.db.x, 40)
-  eq(ns.db.y, 20)
-  W.tap("PADDUP")
-  W.tap("PADDDOWN") -- still on Position after leaving Move
-  W.tap("PADDRIGHT")
-  W.tap("PAD1") -- Reset
-  eq(ns.db.x, 0)
-  eq(ns.db.y, 0)
-  clean(W)
-end)
-
-test("Frames without Move: the d-pad and sticks change settings, never the position", function()
-  local W, ns = game({ saved = { aim = {} } })
-  ns.openOptions()
-  W.tap("PADRSHOULDER")
-  W.tap("PADRSHOULDER") -- Frames
-  W.G.C_GamePad = {
-    GetActiveDeviceID = function()
-      return 1
-    end,
-    GetDeviceMappedState = function()
-      return { sticks = { { x = 1, y = 1 }, { x = -1, y = 0 } } }
-    end,
-  }
-  W.update(0.5)
-  for _, k in ipairs({ "PADDUP", "PADDDOWN", "PADDLEFT", "PADDRIGHT", "PADDDOWN", "PADDDOWN", "PADDRIGHT" }) do
-    W.tap(k)
-  end
-  W.update(0.5)
-  eq(ns.db.x, 0, "x")
-  eq(ns.db.y, 0, "y")
-  W.G.C_GamePad = nil
   clean(W)
 end)
 
@@ -1442,7 +1447,7 @@ test("the settings close when combat starts", function()
   clean(W)
 end)
 
-test("/hp test runs in the game: tabs, diamond, a hold, an aim, a cancel", function()
+test("/hp test runs in the game: both tabs, the menu, a hold, an aim, a cancel", function()
   local W, ns = game()
   W.G.SlashCmdList.HEALPAD("test")
   W.runTimers()
@@ -1450,17 +1455,17 @@ test("/hp test runs in the game: tabs, diamond, a hold, an aim, a cancel", funct
   eq(log:find("TEST FAIL") == nil, true, log)
   eq(log:find("LUA ERROR") == nil, true, log)
   eq(log:find("TEST done: %d+ ok, 0 failed") ~= nil, true, log)
-  eq(W.shots, 4, "screenshots")
+  eq(W.shots, 3, "screenshots: Heals, Menu, a hold")
   eq(#W.casts, 0, "nothing cast")
   clean(W)
 end)
 
-test("/hp shots page stages every look and each tab, takes 11 screenshots, puts everything back", function()
+test("/hp shots page stages every look and both tabs, takes 10 screenshots, puts everything back", function()
   local W, ns = game({ party = false })
   local look = ns.db.look
   W.G.SlashCmdList.HEALPAD("shots page")
   W.runTimers()
-  eq(W.shots, 11, "screenshots")
+  eq(W.shots, 10, "screenshots")
   eq(ns.db.look, look, "the look you had")
   eq(W.G.UIParent:IsShown(), true, "the UI is back")
   eq(ns.diamond.parent, W.G.UIParent, "the diamond is back on UIParent")
@@ -1679,12 +1684,11 @@ test("Gamepad Mode: the page and the stance decide what a button casts", functio
   clean(W)
 end)
 
-test("Gamepad Mode: Enable in the settings reaches the controller bar", function()
+test("Gamepad Mode: ticking the heal in the settings reaches the controller bar", function()
   local W, ns = gamepad({ aim = {} })
   ns.openOptions()
   local dbg = ns.optionsDebug()
   dbg.st.li = 2 -- LT+A
-  dbg.st.focus.buttons = "enable"
   ns.optionsNav("A")
   eq(ns.db.aimPad[5186] ~= nil, true)
   eq(ns.ctl:GetAttribute("gpaim-5186"), "player")

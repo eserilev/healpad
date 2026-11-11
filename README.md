@@ -7,7 +7,7 @@ your character as a diamond, aim, let go.
 
 - **Your buttons**: Healpad reads what you already bound (the game's controller
   setup, the controller bar of the game's Gamepad Mode, or any key). In `/hp`,
-  pick a heal and press **Enable**.
+  tick a heal.
 - **Hold it**: the diamond opens. Tank up, you in the middle.
 - **Aim** with the d-pad, the right stick or the left stick (your choice), or the
   arrow keys. The opposite way comes back to you. **Cancel** with B (your choice).

@@ -226,10 +226,13 @@ function look.build(stage, fx)
   look.float = K.floater(layer)
 end
 
-function look.layout(spread)
-  local k = 1 + (spread - 3) * 0.12
+-- how near a card may come to the rose in the middle (130 across)
+local TOUCH = { UP = { 0, 65 + H / 2 }, RIGHT = { 65 + W / 2, 0 }, DOWN = { 0, -(65 + H / 2) }, SELF = { 0, 0 } }
+TOUCH.LEFT = { -TOUCH.RIGHT[1], 0 }
+
+function look.layout(spacing)
   for d, f in pairs(look.spots) do
-    f.at = { AT[d][1] * k, AT[d][2] * k }
+    f.at = { K.space(AT[d][1], TOUCH[d][1], spacing), K.space(AT[d][2], TOUCH[d][2], spacing) }
     f:ClearAllPoints()
     f:SetPoint("CENTER", look.frame, "CENTER", f.at[1], f.at[2])
   end

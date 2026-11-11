@@ -106,10 +106,11 @@ function look.build(stage)
   look.spots.SELF:SetScale(1.15)
 end
 
-function look.layout(spread)
-  -- the middle frame is bigger; the gaps grow with Spread and never close
-  local hx = W * 1.15 / 2 + W / 2 + 14 + spread * 6
-  local vy = H * 1.15 / 2 + H / 2 + 30 + spread * 5
+function look.layout(spacing)
+  -- the middle frame is bigger; the gaps grow with Spacing and never close
+  local tx, ty = W * 1.15 / 2 + W / 2, H * 1.15 / 2 + H / 2
+  local hx = K.space(tx + 32, tx, spacing)
+  local vy = K.space(ty + 45, ty, spacing)
   local off = { UP = { 0, vy }, RIGHT = { hx, 0 }, DOWN = { 0, -vy }, LEFT = { -hx, 0 }, SELF = { 0, 0 } }
   for d, f in pairs(look.spots) do
     f.at = off[d]

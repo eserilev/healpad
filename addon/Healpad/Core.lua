@@ -59,7 +59,6 @@ function ns.afterCombat(key, fn)
 end
 
 local DEFAULTS = {
-  distance = 3,
   scale = 1,
   arrows = true,
   aimWith = "dpad",
@@ -68,6 +67,22 @@ local DEFAULTS = {
   y = 0,
   look = "classic",
 }
+
+-- Spacing: how far apart the people sit, 0.6 to 1.4 of the usual room
+-- between them. Before 0.4 it was Spread, 1 to 5 (3 the usual); a saved
+-- Spread becomes the nearest tenth once: 1 is 0.8, 3 is 1, 5 is 1.2.
+ns.SPACING_MIN, ns.SPACING_MAX = 0.6, 1.4
+function ns.tenth(v)
+  return math.floor(v * 10 + 0.5) / 10
+end
+function ns.spacingOf(db)
+  local v = tonumber(db.spacing)
+  if not v then
+    local d = tonumber(db.distance)
+    v = d and 1 + (d - 3) * 0.12 or 1
+  end
+  return math.max(ns.SPACING_MIN, math.min(ns.SPACING_MAX, ns.tenth(v)))
+end
 
 function ns.setupDB()
   HealpadDB = HealpadDB or {}
@@ -84,6 +99,7 @@ function ns.setupDB()
     db.look = "classic"
   end
   db.lookV = 1
+  db.spacing = ns.spacingOf(db)
   if ns.looks and not ns.looks[db.look] then
     db.look = DEFAULTS.look
   end

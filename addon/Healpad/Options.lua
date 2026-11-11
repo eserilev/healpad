@@ -1,67 +1,75 @@
--- The settings: /healpad or /hp. Three tabs.
---   Buttons:  your heal buttons in a list; the one you are on shows on the
---             right: Enable (hold to aim, else it casts as before) and who a
---             quick tap heals.
---   Controls: what picks who to heal (d-pad or a stick) and what cancels.
---   Frames:   how big the diamond's frames are, how far apart, its look and
---             where it sits.
--- Works with the pad (d-pad, A, B, LB, RB), the keyboard (arrows, Enter) and
--- the mouse, all by one rule: the d-pad moves the focus to what is next to it
--- on the screen, A picks; only a slider takes Left and Right to change. B goes
--- back one step. Settings change out of combat only; the panel closes in
--- combat.
+-- The settings: /healpad or /hp. A narrow window with two tabs.
+--   Heals: one row per heal on your buttons. Ticked, holding the button
+--          opens the menu; not ticked, it casts as it always did. On the
+--          right, who a quick tap heals.
+--   Menu:  its style, size and spacing, what selects a person, what
+--          cancels, and where it sits.
+-- While the window is open the real menu is its preview: where it will be,
+-- as big and in the look it will have. The window keeps to the side of the
+-- screen the menu leaves free.
+-- The pad (d-pad, A, B, LB, RB), the keys (arrows, Enter, Esc, Q, E) and the
+-- mouse all work: Up and Down pick a row, Left and Right change its value, A
+-- ticks, steps or presses, B closes. Out of combat only; it closes in combat.
 local _, ns = ...
 
-local W, FRAMES_W = 620, 440 -- Frames is narrow and steps aside for the diamond
-local TOP_Y = 120 -- the window's top edge, the same on every tab
-local PAD = 12 -- space inside the window's inset
-local INSET_W = W - 10
-local LIST_X, LIST_W, ROW_H, MAX_ROWS = 8, 262, 34, 12
-local DET_X = LIST_X + LIST_W + 12 + 1 + 16
-local DET_W = INSET_W - DET_X - 14
-local BTN_H = 28
--- the detail, from its top
-local DET_TOP = PAD + 4
-local DET_KEY = DET_TOP + 40 + 10
-local DET_ENABLE = DET_KEY + 14 + 16
-local DET_TAPLABEL = DET_ENABLE + BTN_H + 16
-local DET_STACK = DET_TAPLABEL + 14 + 8
-local STACK_GAP = 4
-local FORM_ROW_GAP = 14
-local TABS = { "buttons", "controls", "frames" }
-local TAB_LABEL = { buttons = "Buttons", controls = "Controls", frames = "Frames" }
-local GOLD, WHITE = { 1, 0.82, 0 }, { 1, 1, 1 }
-local SOFT = { 0.85, 0.78, 0.6 } -- a choice not chosen
-local PAD_COLOR = { A = { 0.4, 0.9, 0.4 }, B = { 1, 0.35, 0.3 }, X = { 0.35, 0.6, 1 }, Y = { 1, 0.85, 0.2 } }
+local W = 392
+local PAD = 6 -- inside the window's inset
+local INSET_X, INSET_TOP, INSET_BOTTOM = 4, 24, 4
+local ROW_W = W - INSET_X - 6 - 2 * PAD
+local ROW_H, HEAD_H, RP = 44, 22, 8 -- a row, the headings over the heals, a row's own margin
+local MAX_ROWS = 7 -- heals shown at once; the rest scroll
+local ARROW = 22
+local TAP_W = 94 -- the tap choice between its arrows
+local CYCLER_W = 2 * ARROW + TAP_W
+local CTL_W = 200 -- every control on the Menu tab
+local LABEL_W = ROW_W - 2 * RP - CTL_W - 8
+local CHECK = 26
+local ICON = 34
+local NAME_X = RP + CHECK + 8 + ICON + 10
+local NAME_W = ROW_W - RP - CYCLER_W - 8 - NAME_X
+local BTN_W, BTN_GAP = 96, 8
+local EDGE = 12 -- the window's gap from the screen's edge
+local TABS = { "heals", "menu" }
+local TAB_LABEL = { heals = "Heals", menu = "Menu" }
+local MENU_ROWS = { "look", "size", "spacing", "pick", "cancel", "pos" }
+local MENU_LABEL = {
+  look = "Style",
+  size = "Size",
+  spacing = "Spacing",
+  pick = "Select person with",
+  cancel = "Cancel heal with",
+  pos = "Menu position",
+}
+local SIZE_MIN, SIZE_MAX = 0.6, 1.6
+local GOLD = { 1, 0.82, 0 }
+local GOLD_SOFT = { 0.79, 0.65, 0.29 }
+local PAD_COLOR = { A = { 0.37, 0.89, 0.37 }, B = { 1, 0.35, 0.3 }, X = { 0.36, 0.61, 1 }, Y = { 1, 0.82, 0.23 } }
 local CANCEL_NAME = { PAD1 = "A", PAD2 = "B", PAD3 = "X", PAD4 = "Y" }
+local BAR = "Interface\\TargetingFrame\\UI-StatusBar"
+local HILIGHT = "Interface\\QuestFrame\\UI-QuestTitleHighlight"
 
 local panel
 local ui = {}
--- focus: what the pad is on, per tab ("row", "enable", "tap2", "size", ...)
-local st = { tab = "buttons", li = 1, top = 1, focus = {} }
-local rows = {} -- the Buttons list: { bind = b }, heals only
-local items = {} -- what the focus can be on in the shown tab
+-- li: the heal row, top: the first heal shown, mi: the Menu row, sub: Move (1)
+-- or Reset (2); keys: driven by the pad or keys (the focus shows)
+local st = { tab = "heals", li = 1, top = 1, mi = 1, sub = 1, keys = false, moving = false, side = "left" }
+local rows = {} -- the heals: { bind = b }
+local fitted = {} -- every label that steps its font down to fit: { fs, room }
 
 ---------------------------------------------------------------- small parts
--- The game's own pieces where they fit: the window frame, its tabs and the
--- red buttons for actions. Choices are dark buttons; the chosen one is edged
--- in gold.
 
-local function text(parent, font, color)
-  local t = parent:CreateFontString(nil, "OVERLAY", font or "GameFontHighlight")
-  if color then
-    t:SetTextColor(unpack(color))
-  end
-  return t
+local function clamp(v, lo, hi)
+  return math.max(lo, math.min(hi, v))
 end
 
-local function keyText(label)
-  local last = (label or ""):match("([^+]+)$")
-  local c = PAD_COLOR[last]
-  if not c then
-    return label
+local function wrap(list, v, d)
+  local i = 1
+  for n, x in ipairs(list) do
+    if x == v then
+      i = n
+    end
   end
-  return string.format("|cff%02x%02x%02x%s|r", c[1] * 255, c[2] * 255, c[3] * 255, label)
+  return list[(i - 1 + d) % #list + 1]
 end
 
 local function textWidth(fs)
@@ -69,87 +77,115 @@ local function textWidth(fs)
   return ok and tonumber(w) or 0
 end
 
-local function fill(tex, top, bottom)
-  if ns.kit and ns.kit.gradient then
-    ns.kit.gradient(tex, "VERTICAL", bottom, top)
-  else
-    tex:SetColorTexture(unpack(top))
+-- A label at a size of its font; it keeps that as its own size.
+local function text(parent, font, size, color)
+  local t = parent:CreateFontString(nil, "OVERLAY", font)
+  t:SetWordWrap(false)
+  if color then
+    t:SetTextColor(unpack(color))
+  end
+  local ok, file, base, flags = pcall(t.GetFont, t)
+  if ok and file then
+    size = size or base
+    pcall(t.SetFont, t, file, size, flags)
+    t.base = { file, size, flags }
+  end
+  return t
+end
+
+-- Sets the words; too wide for room, the font steps down until they fit.
+local function setText(t, s, room)
+  t:SetText(s)
+  local b = t.base
+  if b then
+    local size = b[2]
+    pcall(t.SetFont, t, b[1], size, b[3])
+    while room and size > 7 and textWidth(t) > room do
+      size = size - 0.5
+      pcall(t.SetFont, t, b[1], size, b[3])
+    end
+  end
+  if room and not fitted[t] then
+    fitted[t] = true
+    table.insert(fitted, { fs = t, room = room })
   end
 end
 
--- A dark choice button. w = nil: as wide as its words.
-local function choice(parent, w, h, label, font, left)
+local function keyText(label)
+  local c = PAD_COLOR[label]
+  if not c then
+    return label
+  end
+  return string.format("|cff%02x%02x%02x%s|r", c[1] * 255, c[2] * 255, c[3] * 255, label)
+end
+
+-- A plain button with nothing drawn: clicks and the mouse only.
+local function hit(parent)
   local b = CreateFrame("Button", nil, parent)
-  b.bg = b:CreateTexture(nil, "BACKGROUND")
-  b.bg:SetAllPoints()
-  b.edge = ns.outline(b, b, 0, 1)
-  b.edge:SetColor(0.29, 0.25, 0.17, 1)
-  b.edge:Show()
-  b.gold = ns.outline(b, b, 0, 2)
-  b.gold:SetColor(1, 0.82, 0, 1)
-  local hl = b:CreateTexture(nil, "HIGHLIGHT")
-  hl:SetAllPoints()
-  hl:SetColorTexture(1, 0.82, 0, 0.08)
-  b.label = text(b, font or "GameFontNormal", SOFT)
-  b.label:SetText(label)
-  b.label:SetWordWrap(false)
-  if left then
-    b.label:SetPoint("LEFT", 12, 0)
-    b.label:SetJustifyH("LEFT")
-  else
-    b.label:SetPoint("CENTER")
-  end
-  b.pad = 24
-  b:SetSize(w or math.max(64, textWidth(b.label) + b.pad), h)
-  fill(b.bg, { 0.13, 0.11, 0.08, 1 }, { 0.07, 0.07, 0.05, 1 })
+  b:RegisterForClicks("LeftButtonUp")
   return b
 end
 
-local function setChosen(b, on)
-  b.chosen = on
-  if b.gold then
-    b.gold:SetShown(on)
-    fill(
-      b.bg,
-      on and { 0.27, 0.22, 0.06, 1 } or { 0.13, 0.11, 0.08, 1 },
-      on and { 0.15, 0.11, 0.03, 1 } or { 0.07, 0.07, 0.05, 1 }
-    )
-    b.label:SetTextColor(unpack(on and WHITE or SOFT))
-  else
-    -- a red button: lit while chosen
-    if on then
-      b:LockHighlight()
-    else
-      b:UnlockHighlight()
-    end
-    local fs = b.GetFontString and b:GetFontString()
-    if fs then
-      fs:SetTextColor(unpack(on and WHITE or GOLD))
-    end
-  end
-end
-
--- Dimmed: still there, but not picked and skipped by the pad.
-local function setDim(b, dim)
-  b.dim = dim
-  b:SetAlpha(dim and 0.32 or 1)
-  b:SetEnabled(not dim)
-end
-
--- A red button, for actions.
-local function redButton(parent, w, h, label)
-  local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-  b:SetSize(w, h)
-  b:SetText(label)
+-- The game's page arrows: left and right.
+local function arrow(parent, dir)
+  local b = hit(parent)
+  b:SetSize(ARROW, ARROW)
+  local base = "Interface\\Buttons\\UI-SpellbookIcon-" .. (dir < 0 and "Prev" or "Next") .. "Page-"
+  b:SetNormalTexture(base .. "Up")
+  b:SetPushedTexture(base .. "Down")
+  b:SetDisabledTexture(base .. "Disabled")
+  b:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
+  b.dir = dir
   return b
 end
 
--- Placed by its top left, y down from the tab's top; the pad finds it by
--- this box.
-local function place(f, parent, x, y, w, h)
-  f:ClearAllPoints()
-  f:SetPoint("TOPLEFT", parent, "TOPLEFT", x, -y)
-  f.box = { x = x, y = y, w = w, h = h }
+-- Left arrow, value, right arrow, w wide; mid is the clickable middle.
+local function cycler(parent, w)
+  local c = CreateFrame("Frame", nil, parent)
+  c:SetSize(w, ARROW + 4)
+  c.left = arrow(c, -1)
+  c.left:SetPoint("LEFT", c, "LEFT", 0, 0)
+  c.right = arrow(c, 1)
+  c.right:SetPoint("RIGHT", c, "RIGHT", 0, 0)
+  c.mid = hit(c)
+  c.mid:SetPoint("TOPLEFT", c.left, "TOPRIGHT", 0, 0)
+  c.mid:SetPoint("BOTTOMRIGHT", c.right, "BOTTOMLEFT", 0, 0)
+  c.midW = w - 2 * ARROW
+  return c
+end
+
+-- A thin bar with a gold fill and the percent beside it.
+local function meter(c)
+  local track = CreateFrame("Frame", nil, c.mid)
+  track:SetSize(90, 9)
+  track:SetPoint("CENTER", c.mid, "CENTER", -25, 0)
+  local bg = track:CreateTexture(nil, "BACKGROUND")
+  bg:SetAllPoints()
+  bg:SetColorTexture(0.04, 0.035, 0.03, 1)
+  local edge = ns.outline(track, track, 0, 1)
+  edge:SetColor(0.37, 0.35, 0.32, 1)
+  edge:Show()
+  c.fill = track:CreateTexture(nil, "ARTWORK")
+  c.fill:SetTexture(BAR)
+  c.fill:SetVertexColor(unpack(GOLD))
+  c.fill:SetPoint("TOPLEFT", track, "TOPLEFT", 1, -1)
+  c.fill:SetPoint("BOTTOMLEFT", track, "BOTTOMLEFT", 1, 1)
+  c.trackW = 88
+  c.track = track
+  c.value = text(c.mid, "GameFontHighlight", 14)
+  c.value:SetJustifyH("RIGHT")
+  c.value:SetPoint("RIGHT", track, "RIGHT", 50, 0)
+  c.valueRoom = 44
+end
+
+local function setMeter(c, v, lo, hi)
+  local w = c.trackW * (v - lo) / (hi - lo)
+  c.fill:SetWidth(math.max(1, w))
+  c.fill:SetShown(w >= 1)
+  c.fillW = w
+  setText(c.value, math.floor(v * 100 + 0.5) .. "%", c.valueRoom)
+  c.left:SetEnabled(v > lo + 0.001)
+  c.right:SetEnabled(v < hi - 0.001)
 end
 
 ---------------------------------------------------------------- the data
@@ -183,12 +219,13 @@ local function current()
   return rows[st.li] and rows[st.li].bind
 end
 
-local function aimed(b)
+local function isOn(b)
   return ns.aimConf(b) ~= nil
 end
 
--- Enable: the button holds to aim. Off, it casts as it always did.
-local function setAim(b, on)
+-- Ticked: holding the button opens the menu. Not ticked: it casts as it
+-- always did.
+local function setOn(b, on)
   if not b or not b.heal or InCombatLockdown() then
     return
   end
@@ -201,147 +238,160 @@ local function setAim(b, on)
   ns.applyKeys(true)
 end
 
--- Cancel can't be a plain pad button that holds to aim.
+-- Cancel can't be a plain pad button that holds for the menu.
 local function cancelTaken(key)
   return ns.db.aim[key] ~= nil
 end
 
-local function clamp(v, lo, hi)
-  return math.max(lo, math.min(hi, v))
+local function centred()
+  return math.floor((ns.db.x or 0) + 0.5) == 0 and math.floor((ns.db.y or 0) + 0.5) == 0
 end
 
----------------------------------------------------------------- what A does
+---------------------------------------------------------------- what the controls do
 
 local refresh, takeKeys
 
-local function pick(key, fromMouse)
+local function toggle(i)
+  local r = rows[i]
+  if not r or InCombatLockdown() then
+    return
+  end
+  st.li = i
+  setOn(r.bind, not isOn(r.bind))
+end
+
+local function stepTap(i, d)
+  local r = rows[i]
+  if not r or InCombatLockdown() then
+    return
+  end
+  st.li = i
+  local conf = ns.aimConf(r.bind)
+  if not conf then
+    return
+  end
+  conf.tap = wrap(ns.TAPS, conf.tap or "player", d)
+  ns.applyKeys(true)
+end
+
+local function step(key, d)
   if InCombatLockdown() then
     return
   end
-  local b = current()
-  if key == "row" then
-    if not fromMouse and b then
-      st.focus.buttons = "enable"
-    end
-  elseif key == "enable" then
-    setAim(b, not aimed(b))
-  elseif key:match("^tap%d$") then
-    local conf = ns.aimConf(b)
-    if conf then
-      conf.tap = ns.TAPS[tonumber(key:sub(4))]
-      ns.applyKeys(true)
-    end
-  elseif key:match("^aimer%d$") then
-    ns.db.aimWith = ns.AIMERS[tonumber(key:sub(6))]
+  local db = ns.db
+  if key == "look" then
+    ns.setLook(wrap(ns.LOOKS, db.look, d))
+  elseif key == "size" then
+    db.scale = clamp(ns.tenth((db.scale or 1) + d * 0.1), SIZE_MIN, SIZE_MAX)
+    ns.layout()
+  elseif key == "spacing" then
+    db.spacing = clamp(ns.tenth((db.spacing or 1) + d * 0.1), ns.SPACING_MIN, ns.SPACING_MAX)
+    ns.layout()
+  elseif key == "pick" then
+    db.aimWith = wrap(ns.AIMERS, db.aimWith, d)
     ns.applyKeys(true)
-  elseif key:match("^cancel%d$") then
-    local c = ns.CANCELS[tonumber(key:sub(7))]
+  elseif key == "cancel" then
+    -- a pad button that holds for the menu can't cancel: skipped
+    local c = db.cancel
+    for _ = 1, #ns.CANCELS do
+      c = wrap(ns.CANCELS, c, d)
+      if not cancelTaken(c) then
+        break
+      end
+    end
     if not cancelTaken(c) then
-      ns.db.cancel = c
+      db.cancel = c
       ns.applyKeys(true)
     end
-  elseif key:match("^look%d$") then
-    ns.setLook(ns.LOOKS[tonumber(key:sub(5))])
-  elseif key == "move" then
-    st.moving = not st.moving
-  elseif key == "reset" then
+  end
+end
+
+local function setMoving(on)
+  st.moving = on == true
+  if ns.showMoving then
+    ns.showMoving(st.moving)
+  end
+end
+
+-- Menu position: 1 is Move (Done while moving), 2 is Reset.
+local function press(which)
+  if InCombatLockdown() then
+    return
+  end
+  if which == 1 then
+    setMoving(not st.moving)
+  elseif not centred() then
     ns.db.x, ns.db.y = 0, 0
+    setMoving(false)
+    st.sub = 1
     ns.layout()
   end
 end
 
-local function adjust(which, d)
-  if which == "size" then
-    ns.db.scale = clamp(math.floor(((ns.db.scale or 1) + d * 0.1) * 10 + 0.5) / 10, 0.6, 1.6)
-  else
-    ns.db.distance = clamp((ns.db.distance or 3) + d, 1, 5)
+-- A click: the mouse drives now.
+local function clicked(fn)
+  return function()
+    if InCombatLockdown() or not panel then
+      return
+    end
+    st.keys = false
+    fn()
+    refresh()
   end
-  ns.layout()
 end
 
--- A click: the focus goes there too, and the ring hides.
-local function click(key)
-  if InCombatLockdown() then
+---------------------------------------------------------------- the window's place
+
+-- The side of the screen the menu leaves free for the window: left when
+-- there is room left of it, else right when there is room there, else
+-- where it was. left, right: the menu's edges; screen: the screen's width.
+local function sideFor(left, right, screen, was)
+  if not left or not right or not screen then
+    return was
+  end
+  if left >= EDGE + W + 2 then
+    return "left"
+  elseif right <= screen - EDGE - W - 2 then
+    return "right"
+  end
+  return was
+end
+
+local function dock()
+  if not panel then
     return
   end
-  st.keys = false
-  st.focus[st.tab] = key
-  pick(key, true)
-  refresh()
+  local l, r
+  if ns.menuBox then
+    l, r = ns.menuBox()
+  end
+  local okW, screen = pcall(UIParent.GetWidth, UIParent)
+  st.side = sideFor(l, r, okW and tonumber(screen) or nil, st.side)
+  panel:ClearAllPoints()
+  if st.side == "right" then
+    panel:SetPoint("RIGHT", UIParent, "RIGHT", -EDGE, 0)
+  else
+    panel:SetPoint("LEFT", UIParent, "LEFT", EDGE, 0)
+  end
 end
 
 ---------------------------------------------------------------- drawing
-
--- The outline around what the pad is on: inside a list row, just outside a
--- button.
-local function ring(target)
-  local r = ui.ring
-  if not target then
-    r:Hide()
-    return
-  end
-  local pad = target.ringInside and -1 or 3
-  r:ClearAllPoints()
-  r:SetPoint("TOPLEFT", target, "TOPLEFT", -pad, pad)
-  r:SetPoint("BOTTOMRIGHT", target, "BOTTOMRIGHT", pad, -pad)
-  r:Show()
-end
 
 local function visibleRows()
   return math.min(#rows, MAX_ROWS)
 end
 
--- The tab's height: what it holds, and no more.
-local function insetHeight()
-  if st.tab == "buttons" then
-    local detail = DET_STACK + #ns.TAPS * (BTN_H + STACK_GAP) - STACK_GAP + PAD
-    if #rows == 0 then
-      return 2 * PAD + 60
-    end
-    return math.max(detail, 2 * PAD + visibleRows() * ROW_H)
-  elseif st.tab == "controls" then
-    return ui.controls.bottom + PAD
-  end
-  return ui.frames.bottom + PAD
-end
-
 local function drawTabs()
-  local index = 1
-  for i, t in ipairs(TABS) do
-    if t == st.tab then
-      index = i
-    end
-  end
   if PanelTemplates_SetTab then
-    PanelTemplates_SetTab(panel, index)
+    PanelTemplates_SetTab(panel, st.tab == "menu" and 2 or 1)
   end
-  for _, t in ipairs(TABS) do
-    ui[t]:SetShown(st.tab == t)
-  end
-  -- The preview puts the first enabled button's tap target in the middle.
-  ns.previewTap = nil
-  for _, b in ipairs(ns.binds or {}) do
-    local conf = ns.aimConf(b)
-    if conf and not ns.previewTap then
-      ns.previewTap = conf.tap
-    end
-  end
-  if ns.preview then
-    ns.preview(st.tab == "frames")
-  end
-  local h = insetHeight() + 24 + 4
-  panel:ClearAllPoints()
-  -- On Frames the window is narrow and steps aside so the diamond shows.
-  if st.tab == "frames" then
-    panel:SetSize(FRAMES_W, h)
-    panel:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 24, -TOP_Y)
-  else
-    panel:SetSize(W, h)
-    panel:SetPoint("TOP", UIParent, "TOP", 0, -TOP_Y)
-  end
+  ui.heals:SetShown(st.tab == "heals")
+  ui.menu:SetShown(st.tab == "menu")
+  local inset = 2 * PAD + math.max(HEAD_H + math.max(1, visibleRows()) * ROW_H, #MENU_ROWS * ROW_H)
+  panel:SetSize(W, inset + INSET_TOP + INSET_BOTTOM)
 end
 
-local function drawList()
+local function drawHeals()
   local visible = visibleRows()
   if st.li < st.top then
     st.top = st.li
@@ -350,184 +400,151 @@ local function drawList()
     st.top = st.li - visible + 1
   end
   st.top = clamp(st.top, 1, math.max(1, #rows - visible + 1))
-  -- the key column as wide as the widest key
-  local kw = 22
-  for i = 1, visible do
-    local r = rows[st.top + i - 1]
-    local f = ui.rows[i]
-    f.key:SetText(keyText(ns.bindLabel(r.bind)))
-    kw = math.max(kw, textWidth(f.key) + 2)
-  end
-  kw = math.min(kw, 64)
-  local b = current()
   for i, f in ipairs(ui.rows) do
     local r = i <= visible and rows[st.top + i - 1]
-    f.li = r and st.top + i - 1
-    if not r then
-      f:Hide()
-    else
-      f:Show()
-      local rb = r.bind
-      f.key:SetWidth(kw)
-      f.icon:ClearAllPoints()
-      f.icon:SetPoint("LEFT", 8 + kw + 6, 0)
-      f.icon:SetTexture(ns.spellIcon(rb.spell))
-      f.name:SetText(ns.spellName(rb.spell))
-      f.on:SetShown(aimed(rb))
-      f.selected:SetShown(rb == b)
+    f.li = r and st.top + i - 1 or nil
+    f:SetShown(r and true or false)
+    if r then
+      local b = r.bind
+      local on = isOn(b)
+      f.on = on
+      f.check:SetChecked(on)
+      f.icon:SetTexture(ns.spellIcon(b.spell))
+      f.icon:SetDesaturated(not on)
+      local v = on and 1 or 0.6
+      f.icon:SetVertexColor(v, v, v)
+      setText(f.hotkey, ns.bindLabel(b), ICON - 3)
+      setText(f.name, ns.spellName(b.spell), NAME_W)
+      setText(f.rank, ns.spellRank(b.spell), NAME_W)
+      if on then
+        f.name:SetTextColor(unpack(GOLD))
+        f.rank:SetTextColor(0.74, 0.7, 0.6)
+      else
+        f.name:SetTextColor(0.56, 0.54, 0.49)
+        f.rank:SetTextColor(0.44, 0.42, 0.38)
+      end
+      f.cycler:SetShown(on)
+      if on then
+        setText(f.cycler.value, ns.TAP_LABEL[ns.aimConf(b).tap] or ns.TAP_LABEL.player, TAP_W - 4)
+      end
     end
   end
   ui.empty:SetShown(#rows == 0)
+  ui.headLeft:SetShown(#rows > 0)
+  ui.headRight:SetShown(#rows > 0)
 end
 
-local function drawDetail()
-  local b = current()
-  local d = ui.detail
-  d:SetShown(b ~= nil)
-  if not b then
+local function drawMenu()
+  local db = ns.db
+  local m = ui.mrows
+  setText(m.look.ctl.value, ns.LOOK_LABEL[db.look] or db.look, m.look.ctl.midW - 4)
+  setMeter(m.size.ctl, db.scale or 1, SIZE_MIN, SIZE_MAX)
+  setMeter(m.spacing.ctl, db.spacing or 1, ns.SPACING_MIN, ns.SPACING_MAX)
+  setText(m.pick.ctl.value, ns.AIMER_LABEL[db.aimWith] or db.aimWith, m.pick.ctl.midW - 4)
+  setText(m.cancel.ctl.value, keyText(CANCEL_NAME[db.cancel] or db.cancel), m.cancel.ctl.midW - 4)
+  local move, reset = m.pos.move, m.pos.reset
+  move:SetText(st.moving and "Done" or "Move")
+  if st.moving then
+    move:LockHighlight()
+  else
+    move:UnlockHighlight()
+  end
+  reset:SetEnabled(not centred())
+  local okF, fs = pcall(move.GetFontString, move)
+  if okF and type(fs) == "table" and fs.SetTextColor then
+    fs:SetTextColor(unpack(st.moving and { 1, 1, 1 } or GOLD))
+  end
+end
+
+-- What the pad is on: the lit row (on Menu position, the button) with a
+-- gold edge, only while you drive with the pad or keys; otherwise the row
+-- under the mouse is lit.
+local function drawFocus()
+  local focusHeal
+  for _, f in ipairs(ui.rows) do
+    if f:IsShown() and f.li == st.li then
+      focusHeal = f
+    end
+  end
+  local focusMenu = ui.mlist[st.mi]
+  local function light(list, focus)
+    for _, f in ipairs(list) do
+      f.lit:SetShown(st.keys and f == focus and f.key ~= "pos")
+      f.hover:SetShown(not st.keys and st.hover == f)
+    end
+  end
+  light(ui.rows, st.tab == "heals" and focusHeal or nil)
+  light(ui.mlist, st.tab == "menu" and focusMenu or nil)
+  local target
+  if st.keys then
+    if st.tab == "heals" then
+      target = focusHeal
+    elseif focusMenu then
+      target = focusMenu.key == "pos" and (st.sub == 2 and focusMenu.reset or focusMenu.move) or focusMenu
+    end
+  end
+  local r = ui.ring
+  r.target = target
+  if not target then
+    r:Hide()
     return
   end
-  d.key:SetText(keyText(ns.bindLabel(b)))
-  d.icon:SetTexture(ns.spellIcon(b.spell))
-  d.name:SetText(ns.spellName(b.spell))
-  d.rank:SetText(ns.spellRank(b.spell))
-  local on = aimed(b)
-  setChosen(d.enable, on)
-  d.tapLabel:SetAlpha(on and 1 or 0.35)
-  local tap = on and ns.aimConf(b).tap
-  for i, t in ipairs(ns.TAPS) do
-    setChosen(d.taps[i], tap == t)
-    setDim(d.taps[i], not on)
-  end
+  local pad = target.isRow and 0 or 3
+  r:ClearAllPoints()
+  r:SetPoint("TOPLEFT", target, "TOPLEFT", -pad, pad)
+  r:SetPoint("BOTTOMRIGHT", target, "BOTTOMRIGHT", pad, -pad)
+  r:Show()
 end
 
-local function drawControls()
-  local c = ui.controls
-  for i, k in ipairs(ns.AIMERS) do
-    setChosen(c.aimers[i], ns.db.aimWith == k)
-  end
-  for i, key in ipairs(ns.CANCELS) do
-    setChosen(c.cancels[i], ns.db.cancel == key)
-    setDim(c.cancels[i], cancelTaken(key))
-  end
-end
-
-local function drawSlider(s, v, lo, hi, label)
-  s.drawing = true
-  s.bar:SetValue(v)
-  s.drawing = false
-  s.value:SetText(label)
-  local w = (s.trackW - 8) * (v - lo) / (hi - lo)
-  s.fill:SetWidth(math.max(1, w))
-  s.fill:SetShown(w > 0.5)
-end
-
-local function drawFrames()
-  local f = ui.frames
-  local size, spread = ns.db.scale or 1, ns.db.distance or 3
-  drawSlider(f.size, size, 0.6, 1.6, math.floor(size * 100 + 0.5) .. "%")
-  drawSlider(f.spread, spread, 1, 5, tostring(spread))
-  for i, name in ipairs(ns.LOOKS) do
-    setChosen(f.looks[i], ns.db.look == name)
-  end
-  f.move:SetText(st.moving and "Done" or "Move")
-  setChosen(f.move, st.moving == true)
-end
-
--- What the focus can be on, in the shown tab.
-local function collect()
-  wipe(items)
-  local function add(key, frame, skip)
-    table.insert(items, { key = key, frame = frame, box = frame.box, skip = skip })
-  end
-  if st.tab == "buttons" then
-    for _, f in ipairs(ui.rows) do
-      if f:IsShown() and f.li == st.li then
-        add("row", f.line)
-      end
-    end
-    if current() then
-      local d = ui.detail
-      add("enable", d.enable)
-      for i, b in ipairs(d.taps) do
-        add("tap" .. i, b, b.dim)
-      end
-    end
-  elseif st.tab == "controls" then
-    for i, b in ipairs(ui.controls.aimers) do
-      add("aimer" .. i, b)
-    end
-    for i, b in ipairs(ui.controls.cancels) do
-      add("cancel" .. i, b, b.dim)
-    end
+-- The menu as the preview: titled with the heal the window is on, its tap
+-- person in gold; faded out while that heal doesn't hold for the menu.
+local function drawPreview()
+  local b = current()
+  local dim = false
+  if st.tab == "heals" then
+    local conf = b and ns.aimConf(b)
+    ns.previewSpell = b and b.spell
+    ns.previewTap = conf and conf.tap or "player"
+    dim = b ~= nil and conf == nil
   else
-    local f = ui.frames
-    add("size", f.size.focus)
-    add("spread", f.spread.focus)
-    for i, b in ipairs(f.looks) do
-      add("look" .. i, b)
+    local first
+    for _, r in ipairs(rows) do
+      if not first and isOn(r.bind) then
+        first = r.bind
+      end
     end
-    add("move", f.move)
-    add("reset", f.reset)
+    first = first or b
+    ns.previewSpell = first and first.spell
+    ns.previewTap = "target"
   end
-end
-
-local function itemOf(key)
-  for _, it in ipairs(items) do
-    if it.key == key and not it.skip then
-      return it
-    end
+  if ns.preview then
+    ns.preview(true)
   end
-end
-
--- Keeps the focus on something there: a tap goes back to Enable, Enable to
--- its row, the rest to the first thing in the tab.
-local function settleFocus()
-  local key = st.focus[st.tab]
-  if key and itemOf(key) then
-    return itemOf(key)
+  if ns.showMoving then
+    ns.showMoving(st.moving)
   end
-  local alt = key and (key:match("^tap") and "enable" or key == "enable" and "row")
-  if alt and itemOf(alt) then
-    st.focus[st.tab] = alt
-    return itemOf(alt)
+  if ns.previewDim then
+    ns.previewDim(dim)
   end
-  for _, it in ipairs(items) do
-    if not it.skip then
-      st.focus[st.tab] = it.key
-      return it
-    end
-  end
-  st.focus[st.tab] = nil
 end
 
 refresh = function()
   if not panel or not panel:IsShown() then
     return
   end
-  if st.tab ~= "frames" then
-    st.moving = false
+  if st.tab ~= "menu" and st.moving then
+    setMoving(false)
   end
+  if st.sub == 2 and centred() then
+    st.sub = 1
+  end
+  st.li = clamp(st.li, 1, math.max(1, #rows))
   drawTabs()
-  if st.tab == "buttons" then
-    drawList()
-    drawDetail()
-  elseif st.tab == "controls" then
-    drawControls()
-  else
-    drawFrames()
-  end
-  collect()
-  local it = settleFocus()
-  ring((st.keys or st.moving) and it and it.frame or nil)
-  if ns.showMoving then
-    ns.showMoving(st.moving == true and st.tab == "frames")
-  end
-  if st.moving then
-    ui.ring:SetColor(1, 0.82, 0, 1)
-  else
-    ui.ring:SetColor(0.45, 0.8, 1, 1)
-  end
+  drawHeals()
+  drawMenu()
+  drawFocus()
+  drawPreview()
+  dock()
 end
 
 -- After applyKeys: your bindings may have changed. The nav keys are taken
@@ -536,153 +553,116 @@ function ns.refreshOptions()
   if panel and panel:IsShown() then
     takeKeys()
     buildRows()
-    st.li = clamp(st.li, 1, math.max(1, #rows))
     refresh()
   end
 end
 
 ---------------------------------------------------------------- input
 
--- The nearest thing that way, by where it is on the screen. Boxes are y down.
-local function nearest(from, dir, list)
-  local a = from.box
-  local best, bestScore
-  for _, it in ipairs(list) do
-    local r = it.box
-    if it ~= from and not it.skip and r then
-      local p, s, off
-      local vertical = dir == "UP" or dir == "DOWN"
-      if dir == "DOWN" then
-        p = r.y - (a.y + a.h)
-      elseif dir == "UP" then
-        p = a.y - (r.y + r.h)
-      elseif dir == "RIGHT" then
-        p = r.x - (a.x + a.w)
-      else
-        p = a.x - (r.x + r.w)
-      end
-      -- side: how far off to the side; lined up, the nearer start wins
-      if vertical then
-        s = math.max(0, r.x - (a.x + a.w), a.x - (r.x + r.w))
-        off = s > 0 and math.abs((r.x + r.w / 2) - (a.x + a.w / 2)) or math.abs(r.x - a.x)
-      else
-        s = math.max(0, r.y - (a.y + a.h), a.y - (r.y + r.h))
-        off = s > 0 and math.abs((r.y + r.h / 2) - (a.y + a.h / 2)) or math.abs(r.y - a.y)
-      end
-      if p >= -4 then
-        local score = p + s * 4 + off * 0.15
-        if not bestScore or score < bestScore then
-          best, bestScore = it, score
-        end
-      end
-    end
-  end
-  return best
-end
-
-local function move(dir)
-  local key = st.focus[st.tab]
-  local from = key and itemOf(key)
-  if not from then
-    return
-  end
-  if st.tab == "buttons" then
-    if key == "row" then
-      if dir == "UP" or dir == "DOWN" then
-        st.li = clamp(st.li + (dir == "UP" and -1 or 1), 1, math.max(1, #rows))
-        return
-      end
-    elseif dir == "LEFT" then
-      -- out of the detail: back to the row it belongs to
-      st.focus.buttons = "row"
-      return
-    end
-    local detail = {}
-    for _, it in ipairs(items) do
-      if it.key ~= "row" then
-        table.insert(detail, it)
-      end
-    end
-    local to = nearest(from, dir, detail)
-    if to then
-      st.focus.buttons = to.key
-    end
-    return
-  end
-  local to = nearest(from, dir, items)
-  if to then
-    st.focus[st.tab] = to.key
+local function cursor()
+  local ok, x, y = pcall(GetCursorPosition)
+  if ok then
+    return x, y
   end
 end
 
--- fromKeys: a pad button or key, not the mouse. The focus ring shows only
--- while you drive with keys or the pad.
+-- fromKeys false: the mouse. Otherwise a pad button or key, and the focus
+-- shows.
 local function nav(btn, fromKeys)
-  if InCombatLockdown() or not panel then
+  if InCombatLockdown() or not panel or not panel:IsShown() then
     return
   end
-  st.keys = fromKeys == true
-  if btn == "LB" or btn == "RB" then
-    local i = 1
-    for n, t in ipairs(TABS) do
-      if t == st.tab then
-        i = n
-      end
-    end
-    i = (i + (btn == "RB" and 1 or -1) - 1) % #TABS + 1
-    st.tab, st.moving = TABS[i], false
-    return refresh()
+  if fromKeys ~= false then
+    st.keys = true
+    st.cx, st.cy = cursor()
   end
   if btn == "ESC" then
     panel:Hide()
     return
   end
-  -- Moving: the d-pad or arrows nudge the diamond; A or B is done.
-  if st.moving then
-    local step = 20
+  -- Moving: the d-pad or arrows nudge the menu; A or B is done.
+  if st.moving and btn ~= "LB" and btn ~= "RB" then
+    local by = 20
     if btn == "UP" then
-      ns.db.y = ns.db.y + step
+      ns.db.y = ns.db.y + by
     elseif btn == "DOWN" then
-      ns.db.y = ns.db.y - step
+      ns.db.y = ns.db.y - by
     elseif btn == "LEFT" then
-      ns.db.x = ns.db.x - step
+      ns.db.x = ns.db.x - by
     elseif btn == "RIGHT" then
-      ns.db.x = ns.db.x + step
+      ns.db.x = ns.db.x + by
     elseif btn == "A" or btn == "B" then
-      st.moving = false
+      setMoving(false)
     end
     ns.layout()
     return refresh()
   end
-  local key = st.focus[st.tab]
-  if btn == "B" then
-    if st.tab == "buttons" and key and key ~= "row" and current() then
-      st.focus.buttons = "row"
-      return refresh()
+  if btn == "LB" or btn == "RB" then
+    local tab = btn == "RB" and "menu" or "heals"
+    if tab ~= st.tab then
+      st.tab = tab
+      setMoving(false)
+      if PlaySound and SOUNDKIT then
+        pcall(PlaySound, SOUNDKIT.IG_CHARACTER_INFO_TAB)
+      end
     end
+    return refresh()
+  end
+  if btn == "B" then
     panel:Hide()
     return
   end
-  if (btn == "LEFT" or btn == "RIGHT") and (key == "size" or key == "spread") then
-    adjust(key, btn == "LEFT" and -1 or 1)
-    return refresh()
-  end
-  if btn == "A" then
-    if key then
-      pick(key, false)
+  if btn == "UP" or btn == "DOWN" then
+    local d = btn == "UP" and -1 or 1
+    if st.tab == "heals" then
+      st.li = clamp(st.li + d, 1, math.max(1, #rows))
+    else
+      st.mi = clamp(st.mi + d, 1, #MENU_ROWS)
+      st.sub = 1
     end
     return refresh()
   end
-  move(btn)
+  local d = (btn == "LEFT" and -1) or (btn == "RIGHT" and 1) or nil
+  if st.tab == "heals" then
+    if d then
+      stepTap(st.li, d)
+    elseif btn == "A" then
+      toggle(st.li)
+    end
+  else
+    local key = MENU_ROWS[st.mi]
+    if key == "pos" then
+      if d then
+        st.sub = clamp(st.sub + d, 1, 2)
+      elseif btn == "A" then
+        press(st.sub)
+      end
+    elseif d then
+      step(key, d)
+    elseif btn == "A" then
+      step(key, 1)
+    end
+  end
   refresh()
 end
 ns.optionsNav = nav
 
--- Move with a stick: either stick glides the diamond while Move is on.
+-- While moving, either stick glides the menu. And while the focus shows, a
+-- moving mouse hands the window back to the mouse.
 local SPEED = 700 -- screen units a second at full tilt
 local glide = CreateFrame("Frame")
 glide:SetScript("OnUpdate", function(_, elapsed)
-  if not st.moving or not panel or not panel:IsShown() then
+  if not panel or not panel:IsShown() then
+    return
+  end
+  if st.keys then
+    local x, y = cursor()
+    if x and st.cx and (x ~= st.cx or y ~= st.cy) then
+      st.keys = false
+      refresh()
+    end
+  end
+  if not st.moving then
     return
   end
   local ok, state = pcall(function()
@@ -711,9 +691,10 @@ glide:SetScript("OnUpdate", function(_, elapsed)
   ns.db.x = ns.db.x + dx * SPEED * elapsed
   ns.db.y = ns.db.y + dy * SPEED * elapsed
   ns.layout()
+  dock()
 end)
 
--- While the panel is open these keys drive it; they go back when it closes.
+-- While the window is open these keys drive it; they go back when it closes.
 local NAV_KEYS = {
   PADDUP = "UP",
   PADDDOWN = "DOWN",
@@ -757,241 +738,198 @@ end
 
 ---------------------------------------------------------------- building
 
-local function onClick(b, key)
-  b:SetScript("OnClick", function()
-    click(key)
-  end)
+-- A row: the mouse lights it softly; the pad lights it and edges it in gold.
+local function row(parent, y)
+  local f = hit(parent)
+  f:SetSize(ROW_W, ROW_H)
+  f:SetPoint("TOPLEFT", parent, "TOPLEFT", PAD, -y)
+  f.isRow = true
+  f.hover = f:CreateTexture(nil, "BACKGROUND")
+  f.hover:SetTexture(HILIGHT)
+  f.hover:SetBlendMode("ADD")
+  f.hover:SetVertexColor(1, 0.82, 0, 0.35)
+  f.hover:SetAllPoints()
+  f.hover:Hide()
+  f.lit = f:CreateTexture(nil, "BACKGROUND")
+  f.lit:SetTexture(HILIGHT)
+  f.lit:SetBlendMode("ADD")
+  f.lit:SetVertexColor(1, 0.82, 0, 0.8)
+  f.lit:SetAllPoints()
+  f.lit:Hide()
+  return f
 end
 
-local function buildButtonsTab(parent)
-  local t = CreateFrame("Frame", nil, parent)
-  t:SetAllPoints()
-  local divider = t:CreateTexture(nil, "ARTWORK")
-  divider:SetColorTexture(0.47, 0.39, 0.24, 0.45)
-  divider:SetWidth(1)
-  divider:SetPoint("TOPLEFT", LIST_X + LIST_W + 12, -PAD)
-  divider:SetPoint("BOTTOMLEFT", LIST_X + LIST_W + 12, PAD)
-  ui.rows = {}
-  for i = 1, MAX_ROWS do
-    local f = CreateFrame("Frame", nil, t)
-    f:SetSize(LIST_W, ROW_H)
-    f:SetPoint("TOPLEFT", LIST_X, -(PAD + (i - 1) * ROW_H))
-    local line = CreateFrame("Button", nil, f)
-    line:SetAllPoints()
-    line.ringInside = true
-    line.box = { x = LIST_X, y = PAD + (i - 1) * ROW_H, w = LIST_W, h = ROW_H }
-    f.line = line
-    local hl = line:CreateTexture(nil, "HIGHLIGHT")
-    hl:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
-    hl:SetBlendMode("ADD")
-    hl:SetAllPoints()
-    f.selected = line:CreateTexture(nil, "BACKGROUND")
-    f.selected:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
-    f.selected:SetBlendMode("ADD")
-    f.selected:SetVertexColor(1, 0.82, 0, 0.6)
-    f.selected:SetAllPoints()
-    f.key = text(line, "GameFontHighlight")
-    f.key:SetPoint("LEFT", 8, 0)
-    f.key:SetJustifyH("LEFT")
-    f.key:SetWordWrap(false)
-    f.icon = line:CreateTexture(nil, "ARTWORK")
-    f.icon:SetSize(24, 24)
-    f.icon:SetPoint("LEFT", 46, 0)
-    f.on = text(line, "GameFontNormal", { 0.91, 0.76, 0.35 })
-    f.on:SetText("On")
-    f.on:SetPoint("RIGHT", -8, 0)
-    f.name = text(line, "GameFontNormal")
-    f.name:SetPoint("LEFT", f.icon, "RIGHT", 8, 0)
-    f.name:SetPoint("RIGHT", -36, 0)
-    f.name:SetJustifyH("LEFT")
-    f.name:SetWordWrap(false)
-    line:SetScript("OnClick", function()
-      if InCombatLockdown() or not f.li then
-        return
-      end
-      st.li = f.li
-      click("row")
-    end)
-    ui.rows[i] = f
-  end
-  ui.empty = text(t, "GameFontDisable")
-  ui.empty:SetPoint("TOPLEFT", LIST_X + 8, -PAD - 10)
-  ui.empty:SetText("No heals on your buttons")
-
-  local d = CreateFrame("Frame", nil, t)
-  d:SetAllPoints()
-  ui.detail = d
-  d.icon = d:CreateTexture(nil, "ARTWORK")
-  d.icon:SetSize(40, 40)
-  d.icon:SetPoint("TOPLEFT", DET_X, -DET_TOP)
-  d.name = text(d, "GameFontNormalLarge")
-  d.name:SetPoint("TOPLEFT", d.icon, "TOPRIGHT", 12, -2)
-  d.name:SetWidth(DET_W - 52)
-  d.name:SetJustifyH("LEFT")
-  d.name:SetWordWrap(false)
-  d.rank = text(d, "GameFontHighlightSmall")
-  d.rank:SetPoint("TOPLEFT", d.name, "BOTTOMLEFT", 0, -3)
-  d.key = text(d, "GameFontHighlight")
-  d.key:SetPoint("TOPLEFT", DET_X, -DET_KEY)
-
-  d.enable = choice(d, nil, BTN_H, "Enable")
-  d.enable:SetWidth(math.max(96, textWidth(d.enable.label) + 32))
-  place(d.enable, d, DET_X, DET_ENABLE, d.enable:GetWidth() or 96, BTN_H)
-  onClick(d.enable, "enable")
-
-  d.tapLabel = text(d, "GameFontNormal")
-  d.tapLabel:SetText("Tap to heal")
-  d.tapLabel:SetPoint("TOPLEFT", DET_X, -DET_TAPLABEL)
-  d.taps = {}
-  for i, tap in ipairs(ns.TAPS) do
-    local b = choice(d, DET_W, BTN_H, ns.TAP_LABEL[tap], nil, true)
-    place(b, d, DET_X, DET_STACK + (i - 1) * (BTN_H + STACK_GAP), DET_W, BTN_H)
-    onClick(b, "tap" .. i)
-    d.taps[i] = b
-  end
-  return t
-end
-
--- A label and a row of choices beside it; returns the row's bottom.
-local function choiceRow(t, label, y, labelW, buttons)
-  local l = text(t, "GameFontNormalLarge")
-  l:SetText(label)
-  l:SetPoint("LEFT", t, "TOPLEFT", PAD, -(y + BTN_H / 2))
-  local x = PAD + labelW
-  for _, b in ipairs(buttons) do
-    local w = b:GetWidth() or 64
-    place(b, t, x, y, w, BTN_H)
-    x = x + w + 6
-  end
-  t.right = math.max(t.right or 0, x - 6)
-  return y + BTN_H
-end
-
-local function buildControlsTab(parent)
-  local t = CreateFrame("Frame", nil, parent)
-  t:SetAllPoints()
-  t.aimers, t.cancels = {}, {}
-  for i, k in ipairs(ns.AIMERS) do
-    t.aimers[i] = choice(t, nil, BTN_H, ns.AIMER_LABEL[k])
-    onClick(t.aimers[i], "aimer" .. i)
-  end
-  for i, key in ipairs(ns.CANCELS) do
-    t.cancels[i] = choice(t, 40, BTN_H, keyText(CANCEL_NAME[key]), "GameFontNormalLarge")
-    onClick(t.cancels[i], "cancel" .. i)
-  end
-  local y = choiceRow(t, "Select with", PAD + 4, 116, t.aimers)
-  t.bottom = choiceRow(t, "Cancel with", y + FORM_ROW_GAP, 116, t.cancels)
-  return t
-end
-
-local FRAMES_LABEL_W, TRACK_W, STEP_W, VALUE_W = 96, 170, 28, 44
-
--- Size and Spread: - and + either side of a slider, the value at the right.
-local function slider(t, label, y, which, lo, hi, step)
-  local s = {}
-  local l = text(t, "GameFontNormalLarge")
-  l:SetText(label)
-  l:SetPoint("LEFT", t, "TOPLEFT", PAD, -(y + 15))
-  local x = PAD + FRAMES_LABEL_W
-  local w = STEP_W * 2 + TRACK_W + VALUE_W + 3 * 6
-  s.focus = CreateFrame("Frame", nil, t)
-  place(s.focus, t, x - 2, y, w + 4, 30)
-  s.focus:SetSize(w + 4, 30)
-  local minus = choice(t, STEP_W, 26, "-", "GameFontNormalLarge")
-  place(minus, t, x, y + 2, STEP_W, 26)
-  minus.label:SetTextColor(unpack(GOLD))
-  local bar = CreateFrame("Slider", nil, t, "BackdropTemplate")
-  s.bar, s.trackW = bar, TRACK_W
-  bar:SetOrientation("HORIZONTAL")
-  bar:SetSize(TRACK_W, 17)
-  place(bar, t, x + STEP_W + 6, y + 6.5, TRACK_W, 17)
-  if bar.SetBackdrop then
-    bar:SetBackdrop({
-      bgFile = "Interface\\Buttons\\UI-SliderBar-Background",
-      edgeFile = "Interface\\Buttons\\UI-SliderBar-Border",
-      tile = true,
-      tileEdge = true,
-      tileSize = 8,
-      edgeSize = 8,
-      insets = { left = 3, right = 3, top = 6, bottom = 6 },
-    })
-  end
-  bar:SetThumbTexture("Interface\\Buttons\\UI-SliderBar-Button-Horizontal")
-  bar:SetMinMaxValues(lo, hi)
-  bar:SetValueStep(step)
-  if bar.SetObeyStepOnDrag then
-    bar:SetObeyStepOnDrag(true)
-  end
-  s.fill = bar:CreateTexture(nil, "ARTWORK")
-  s.fill:SetPoint("LEFT", 4, 0)
-  s.fill:SetHeight(5)
-  s.fill:SetColorTexture(1, 0.82, 0, 0.85)
-  bar:SetScript("OnValueChanged", function(_, v)
-    if s.drawing or InCombatLockdown() then
+-- The mouse over a row or anything in it lights the row; on Heals the
+-- preview follows it.
+local function hovers(f, part)
+  part:SetScript("OnEnter", function()
+    if st.keys then
       return
     end
-    st.keys = false
-    st.focus.frames = which
-    if which == "size" then
-      ns.db.scale = clamp(math.floor(v * 10 + 0.5) / 10, lo, hi)
-    else
-      ns.db.distance = clamp(math.floor(v + 0.5), lo, hi)
+    st.hover = f
+    if f.li and not InCombatLockdown() then
+      st.li = f.li
     end
-    ns.layout()
     refresh()
   end)
-  local plus = choice(t, STEP_W, 26, "+", "GameFontNormalLarge")
-  place(plus, t, x + STEP_W + 6 + TRACK_W + 6, y + 2, STEP_W, 26)
-  plus.label:SetTextColor(unpack(GOLD))
-  local function stepper(b, d)
-    b:SetScript("OnClick", function()
-      if InCombatLockdown() then
-        return
-      end
-      st.keys = false
-      st.focus.frames = which
-      adjust(which, d)
-      refresh()
-    end)
-  end
-  stepper(minus, -1)
-  stepper(plus, 1)
-  s.minus, s.plus = minus, plus
-  s.value = text(t, "GameFontHighlightLarge")
-  s.value:SetPoint("RIGHT", t, "TOPLEFT", x + w, -(y + 15))
-  s.value:SetJustifyH("RIGHT")
-  s.right = x + w
-  return s
+  part:SetScript("OnLeave", function()
+    if st.hover == f then
+      st.hover = nil
+      f.hover:Hide()
+    end
+  end)
 end
 
-local function buildFramesTab(parent)
+local function checkbox(parent)
+  local ok, check = pcall(CreateFrame, "CheckButton", nil, parent, "UICheckButtonTemplate")
+  if ok and check then
+    return check
+  end
+  -- the same art, by hand
+  check = CreateFrame("CheckButton", nil, parent)
+  check:SetNormalTexture("Interface\\Buttons\\UI-CheckBox-Up")
+  check:SetPushedTexture("Interface\\Buttons\\UI-CheckBox-Down")
+  check:SetHighlightTexture("Interface\\Buttons\\UI-CheckBox-Highlight", "ADD")
+  check:SetCheckedTexture("Interface\\Buttons\\UI-CheckBox-Check")
+  return check
+end
+
+local function buildHeals(parent)
   local t = CreateFrame("Frame", nil, parent)
   t:SetAllPoints()
-  local y = PAD + 4
-  t.size = slider(t, "Size", y, "size", 0.6, 1.6, 0.1)
-  y = y + 30 + FORM_ROW_GAP
-  t.spread = slider(t, "Spread", y, "spread", 1, 5, 1)
-  y = y + 30 + FORM_ROW_GAP
-  t.right = t.size.right
-  t.looks = {}
-  for i, name in ipairs(ns.LOOKS) do
-    t.looks[i] = choice(t, nil, BTN_H, ns.LOOK_LABEL[name])
-    onClick(t.looks[i], "look" .. i)
+  ui.headLeft = text(t, "GameFontNormal", 13, GOLD_SOFT)
+  ui.headLeft:SetPoint("LEFT", t, "TOPLEFT", PAD + RP, -(PAD + HEAD_H / 2))
+  ui.headLeft:SetJustifyH("LEFT")
+  setText(ui.headLeft, "Hold for menu", ROW_W - 2 * RP - CYCLER_W - 8)
+  ui.headRight = text(t, "GameFontNormal", 13, GOLD_SOFT)
+  ui.headRight:SetPoint("CENTER", t, "TOPRIGHT", -(PAD + RP + CYCLER_W / 2), -(PAD + HEAD_H / 2))
+  setText(ui.headRight, "Quick tap heals", CYCLER_W)
+  ui.rows = {}
+  for i = 1, MAX_ROWS do
+    local f = row(t, PAD + HEAD_H + (i - 1) * ROW_H)
+    local check = checkbox(f)
+    check:SetSize(CHECK, CHECK)
+    check:SetPoint("LEFT", f, "LEFT", RP - 2, 0)
+    f.check = check
+    f.icon = f:CreateTexture(nil, "ARTWORK")
+    f.icon:SetSize(ICON, ICON)
+    f.icon:SetPoint("LEFT", f, "LEFT", RP + CHECK + 8, 0)
+    f.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+    local edge = ns.outline(f, f.icon, 1, 1)
+    edge:SetColor(0.36, 0.33, 0.27, 1)
+    edge:Show()
+    -- the key in the corner, as on an action button
+    f.hotkey = text(f, "NumberFontNormalSmallGray", nil, { 0.9, 0.9, 0.9 })
+    f.hotkey:SetPoint("TOPRIGHT", f.icon, "TOPRIGHT", -1, -2)
+    f.hotkey:SetJustifyH("RIGHT")
+    f.hotkey:SetDrawLayer("OVERLAY", 2)
+    f.name = text(f, "GameFontNormal", 14)
+    f.name:SetPoint("BOTTOMLEFT", f, "LEFT", NAME_X, 0)
+    f.name:SetJustifyH("LEFT")
+    f.rank = text(f, "GameFontHighlightSmall", 11)
+    f.rank:SetPoint("TOPLEFT", f, "LEFT", NAME_X, -2)
+    f.rank:SetJustifyH("LEFT")
+    f.cycler = cycler(f, CYCLER_W)
+    f.cycler:SetPoint("RIGHT", f, "RIGHT", -RP, 0)
+    f.cycler.value = text(f.cycler.mid, "GameFontHighlight", 13)
+    f.cycler.value:SetPoint("CENTER")
+    local function tick()
+      toggle(f.li)
+    end
+    f:SetScript("OnClick", clicked(tick))
+    check:SetScript("OnClick", clicked(tick))
+    for _, part in ipairs({ { f.cycler.left, -1 }, { f.cycler.right, 1 }, { f.cycler.mid, 1 } }) do
+      part[1]:SetScript(
+        "OnClick",
+        clicked(function()
+          stepTap(f.li, part[2])
+        end)
+      )
+    end
+    for _, part in ipairs({ f, check, f.cycler.left, f.cycler.right, f.cycler.mid }) do
+      hovers(f, part)
+    end
+    ui.rows[i] = f
   end
-  y = choiceRow(t, "Look", y, FRAMES_LABEL_W, t.looks) + FORM_ROW_GAP
-  -- Position: drag the diamond with the mouse, or Move with the pad.
-  t.move = redButton(t, 104, BTN_H, "Move")
-  t.reset = redButton(t, 104, BTN_H, "Reset")
-  onClick(t.move, "move")
-  onClick(t.reset, "reset")
-  t.bottom = choiceRow(t, "Position", y, FRAMES_LABEL_W, { t.move, t.reset })
+  ui.empty = text(t, "GameFontDisable", nil)
+  ui.empty:SetPoint("TOPLEFT", t, "TOPLEFT", PAD + RP, -(PAD + 10))
+  setText(ui.empty, "No heals on your buttons", ROW_W - 2 * RP)
+  -- the wheel scrolls a long list
+  t:EnableMouseWheel(true)
+  t:SetScript("OnMouseWheel", function(_, delta)
+    st.keys = false
+    st.top = clamp(st.top - (delta > 0 and 1 or -1), 1, math.max(1, #rows - visibleRows() + 1))
+    st.li = clamp(st.li, st.top, st.top + math.max(1, visibleRows()) - 1)
+    refresh()
+  end)
+  return t
+end
+
+local function buildMenu(parent)
+  local t = CreateFrame("Frame", nil, parent)
+  t:SetAllPoints()
+  ui.mrows, ui.mlist = {}, {}
+  for i, key in ipairs(MENU_ROWS) do
+    local f = row(t, PAD + (i - 1) * ROW_H)
+    f.key = key
+    f.label = text(f, "GameFontNormal", 15)
+    f.label:SetPoint("LEFT", f, "LEFT", RP, 0)
+    f.label:SetJustifyH("LEFT")
+    setText(f.label, MENU_LABEL[key], LABEL_W)
+    local function focusHere()
+      st.mi = i
+    end
+    if key == "pos" then
+      f.move = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+      f.reset = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+      for n, b in ipairs({ f.move, f.reset }) do
+        b:SetSize(BTN_W, 24)
+        b:SetPoint("RIGHT", f, "RIGHT", -RP - (2 - n) * (BTN_W + BTN_GAP), 0)
+        b:SetScript(
+          "OnClick",
+          clicked(function()
+            focusHere()
+            st.sub = n
+            press(n)
+          end)
+        )
+        hovers(f, b)
+      end
+      f.move:SetText("Move")
+      f.reset:SetText("Reset")
+    else
+      local c = cycler(f, CTL_W)
+      c:SetPoint("RIGHT", f, "RIGHT", -RP, 0)
+      f.ctl = c
+      if key == "size" or key == "spacing" then
+        meter(c)
+      else
+        c.value = text(c.mid, "GameFontHighlight", key == "cancel" and 16 or 14)
+        c.value:SetPoint("CENTER")
+      end
+      for _, part in ipairs({ { c.left, -1 }, { c.right, 1 }, { c.mid, 1 } }) do
+        part[1]:SetScript(
+          "OnClick",
+          clicked(function()
+            focusHere()
+            step(key, part[2])
+          end)
+        )
+        hovers(f, part[1])
+      end
+    end
+    f:SetScript("OnClick", clicked(focusHere))
+    hovers(f, f)
+    ui.mrows[key] = f
+    ui.mlist[i] = f
+  end
   return t
 end
 
 local function build()
   panel = CreateFrame("Frame", "HealpadOptions", UIParent, "ButtonFrameTemplate")
   panel:SetSize(W, 400)
-  panel:SetPoint("TOP", UIParent, "TOP", 0, -TOP_Y)
+  panel:SetPoint("LEFT", UIParent, "LEFT", EDGE, 0)
   panel:SetFrameStrata("DIALOG")
   panel:SetToplevel(true)
   panel:EnableMouse(true)
@@ -1020,8 +958,8 @@ local function build()
   local body = inset or panel
   if inset then
     inset:ClearAllPoints()
-    inset:SetPoint("TOPLEFT", 4, -24)
-    inset:SetPoint("BOTTOMRIGHT", -6, 4)
+    inset:SetPoint("TOPLEFT", INSET_X, -INSET_TOP)
+    inset:SetPoint("BOTTOMRIGHT", -6, INSET_BOTTOM)
   end
 
   -- tabs hang off the bottom edge, like the character window's
@@ -1039,42 +977,45 @@ local function build()
       -- the game lines up the rest itself
       tab:SetPoint("TOPLEFT", ui.tabs[i - 1], "TOPRIGHT", 3, 0)
     end
-    tab:SetScript("OnClick", function()
-      if InCombatLockdown() then
-        return
-      end
-      st.tab, st.keys = t, false
-      if PlaySound and SOUNDKIT then
-        pcall(PlaySound, SOUNDKIT.IG_CHARACTER_INFO_TAB)
-      end
-      refresh()
-    end)
+    tab:SetScript(
+      "OnClick",
+      clicked(function()
+        if st.tab ~= t then
+          st.tab = t
+          setMoving(false)
+          if PlaySound and SOUNDKIT then
+            pcall(PlaySound, SOUNDKIT.IG_CHARACTER_INFO_TAB)
+          end
+        end
+      end)
+    )
     ui.tabs[i] = tab
   end
   if PanelTemplates_SetNumTabs then
     PanelTemplates_SetNumTabs(panel, #TABS)
   end
 
-  ui.buttons = buildButtonsTab(body)
-  ui.controls = buildControlsTab(body)
-  ui.frames = buildFramesTab(body)
+  ui.heals = buildHeals(body)
+  ui.menu = buildMenu(body)
 
   ui.ring = ns.outline(panel, panel, 0, 2)
-  ui.ring:SetColor(0.45, 0.8, 1, 1)
+  ui.ring:SetColor(1, 0.82, 0, 1)
   ui.ring:SetFrameLevel((panel:GetFrameLevel() or 0) + 30)
 
   panel:SetScript("OnShow", function()
-    st.keys, st.moving = false, false
+    st.keys, st.hover = false, nil
+    setMoving(false)
     takeKeys()
+    -- a short fade in
+    panel.a = 0
+    ns.kit.fadeTo(panel, 1, 0.15)
   end)
   panel:SetScript("OnHide", function()
     giveKeys()
+    setMoving(false)
+    ns.previewSpell, ns.previewTap = nil, nil
     if ns.preview then
       ns.preview(false)
-    end
-    st.moving = false
-    if ns.showMoving then
-      ns.showMoving(false)
     end
     if ns.db then
       ns.db.x, ns.db.y = math.floor(ns.db.x + 0.5), math.floor(ns.db.y + 0.5)
@@ -1093,32 +1034,37 @@ function ns.openOptions()
   end
   ns.binds = ns.readBinds()
   buildRows()
-  st.li = clamp(st.li, 1, math.max(1, #rows))
   panel:Show()
   refresh()
+  -- the menu's place on the screen is known once the game has laid it out
+  if C_Timer and C_Timer.After then
+    C_Timer.After(0, dock)
+  end
 end
 function ns.optionsPanel()
   return panel
 end
--- For /hp test and the tests: the parts and the focus.
+-- For /hp test, /hp shots and the tests: the parts and the state.
 function ns.optionsDebug()
   return {
     panel = panel,
     ui = ui,
     st = st,
     rows = rows,
-    items = items,
+    fitted = fitted,
+    sideFor = sideFor,
+    -- the heal row's number, or the Menu row's name (move or reset on Menu position)
     focus = function()
-      return st.focus[st.tab]
+      if st.tab == "heals" then
+        return st.li
+      end
+      local key = MENU_ROWS[st.mi]
+      if key == "pos" then
+        return st.sub == 2 and "reset" or "move"
+      end
+      return key
     end,
-    layout = {
-      W = W,
-      FRAMES_W = FRAMES_W,
-      INSET_W = INSET_W,
-      LIST_W = LIST_W,
-      DET_X = DET_X,
-      DET_W = DET_W,
-    },
+    layout = { W = W, ROW_W = ROW_W, CTL_W = CTL_W, LABEL_W = LABEL_W, NAME_W = NAME_W, TAP_W = TAP_W },
   }
 end
 

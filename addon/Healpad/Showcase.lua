@@ -1,6 +1,6 @@
 -- /hp shots: screenshots for the addon's page. Hides the game's interface,
 -- stages the diamond (example party, a heal aimed, an incoming heal, a debuff
--- to cleanse) and each settings tab over the game world, takes a screenshot
+-- to cleanse) and both settings tabs over the game world, takes a screenshot
 -- of each, then puts everything back. Out of combat; stand somewhere pretty.
 local _, ns = ...
 
@@ -86,24 +86,24 @@ function ns.showcase()
   table.insert(scenes, function()
     ns.setLook(before)
   end)
+  -- the settings: Heals on a heal that holds for the menu, then Menu; the
+  -- menu beside them is the preview
   local tail = {
     function()
       ns.stage = nil
-      ns.preview(false)
       ns.openOptions()
       local d = ns.optionsDebug()
-      d.st.tab, d.st.focus.buttons = "buttons", "row"
+      d.st.tab, d.st.li = "heals", 1
+      for i = #d.rows, 1, -1 do
+        if ns.aimConf(d.rows[i].bind) then
+          d.st.li = i
+        end
+      end
       ns.refreshOptions()
     end,
     shot,
     function()
-      ns.optionsNav("RB")
-    end,
-    shot,
-    function()
-      ns.optionsNav("RB")
-      ns.stage = { sel = "RIGHT" }
-      ns.redraw()
+      ns.optionsNav("RB", false) -- as with the mouse: no focus edge
     end,
     shot,
   }
