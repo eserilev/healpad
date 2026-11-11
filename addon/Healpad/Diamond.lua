@@ -268,6 +268,8 @@ function ns.redraw()
       if src.face then
         local ok, _, class = pcall(UnitClass, "player")
         src.class = ok and class or nil
+        local okN, me = pcall(UnitName, "player")
+        src.name = okN and me or src.name
       end
     else
       local unit = ctl:GetAttribute("u" .. page .. "-" .. from)

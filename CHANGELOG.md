@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- /hp shots now takes screenshots while you play: one as the menu opens and one for each person
+  you pick, with the rest of the interface hidden out of combat. /hp shots page takes the old set.
+- The preview shows your own name in the middle.
 - New settings window. Buttons: your heals in a list, the one you're on shown beside it with
   one Enable button (off, the button casts as it always did) and Tap to heal as a column: You,
   Target, Focus, Tank, Last healed. Not enabled, Tap to heal is dimmed and skipped.

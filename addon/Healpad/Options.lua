@@ -1133,8 +1133,12 @@ SlashCmdList.HEALPAD = function(msg)
     return
   end
   if cmd == "shots" then
-    if ns.showcase then
-      ns.showcase()
+    if msg:lower():match("page") then
+      if ns.showcase then
+        ns.showcase()
+      end
+    elseif ns.actionShots then
+      ns.actionShots()
     end
     return
   end
