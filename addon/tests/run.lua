@@ -810,6 +810,8 @@ test("settings: pad drives the tabs; A sets Hold to Aim; nav keys go back on clo
   W.tap("PAD2") -- back to the list
   W.tap("PADRSHOULDER") -- Aim tab
   W.tap("PADDRIGHT")
+  eq(ns.db.aimWith, "lstick", "left stick, then right")
+  W.tap("PADDRIGHT")
   eq(ns.db.aimWith, "rstick")
   W.tap("PADDDOWN")
   W.tap("PADDRIGHT")
