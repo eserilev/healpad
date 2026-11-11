@@ -126,7 +126,8 @@ local function applyLook()
   end
   anchorAround(want.spots)
   want.frame:Show()
-  opening = root:IsShown()
+  -- the entrance is for a real hold; the settings' preview just shows it
+  opening = root:IsShown() and not previewing
   ns.layout()
   ns.redraw()
 end
@@ -199,10 +200,10 @@ end
 -- Example people for the Frames tab when you're not in a group: one of each
 -- state the looks show.
 local SAMPLE = {
-  UP = { name = "Party Member", class = "WARRIOR", hp = 0.46, inc = 0.14, miss = 1620, hot = true },
-  RIGHT = { name = "Party Member", class = "PRIEST", hp = 0.92, miss = 240, dispel = { 0.2, 0.6, 1, 1 } },
-  DOWN = { name = "Party Member", class = "ROGUE", hp = 0.14, miss = 2580 },
-  LEFT = { name = "Party Member", class = "MAGE", hp = 0.68, miss = 960, far = true },
+  UP = { name = "Thrain", class = "WARRIOR", hp = 0.46, inc = 0.14, miss = 1620, hot = true },
+  RIGHT = { name = "Mirelle", class = "PRIEST", hp = 0.92, miss = 240, dispel = { 0.2, 0.6, 1, 1 } },
+  DOWN = { name = "Kesh", class = "ROGUE", hp = 0.3, miss = 2100 },
+  LEFT = { name = "Brannoc", class = "MAGE", hp = 0.68, miss = 960, far = true },
   SELF = { name = "Tap to Heal Target", face = "player", hp = 0.84, miss = 480 },
 }
 for _, p in pairs(SAMPLE) do
@@ -349,7 +350,7 @@ end
 
 -- It opens with the look's entrance, once the people are drawn.
 root:SetScript("OnShow", function()
-  opening = true
+  opening = not previewing
 end)
 
 -- The settings' Frames tab shows the menu where it will be, out of combat;

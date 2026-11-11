@@ -4,7 +4,9 @@
 
 - /hp shots now takes screenshots while you play: one as the menu opens and one for each person
   you pick, with the rest of the interface hidden out of combat. /hp shots page stages a named example party in every look, aimed two ways, plus each settings tab.
-- The preview shows your own name in the middle.
+- The preview shows your own name in the middle and an example party with names (Thrain,
+  Mirelle, Kesh, Brannoc), the same in every look. Nothing flashes in it: no opening animation
+  and no red pulse.
 - All four looks take about the same room on screen at the same Size; Classic is bigger and
   its rows further apart.
 - New settings window. Buttons: your heals in a list, the one you're on shown beside it with
