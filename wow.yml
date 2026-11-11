@@ -2,6 +2,8 @@
 # scripts/api-check.sh checks each name against the Forever client source.
 base: lua51
 globals:
+  BreakUpLargeNumbers:
+    any: true
   ButtonFrameTemplate_HideButtonBar:
     any: true
   C_ActionBar:
@@ -74,6 +76,8 @@ globals:
     any: true
   IsInRaid:
     any: true
+  issecretvalue:
+    any: true
   KeyBarsAPI:
     any: true
   PanelTemplates_SetNumTabs:
@@ -85,6 +89,8 @@ globals:
   PlaySound:
     any: true
   PowerBarColor:
+    any: true
+  RAID_CLASS_COLORS:
     any: true
   RegisterStateDriver:
     any: true
@@ -120,6 +126,8 @@ globals:
     any: true
   UISpecialFrames:
     any: true
+  UnitClass:
+    any: true
   UnitExists:
     any: true
   UnitGetIncomingHeals:
@@ -129,6 +137,10 @@ globals:
   UnitHealth:
     any: true
   UnitHealthMax:
+    any: true
+  UnitHealthMissing:
+    any: true
+  UnitHealthPercent:
     any: true
   UnitIsConnected:
     any: true

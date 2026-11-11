@@ -2,8 +2,21 @@
 package.path = "addon/tests/?.lua;" .. package.path
 local Wow = require("wow")
 
-local FILES =
-  { "Core.lua", "Binds.lua", "Roster.lua", "Secure.lua", "Diamond.lua", "Options.lua", "Test.lua", "Showcase.lua" }
+local FILES = {
+  "Core.lua",
+  "Binds.lua",
+  "Roster.lua",
+  "Secure.lua",
+  "Looks.lua",
+  "LookMedallions.lua",
+  "LookSigil.lua",
+  "LookCompass.lua",
+  "LookGlass.lua",
+  "Diamond.lua",
+  "Options.lua",
+  "Test.lua",
+  "Showcase.lua",
+}
 local DIR = "addon/Healpad"
 
 local passed, failed = 0, 0
@@ -389,18 +402,214 @@ test("drawing in combat: bars get the secret values, nothing compares them", fun
   W.combat = true
   W.key("PAD3", true)
   W.tap("PADDLEFT")
-  W.update(0.3)
+  W.update(0.6)
   local up = ns.spots.UP
   eq(Wow.isSecret(up.health.value), true, "health bar got the secret value")
-  eq(Wow.isSecret(up.incoming.value), true, "incoming bar too")
-  eq(Wow.isSecret(up.power.value), true, "power bar too")
-  eq(up.hpText.text, "80 / 100", "numbers from secrets, by the font string")
+  eq(Wow.isSecret(up.health.incoming.value), true, "incoming bar too")
+  eq(Wow.isSecret(up.health.barColor[1]), true, "health color from the curve, secret")
   eq(up.face.portrait, "party2", "portrait")
-  eq(up.glow.border[1], 0.2, "dispel glow")
-  eq(ns.spots.LEFT.glow.border[1], 1, "aimed gold wins")
+  eq(up.dispel:IsShown(), true, "dispel pip")
+  eq(up.glow, nil, "no outline for a dispel any more")
   eq(ns.spots.LEFT.name.text, "Zed")
-  eq(ns.spots.LEFT.hpText.text, "Dead")
+  eq(ns.spots.LEFT.state:IsShown(), true, "dead: the skull")
+  eq(ns.spots.LEFT.state.texture, ns.kit.SKULL)
+  eq(Wow.isSecret(ns.spots.DOWN.body.alphaBool[1]), true, "range: the game fades it from the secret answer")
   W.key("PAD3", false)
+  clean(W)
+end)
+
+---------------------------------------------------------------- looks
+
+local function lookNames(ns)
+  local names = {}
+  for _, n in ipairs(ns.LOOKS) do
+    names[#names + 1] = n
+  end
+  return table.concat(names, " ")
+end
+
+test("looks: four in the registry, Medallions by default, each with its parts", function()
+  local W, ns = game()
+  eq(lookNames(ns), "medallions sigil compass glass")
+  eq(ns.db.look, "medallions", "default")
+  eq(ns.look.name, "medallions")
+  eq(ns.spots, ns.looks.medallions.spots)
+  for _, name in ipairs(ns.LOOKS) do
+    local look = ns.looks[name]
+    eq(type(ns.LOOK_LABEL[name]), "string", name .. " label")
+    for _, fn in ipairs({ "build", "layout", "draw", "aim", "open", "cast" }) do
+      eq(type(look[fn]), "function", name .. "." .. fn)
+    end
+  end
+  eq(ns.looks.sigil.frame, nil, "a look is built only when chosen")
+  clean(W)
+end)
+
+test("looks: a saved look comes back; an unknown one falls back to Medallions", function()
+  local W, ns = game({ saved = { look = "compass", aim = { PAD3 = { tap = "player" } } } })
+  eq(ns.look.name, "compass")
+  eq(ns.spots.UP.miss ~= nil, true, "compass cards")
+  clean(W)
+  local W2, ns2 = game({ saved = { look = "gone", aim = { PAD3 = { tap = "player" } } } })
+  eq(ns2.db.look, "medallions")
+  eq(ns2.look.name, "medallions")
+  clean(W2)
+end)
+
+test("looks: switching shows the new one at once; in combat it waits for the fight to end", function()
+  local W, ns = game()
+  eq(ns.setLook("sigil"), true)
+  eq(ns.look.name, "sigil")
+  eq(ns.spots, ns.looks.sigil.spots)
+  eq(ns.looks.sigil.frame:IsShown(), true)
+  eq(ns.looks.medallions.frame:IsShown(), false, "the old one hidden")
+  eq(ns.setLook("nope"), false, "no such look")
+  eq(ns.db.look, "sigil")
+  W.combat = true
+  W.key("PAD3", true)
+  eq(ns.setLook("glass"), false, "not in combat")
+  eq(ns.db.look, "glass", "saved")
+  eq(ns.look.name, "sigil", "still the old look")
+  eq(ns.looks.glass.frame, nil, "nothing built in combat")
+  W.tap("PADDUP")
+  W.key("PAD3", false)
+  W.combat = false
+  W.fire("PLAYER_REGEN_ENABLED")
+  eq(ns.look.name, "glass", "after the fight")
+  eq(ns.looks.sigil.frame:IsShown(), false)
+  clean(W)
+end)
+
+-- Everyone in every state: a dispel and your HoT up, dead left, offline
+-- right, out of range and nearly dead down.
+local function troubled(W)
+  W.units.party2.debuff = "Magic"
+  W.units.party2.hot = true
+  W.units.party1.dead = true
+  W.units.party4.offline = true
+  W.units.party3.hp = 10
+  W.rangeOut.party3 = true
+end
+
+-- Holds X, aims all round (up, right, down, left, back to you) and lets go.
+local function aimAround(W, ns, combat)
+  W.combat = combat
+  W.key("PAD3", true)
+  eq(ns.diamond:IsShown(), true)
+  for _, d in ipairs({ "UP", "RIGHT", "DOWN", "LEFT", "RIGHT" }) do
+    W.tap("PADD" .. d)
+    W.update(0.6)
+  end
+  eq(ns.ctl:GetAttribute("sel"), "SELF", "the opposite way: back to you")
+  W.tap("PADDUP")
+  W.key("PAD3", false)
+  eq(ns.diamond:IsShown(), false)
+  W.combat = false
+end
+
+for _, name in ipairs({ "medallions", "sigil", "compass", "glass" }) do
+  test("look " .. name .. ": draws everyone in every state, in and out of combat", function()
+    local W, ns = game()
+    troubled(W)
+    eq(ns.setLook(name), true)
+    local s = ns.spots
+    for _, combat in ipairs({ false, true }) do
+      W.combat = combat
+      W.key("PAD3", true)
+      W.update(0.6)
+      eq(s.UP.name.text, "Brakka", "name")
+      eq(s.SELF.name.text, "Me")
+      eq(Wow.isSecret(s.UP.health.value), combat, "health bar value secret in combat")
+      eq(s.UP.dispel:IsShown(), true, "dispel pip")
+      eq(s.UP.hot:IsShown(), true, "HoT pip")
+      eq(s.UP.hot.icon.texture, 136081, "your HoT's icon")
+      eq(s.LEFT.state.texture, ns.kit.SKULL, "dead: skull")
+      eq(s.LEFT.state:IsShown(), true)
+      eq(s.LEFT.dispel:IsShown(), false)
+      eq(s.RIGHT.state.texture, ns.kit.PLUG, "offline: unplugged")
+      eq(s.RIGHT.state:IsShown(), true)
+      eq(s.SELF.state:IsShown(), false, "you are fine")
+      eq(Wow.isSecret(s.DOWN.crit.vertex[4]), combat, "crit pulse from the curve")
+      if combat then
+        eq(Wow.isSecret(s.DOWN.body.alphaBool[1]), true, "out of range: faded by the game")
+      else
+        eq(s.DOWN.far, true, "out of range")
+        eq(s.DOWN.crit.vertex[4], 1, "under a quarter: the red pulse")
+        eq(s.UP.crit.vertex[4], 0, "no pulse at 80%")
+      end
+      if name == "compass" then
+        eq(s.UP.miss.text, "-20", "missing health")
+        eq(s.DOWN.miss.text, "-90")
+      end
+      W.key("PAD3", false)
+      W.combat = false
+      aimAround(W, ns, combat)
+    end
+    -- The cast landed on you last: the look's cast ran without an error.
+    clean(W)
+  end)
+
+  test("look " .. name .. ": alone, the Target spot; the Frames tab's sample people", function()
+    local W, ns = game({ party = false })
+    ns.setLook(name)
+    W.key("PAD3", true)
+    W.update(0.6)
+    eq(ns.spots.UP.name.text, "Target", "nobody targeted: the empty Target spot")
+    eq(ns.spots.UP.body.alpha, 0.45)
+    eq(ns.spots.RIGHT:IsShown(), false)
+    W.tap("PADDUP")
+    W.key("PAD3", false)
+    ns.openOptions()
+    W.tap("PADRSHOULDER")
+    W.tap("PADRSHOULDER")
+    eq(ns.diamond:IsShown(), true, "preview")
+    eq(ns.spots.UP.hot:IsShown(), true, "sample HoT")
+    eq(ns.spots.RIGHT.dispel:IsShown(), true, "sample dispel")
+    eq(ns.spots.LEFT.far, true, "sample out of range")
+    eq(ns.spots.DOWN.crit.vertex[4], 1, "sample critical")
+    ns.optionsPanel():Hide()
+    clean(W)
+  end)
+end
+
+test("Frames tab: Look picks one of four, the chosen one in gold, the preview follows", function()
+  local W, ns = game({ party = false })
+  ns.openOptions()
+  W.tap("PADRSHOULDER")
+  W.tap("PADRSHOULDER")
+  local d = ns.optionsDebug()
+  eq(d.st.tab, "frames")
+  local looks = d.ui.frames.looks
+  eq(#looks, 4)
+  eq(looks[1].text, "Medallions")
+  eq(looks[4].text, "Glass")
+  eq(looks[1].gold:IsShown(), true, "Medallions chosen")
+  eq(looks[2].gold:IsShown(), false)
+  for _ = 1, 3 do
+    W.tap("PADDDOWN")
+  end
+  eq(d.st.row, 3, "the Look row")
+  W.tap("PADDRIGHT")
+  eq(ns.db.look, "sigil")
+  eq(ns.look.name, "sigil", "the preview shows it")
+  eq(ns.diamond:IsShown(), true)
+  eq(looks[2].gold:IsShown(), true)
+  eq(looks[1].gold:IsShown(), false)
+  W.tap("PADDRIGHT")
+  W.tap("PADDRIGHT")
+  W.tap("PADDRIGHT")
+  eq(ns.db.look, "glass", "stops at the last")
+  looks[3]:GetScript("OnClick")(looks[3])
+  eq(ns.db.look, "compass", "a click picks too")
+  eq(ns.spots.UP.name.text, "Party Member", "sample people in the new look")
+  W.tap("PADDUP")
+  W.tap("PADDUP")
+  W.tap("PADDRIGHT")
+  eq(ns.db.distance, 4, "Spread still works")
+  W.tap("PADDUP")
+  W.tap("PADDRIGHT")
+  eq(ns.db.scale, 1.1, "Size still works")
+  eq(ns.looks.compass.spots.UP.at[2] > 158, true, "spread moves the cards out")
   clean(W)
 end)
 

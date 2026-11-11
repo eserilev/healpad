@@ -12,6 +12,11 @@ Core.lua
 Binds.lua
 Roster.lua
 Secure.lua
+Looks.lua
+LookMedallions.lua
+LookSigil.lua
+LookCompass.lua
+LookGlass.lua
 Diamond.lua
 Options.lua
 Test.lua

@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+- Four looks for the aim menu, picked under Frames > Look; the preview changes as you pick.
+  - Medallions (the default): round gold-rimmed portraits on a circle. The one you aim at grows
+    inside a turning gold ring, a gold spoke points to them, and the others dim.
+  - Sigil: a slowly turning blue rune circle; each person a gem with their health as a ring
+    around it; a beam of light turns to whoever you aim at.
+  - Compass: parchment cards with a class-color stripe and the missing health in big numbers; the
+    needle of the compass rose in the middle swings to your aim.
+  - Glass: slim see-through bars in class colors; the aimed one gets a gold border and small gold
+    arrows light up toward it.
+- In every look: health is colored green to yellow to red, and pulses red under a quarter. Your
+  own heal over time shows as a small icon, a debuff you can remove as a small colored gem (no
+  longer the outline). Out of range is faded and grey; dead shows a skull, offline a cable.
+- The menu slides open, and a heal leaves a mark on the person it went to.
+- Size, Spread and Position work for every look.
+
 ## 0.2.3
 
 - Gamepad Mode: the d-pad picks who to heal while you aim, even where the game's own controller

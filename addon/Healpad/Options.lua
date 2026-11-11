@@ -2,7 +2,7 @@
 --   Buttons: what you already bound; switch a heal to Hold to Aim, and pick
 --            who a quick tap heals.
 --   Aim:     what aims (d-pad or a stick) and what cancels.
---   Frames:  how big the diamond's frames are and how far apart.
+--   Frames:  how big the diamond's frames are, how far apart, and its look.
 -- Works with the pad (d-pad, A, B, LB, RB), the keyboard (arrows, Enter) and
 -- the mouse. Settings change out of combat only; the panel closes in combat.
 local _, ns = ...
@@ -302,6 +302,18 @@ local function drawFrames()
   f.spread.value:SetText(tostring(spread))
   f.spread.bar:SetValue(spread)
   setChosen(f.move, st.moving)
+  local lookFocus
+  for i, name in ipairs(ns.LOOKS) do
+    local on = ns.db.look == name
+    setChosen(f.looks[i], on)
+    f.looks[i].gold:SetShown(on)
+    if on then
+      lookFocus = f.looks[i]
+    end
+  end
+  if st.row == 3 then
+    return lookFocus
+  end
   if st.row == 2 then
     return st.col == 0 and f.move or f.reset
   end
@@ -429,9 +441,21 @@ local function nav(btn, fromKeys)
       st.row, st.col = math.max(0, st.row - 1), 0
     end
     if btn == "DOWN" then
-      st.row, st.col = math.min(2, st.row + 1), 0
+      st.row, st.col = math.min(3, st.row + 1), 0
     end
     local d = btn == "RIGHT" and 1 or btn == "LEFT" and -1 or 0
+    if st.row == 3 then
+      if d ~= 0 then
+        local i = 1
+        for n, name in ipairs(ns.LOOKS) do
+          if name == ns.db.look then
+            i = n
+          end
+        end
+        ns.setLook(ns.LOOKS[clamp(i + d, 1, #ns.LOOKS)])
+      end
+      return refresh()
+    end
     if st.row == 2 then
       if d ~= 0 then
         st.col = clamp(st.col + d, 0, 1)
@@ -834,6 +858,26 @@ local function buildFramesTab(parent)
     st.row, st.col = 2, 1
     nav("A")
   end)
+  local look = text(t, "GameFontNormalLarge")
+  look:SetText("Look")
+  look:SetPoint("TOPLEFT", PAD, -PAD - 270)
+  t.looks = {}
+  local w = (400 - 10 - 2 * PAD - 3 * 6) / #ns.LOOKS
+  for i, name in ipairs(ns.LOOKS) do
+    local b = redButton(t, w, 30, ns.LOOK_LABEL[name])
+    b:SetPoint("TOPLEFT", PAD + (i - 1) * (w + 6), -PAD - 298)
+    b.gold = ns.outline(b, b, 1, 2)
+    b.gold:SetColor(1, 0.82, 0, 1)
+    b:SetScript("OnClick", function()
+      if InCombatLockdown() then
+        return
+      end
+      st.row = 3
+      ns.setLook(name)
+      refresh()
+    end)
+    t.looks[i] = b
+  end
   return t
 end
 

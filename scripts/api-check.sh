@@ -40,9 +40,9 @@ for call in $(grep -ohE "\bC_[A-Za-z]+\.[A-Za-z]+" addon/Healpad/*.lua | sort -u
     failed=1
   fi
 done
-# Events go through ns.on("EVENT"), or a list of them in Secure.lua that it loops over.
+# Events go through ns.on("EVENT"), or a list of them that a file loops over.
 events=$( (grep -ohE 'ns\.on\("[A-Z_]+"' addon/Healpad/*.lua
-  awk '/for _, e in ipairs\(\{/,/ns\.on\(e/' addon/Healpad/Secure.lua) | grep -oE '"[A-Z][A-Z_]+"' | tr -d '"' | sort -u)
+  awk '/for _, e in ipairs\(\{/,/ns\.on\(e/' addon/Healpad/*.lua) | grep -oE '"[A-Z][A-Z_]+"' | tr -d '"' | sort -u)
 for event in $events; do
   if ! grep -qF "\"$event\"" "$res/Events.lua"; then
     echo "error: event $event is not in the client" >&2

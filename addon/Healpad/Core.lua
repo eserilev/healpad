@@ -58,7 +58,16 @@ function ns.afterCombat(key, fn)
   end
 end
 
-local DEFAULTS = { distance = 3, scale = 1, arrows = true, aimWith = "dpad", cancel = "PAD2", x = 0, y = 0 }
+local DEFAULTS = {
+  distance = 3,
+  scale = 1,
+  arrows = true,
+  aimWith = "dpad",
+  cancel = "PAD2",
+  x = 0,
+  y = 0,
+  look = "medallions",
+}
 
 function ns.setupDB()
   HealpadDB = HealpadDB or {}
@@ -69,6 +78,9 @@ function ns.setupDB()
     if db[k] == nil then
       db[k] = v
     end
+  end
+  if ns.looks and not ns.looks[db.look] then
+    db.look = DEFAULTS.look
   end
   db.aim = db.aim or {} -- [binding key] = { tap = "player" }: that key holds to aim
   db.aimSpell = db.aimSpell or {} -- [KeyBars cast value] = { tap }: that spell holds to aim on KeyBars keys

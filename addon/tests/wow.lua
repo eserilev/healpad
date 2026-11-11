@@ -113,6 +113,44 @@ function M.new()
   function Frame:CreateMaskTexture()
     return newRegion(self)
   end
+  function Frame:CreateLine()
+    return newRegion(self)
+  end
+  -- Animations: groups and animations take any setting and never run, so
+  -- what they end on must also be set without them.
+  function Frame:CreateAnimationGroup()
+    local g = newRegion(self)
+    g.anims = {}
+    return g
+  end
+  function Frame:CreateAnimation(kind)
+    local a = newRegion(self)
+    a.kind = kind
+    table.insert(self.anims, a)
+    return a
+  end
+  function Frame:Play()
+    self.played = (self.played or 0) + 1
+  end
+  -- Setters that take secret values: they keep what they got.
+  function Frame:SetAlphaFromBoolean(v, yes, no)
+    self.alphaBool = { v, yes, no }
+  end
+  function Frame:SetVertexColor(r, g, b, a)
+    self.vertex = { r, g, b, a }
+  end
+  function Frame:SetStatusBarColor(r, g, b, a)
+    self.barColor = { r, g, b, a }
+  end
+  function Frame:SetTextColor(r, g, b, a)
+    self.textColor = { r, g, b, a }
+  end
+  function Frame:SetDesaturation(v)
+    self.desat = v
+  end
+  function Frame:SetTexture(t)
+    self.texture = t
+  end
   function Frame:SetFormattedText(fmt, ...)
     local args = {}
     for i = 1, select("#", ...) do
@@ -746,6 +784,40 @@ function M.new()
   G.UnitHealthMax = function(u)
     return hidden(W.units[u] and W.units[u].max or 1)
   end
+  G.UnitHealthMissing = function(u)
+    local x = W.units[u]
+    return hidden(x and (x.max - x.hp) or 0)
+  end
+  -- A fraction, or with a curve the color there; secret in combat.
+  G.UnitHealthPercent = function(u, _, curve)
+    local x = W.units[u]
+    local pct = x and x.hp / x.max or 0
+    if curve then
+      local r, g, b, a = curve:Evaluate(pct):GetRGBA()
+      return {
+        GetRGBA = function()
+          return hidden(r), hidden(g), hidden(b), hidden(a)
+        end,
+      }
+    end
+    return hidden(pct)
+  end
+  G.issecretvalue = M.isSecret
+  G.BreakUpLargeNumbers = function(n)
+    local s = tostring(plain(n)):reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", "")
+    return M.isSecret(n) and secret(s) or s
+  end
+  G.UnitClass = function(u)
+    local c = W.units[u] and W.units[u].class or "PRIEST"
+    return c:sub(1, 1) .. c:sub(2):lower(), c
+  end
+  G.RAID_CLASS_COLORS = {
+    PRIEST = { r = 1, g = 1, b = 1 },
+    WARRIOR = { r = 0.78, g = 0.61, b = 0.43 },
+    MAGE = { r = 0.25, g = 0.78, b = 0.92 },
+    ROGUE = { r = 1, g = 0.96, b = 0.41 },
+    DRUID = { r = 1, g = 0.49, b = 0.04 },
+  }
   G.UnitGetIncomingHeals = function(u)
     return hidden(W.units[u] and W.units[u].incoming or 0)
   end
@@ -864,8 +936,12 @@ function M.new()
     end,
   }
   G.C_UnitAuras = {
-    GetAuraDataByIndex = function(unit)
-      local d = W.units[unit] and W.units[unit].debuff
+    GetAuraDataByIndex = function(unit, _, filter)
+      local x = W.units[unit]
+      if filter and filter:find("HELPFUL") then
+        return x and x.hot and { auraInstanceID = 8, icon = 136081 } or nil
+      end
+      local d = x and x.debuff
       return d and { auraInstanceID = 7, dispelName = d } or nil
     end,
     GetAuraDispelTypeColor = function()
@@ -878,9 +954,40 @@ function M.new()
   }
   G.C_CurveUtil = {
     CreateColorCurve = function()
-      return { SetType = function() end, AddPoint = function() end }
+      local c = { points = {} }
+      function c.SetType() end
+      function c.AddPoint(_, x, color)
+        assert(not M.isSecret(x), "a curve point from a secret")
+        table.insert(c.points, { x, color })
+      end
+      -- linear between points
+      function c.Evaluate(_, x)
+        local p = c.points
+        local lo, hi = p[1], p[#p]
+        for i = 2, #p do
+          if x <= p[i][1] then
+            lo, hi = p[i - 1], p[i]
+            break
+          end
+        end
+        local t = hi[1] == lo[1] and 0 or math.max(0, math.min(1, (x - lo[1]) / (hi[1] - lo[1])))
+        local a, b = { lo[2].GetRGBA() }, { hi[2].GetRGBA() }
+        local out = {}
+        for i = 1, 4 do
+          out[i] = a[i] + (b[i] - a[i]) * t
+        end
+        return G.CreateColor(unpack(out))
+      end
+      return c
+    end,
+    EvaluateColorValueFromBoolean = function(v, yes, no)
+      local r = plain(v) and yes or no
+      return M.isSecret(v) and secret(r) or r
     end,
   }
+  G.CreateVector2D = function(x, y)
+    return { x = x, y = y }
+  end
   G.CreateColor = function(r, g, b, a)
     return {
       GetRGBA = function()
