@@ -65,12 +65,6 @@ local function makeCard(c)
   f.health:SetPoint("BOTTOMLEFT", 16, 9)
   f.health:SetPoint("BOTTOMRIGHT", -12, 9)
   f.health.back:SetColorTexture(0.24, 0.14, 0.05, 0.25)
-  f.crit = med:CreateTexture(nil, "ARTWORK", nil, 3)
-  f.crit:SetPoint("TOPLEFT", 2, -2)
-  f.crit:SetPoint("BOTTOMRIGHT", -2, 2)
-  f.crit:SetColorTexture(1, 1, 1, 1)
-  f.crit:SetVertexColor(1, 0.16, 0.1, 0)
-  K.pulse(f.crit, 0.15, 0.55, 0.55)
   f.state = K.stateIcon(med, 30)
   f.state:SetPoint("RIGHT", -16, 5)
   f.hot = K.hotPip(med, 14)
@@ -123,11 +117,6 @@ local function makeRose(c)
   local paper = K.disc(med, S - 8, "BACKGROUND", 1)
   paper:SetPoint("CENTER")
   K.gradient(paper, "VERTICAL", { 0.72, 0.6, 0.38, 1 }, { 0.94, 0.88, 0.72, 1 })
-  f.crit = K.disc(med, S - 8, "BACKGROUND", 2)
-  f.crit:SetPoint("CENTER")
-  f.crit:SetColorTexture(1, 1, 1, 1)
-  f.crit:SetVertexColor(1, 0.16, 0.1, 0)
-  K.pulse(f.crit, 0.15, 0.55, 0.55)
   for i = 1, 32 do
     local a = (i - 1) / 32 * 2 * math.pi
     local t = med:CreateTexture(nil, "BORDER", nil, 0)
@@ -286,10 +275,6 @@ function look.aim(sel)
       f.med:SetPoint("CENTER", f, "CENTER", 0, on and 5 / k or 0)
       f.sel:SetShown(on)
       f:SetFrameLevel(on and 20 or 5)
-      if on and look.aimed ~= sel then
-        f.sweep:Stop()
-        f.sweep:Play()
-      end
     end
   end
   local rose = look.spots.SELF

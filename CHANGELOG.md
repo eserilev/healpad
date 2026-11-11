@@ -5,8 +5,9 @@
 - /hp shots now takes screenshots while you play: one as the menu opens and one for each person
   you pick, with the rest of the interface hidden out of combat. /hp shots page stages a named example party in every look, aimed two ways, plus each settings tab.
 - The preview shows your own name in the middle and an example party with names (Thrain,
-  Mirelle, Kesh, Brannoc), the same in every look. Nothing flashes in it: no opening animation
-  and no red pulse.
+  Mirelle, Kesh, Brannoc), the same in every look. Nothing flashes in it: no opening animation.
+- Nothing flashes or spins in any look: no red pulse for low health (the bar turns red), no
+  turning ring in Medallions, no shine on Compass cards.
 - All four looks take about the same room on screen at the same Size; Classic is bigger and
   its rows further apart.
 - New settings window. Buttons: your heals in a list, the one you're on shown beside it with
@@ -28,7 +29,7 @@
     around it; a beam of light turns to whoever you aim at.
   - Compass: parchment cards with a class-color stripe and the missing health in big numbers; the
     needle of the compass rose in the middle swings to your aim.
-- In every look: health is colored green to yellow to red, and pulses red under a quarter. Your
+- In every look: health is colored green to yellow to red,. Your
   own heal over time shows as a small icon, a debuff you can remove as a small colored gem (no
   longer the outline). Out of range is faded and grey; dead shows a skull, offline a cable.
 - The menu slides open. Nothing flashes when a heal goes off.

@@ -1,5 +1,5 @@
 -- Medallions: round gold-rimmed portraits on a circle, you in the middle.
--- Name and health under each. The aimed one grows inside a turning gold ring,
+-- Name and health under each. The aimed one grows inside a gold ring,
 -- the others dim, and a gold spoke points from the middle to it.
 local _, ns = ...
 local K = ns.kit
@@ -18,15 +18,11 @@ local function makeSpot(c, dir)
   med:SetSize(S, S)
   med:SetPoint("CENTER")
   f.med = med
-  -- the aimed one's ring of gold light, turning
-  f.ring = med:CreateTexture(nil, "BACKGROUND", nil, 0)
-  f.ring:SetSize(S + 34, S + 34)
+  -- the aimed one's ring of gold
+  f.ring = K.disc(med, S + 12, "BACKGROUND", 0)
   f.ring:SetPoint("CENTER")
-  f.ring:SetTexture(K.RING)
-  f.ring:SetBlendMode("ADD")
-  f.ring:SetVertexColor(1, 0.85, 0.3, 1)
+  f.ring:SetColorTexture(1, 0.82, 0.2, 1)
   f.ring:Hide()
-  K.spin(f.ring, 2.4)
   local shadow = K.disc(med, S + 4, "BACKGROUND", 2)
   shadow:SetPoint("CENTER")
   shadow:SetColorTexture(0.11, 0.08, 0.02, 1)
@@ -35,11 +31,6 @@ local function makeSpot(c, dir)
   K.gradient(rim, "VERTICAL", { 0.36, 0.25, 0.09, 1 }, { 0.95, 0.82, 0.48, 1 })
   f.face = K.disc(med, S - 10, "ARTWORK", 0)
   f.face:SetPoint("CENTER")
-  f.crit = K.disc(med, S - 10, "ARTWORK", 3)
-  f.crit:SetPoint("CENTER")
-  f.crit:SetColorTexture(1, 1, 1, 1)
-  f.crit:SetVertexColor(1, 0.16, 0.1, 0)
-  K.pulse(f.crit, 0.25, 0.75, 0.55)
   f.state = K.stateIcon(med, S * 0.5)
   f.state:SetPoint("CENTER")
   f.hot = K.hotPip(med, 22)

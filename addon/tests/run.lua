@@ -548,13 +548,11 @@ for _, name in ipairs({ "medallions", "sigil", "compass", "classic" }) do
       eq(s.RIGHT.state.texture, ns.kit.PLUG, "offline: unplugged")
       eq(s.RIGHT.state:IsShown(), true)
       eq(s.SELF.state:IsShown(), false, "you are fine")
-      eq(Wow.isSecret(s.DOWN.crit.vertex[4]), combat, "crit pulse from the curve")
+      eq(s.DOWN.crit, nil, "no red pulse")
       if combat then
         eq(Wow.isSecret(s.DOWN.body.alphaBool[1]), true, "out of range: faded by the game")
       else
         eq(s.DOWN.far, true, "out of range")
-        eq(s.DOWN.crit.vertex[4], 1, "under a quarter: the red pulse")
-        eq(s.UP.crit.vertex[4], 0, "no pulse at 80%")
       end
       if name == "compass" then
         eq(s.UP.miss.text, "-20", "missing health")
@@ -585,7 +583,7 @@ for _, name in ipairs({ "medallions", "sigil", "compass", "classic" }) do
     eq(ns.spots.UP.hot:IsShown(), true, "sample HoT")
     eq(ns.spots.RIGHT.dispel:IsShown(), true, "sample dispel")
     eq(ns.spots.LEFT.far, true, "sample out of range")
-    eq(ns.spots.DOWN.crit.vertex[4], 0, "no red pulse in the preview")
+    eq(ns.spots.DOWN.crit, nil, "no red pulse in the preview")
     ns.optionsPanel():Hide()
     clean(W)
   end)

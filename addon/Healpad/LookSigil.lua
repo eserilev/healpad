@@ -21,11 +21,6 @@ local function makeGem(c, dir)
   med:SetPoint("CENTER")
   f.med = med
   -- a red disc just outside the rim, pulsing when they are low
-  f.crit = K.disc(med, G + 12, "BACKGROUND", 0)
-  f.crit:SetPoint("CENTER")
-  f.crit:SetColorTexture(1, 1, 1, 1)
-  f.crit:SetVertexColor(1, 0.16, 0.1, 0)
-  K.pulse(f.crit, 0.3, 0.85, 0.55)
   f.rim = K.disc(med, G, "BACKGROUND", 2)
   f.rim:SetPoint("CENTER")
   f.rim:SetColorTexture(unpack(RIM))
