@@ -52,6 +52,8 @@ function ns.showcase()
   local function shot()
     pcall(Screenshot)
   end
+  local NAMES = { UP = "Thrain", RIGHT = "Mirelle", DOWN = "Kesh", LEFT = "Brannoc" }
+  local before = ns.db.look
   local scenes = {
     function()
       ns.openOptions()
@@ -60,15 +62,24 @@ function ns.showcase()
       lift(ns.optionsPanel())
       UIParent:Hide()
       ns.previewSpell = spell
-      ns.stage = { sel = "RIGHT" }
       ns.preview(true)
     end,
-    shot,
-    function()
-      ns.stage = { sel = "UP", dispel = true }
-      ns.redraw()
-    end,
-    shot,
+  }
+  -- every look, aimed two ways: at a healthy one and at the one nearly down
+  for _, look in ipairs(ns.LOOKS) do
+    for _, sel in ipairs({ "RIGHT", "DOWN" }) do
+      table.insert(scenes, function()
+        ns.setLook(look)
+        ns.stage = { sel = sel, names = NAMES }
+        ns.redraw()
+      end)
+      table.insert(scenes, shot)
+    end
+  end
+  table.insert(scenes, function()
+    ns.setLook(before)
+  end)
+  local tail = {
     function()
       ns.stage = nil
       ns.preview(false)
@@ -89,6 +100,15 @@ function ns.showcase()
     end,
     shot,
   }
+  for _, fn in ipairs(tail) do
+    table.insert(scenes, fn)
+  end
+  local total = 0
+  for _, fn in ipairs(scenes) do
+    if fn == shot then
+      total = total + 1
+    end
+  end
   ns.say("taking screenshots… hands off for a few seconds.")
   local i = 0
   local function step()
@@ -96,7 +116,7 @@ function ns.showcase()
     local fn = scenes[i]
     if not fn then
       restore()
-      ns.say("done: " .. 5 .. " screenshots in your Screenshots folder.")
+      ns.say("done: " .. total .. " screenshots in your Screenshots folder.")
       return
     end
     local ok, err = pcall(fn)

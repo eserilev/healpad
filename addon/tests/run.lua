@@ -1457,11 +1457,13 @@ test("/hp test runs in the game: tabs, diamond, a hold, an aim, a cancel", funct
   clean(W)
 end)
 
-test("/hp shots page stages the diamond and each tab, takes 5 screenshots, puts the UI back", function()
+test("/hp shots page stages every look and each tab, takes 11 screenshots, puts everything back", function()
   local W, ns = game({ party = false })
+  local look = ns.db.look
   W.G.SlashCmdList.HEALPAD("shots page")
   W.runTimers()
-  eq(W.shots, 5, "screenshots")
+  eq(W.shots, 11, "screenshots")
+  eq(ns.db.look, look, "the look you had")
   eq(W.G.UIParent:IsShown(), true, "the UI is back")
   eq(ns.diamond.parent, W.G.UIParent, "the diamond is back on UIParent")
   eq(ns.diamond:IsShown(), false)

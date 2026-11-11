@@ -271,6 +271,16 @@ function ns.redraw()
         local okN, me = pcall(UnitName, "player")
         src.name = okN and me or src.name
       end
+      -- screenshots: the sample people get names
+      local named = ns.stage and ns.stage.names and ns.stage.names[from]
+      if named then
+        local copy = {}
+        for k, v in pairs(src) do
+          copy[k] = v
+        end
+        copy.name = named
+        src = copy
+      end
     else
       local unit = ctl:GetAttribute("u" .. page .. "-" .. from)
       if from == "SELF" and swap then
