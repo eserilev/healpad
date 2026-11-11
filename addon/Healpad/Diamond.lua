@@ -105,7 +105,7 @@ end
 
 -- Puts the saved look in place: built the first time, the old one hidden.
 local function applyLook()
-  local want = ns.looks[ns.db and ns.db.look] or ns.looks.medallions
+  local want = ns.looks[ns.db and ns.db.look] or ns.looks.classic
   if want == look then
     return
   end

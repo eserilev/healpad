@@ -66,7 +66,7 @@ local DEFAULTS = {
   cancel = "PAD2",
   x = 0,
   y = 0,
-  look = "medallions",
+  look = "classic",
 }
 
 function ns.setupDB()
@@ -79,9 +79,11 @@ function ns.setupDB()
       db[k] = v
     end
   end
-  if db.look == "glass" then
-    db.look = "classic" -- Glass became Classic
+  -- Glass became Classic; Classic took over from Medallions as the default
+  if db.look == "glass" or (db.look == "medallions" and not db.lookV) then
+    db.look = "classic"
   end
+  db.lookV = 1
   if ns.looks and not ns.looks[db.look] then
     db.look = DEFAULTS.look
   end
