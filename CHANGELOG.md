@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+- Buttons lists heals bound straight to a key or pad button (for example a heal on LB from the
+  game's controller settings), and heals in macros. Before, only action bar buttons showed.
+- /hp test also logs what every controller button is bound to.
+
 ## 0.2.0
 
 - Settings rebuilt: Buttons, Aim and Frames tabs, all usable with the pad.
