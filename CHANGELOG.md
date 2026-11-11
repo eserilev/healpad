@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.2
 
 - The game's Gamepad Mode: Buttons lists the controller bar (A, LT+A, RT+X, the d-pad...) with
   the spell each button casts on the page in front, and leaves out the action bars' keys, which
