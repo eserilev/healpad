@@ -1153,6 +1153,6 @@ end)
 
 ns.on("PLAYER_LOGIN", function()
   if next(ns.db.aim) == nil and next(ns.db.aimSpell) == nil and next(ns.db.aimPad) == nil then
-    ns.say("type /hp to choose which heals hold to aim.")
+    ns.say("type /hp to set up your heals.")
   end
 end)
