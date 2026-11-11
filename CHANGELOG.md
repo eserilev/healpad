@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.3
 
 - Gamepad Mode: the d-pad picks who to heal while you aim, even where the game's own controller
   bindings take the d-pad.
