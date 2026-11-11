@@ -208,7 +208,7 @@ local function tapPlace(page)
   elseif tap == "last" then
     unit = ctl:GetAttribute("last")
   elseif tap == "focus" then
-    unit = "focus"
+    unit = UnitExists("focus") and "focus" or "target"
   elseif tap == "target" then
     unit = "target"
   end

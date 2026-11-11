@@ -49,6 +49,14 @@ local function redButton(parent, w, h, label)
   return b
 end
 local function setChosen(b, on)
+  -- the chosen one is edged in gold
+  if on and not b.chosenEdge then
+    b.chosenEdge = ns.outline(b, b, 1, 2)
+    b.chosenEdge:SetColor(1, 0.82, 0, 1)
+  end
+  if b.chosenEdge then
+    b.chosenEdge:SetShown(on)
+  end
   if on then
     b:LockHighlight()
   else

@@ -16,6 +16,8 @@
   longer the outline). Out of range is faded and grey; dead shows a skull, offline a cable.
 - The menu slides open. Nothing flashes when a heal goes off.
 - Tap to heal has a new choice, Target: a tap heals your target when it's a friend, else you.
+- Tap to heal set to Focus heals your target when you have no friendly focus.
+- The chosen button in the settings is edged in gold.
 - Sigil: cleaner rune circle, no blurry glows, names clear of the middle.
 - The preview's heal-over-time icon no longer shows a question mark.
 - Size, Spread and Position work for every look.

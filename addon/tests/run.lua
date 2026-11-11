@@ -304,6 +304,10 @@ test("solo: a tap set to Focus heals your focus if it's a friend, else you; Tank
   W.units.focus = nil
   W.tap("PAD3")
   eq(last(W).unit, "player", "no focus: you")
+  W.units.target = { name = "Pal", hp = 1, max = 2, friendly = true }
+  W.tap("PAD3")
+  eq(last(W).unit, "target", "no focus: your friendly target")
+  W.units.target = nil
   W.tap("PAD1")
   eq(last(W).unit, "player", "no tank: you")
   clean(W)
@@ -921,6 +925,25 @@ test("KeyBars: its layers are listed; Healpad sits in its button and leaves the 
   W.key("1", false)
   eq(#W.casts, 2)
   clean(W)
+end)
+
+test("KeyBars: a tap set to Target heals your friendly target, alone and in a party", function()
+  for _, grouped in ipairs({ false, true }) do
+    local W = Wow.new()
+    setup(W)
+    if grouped then
+      party(W)
+    end
+    withKeyBars(W)
+    local ns = W.load(DIR, FILES, { aim = {}, aimSpell = { ["Healing Touch"] = { tap = "target" } } })
+    W.combat = true
+    W.units.target = { name = "Pal", hp = 1, max = 2, friendly = true }
+    W.key("1", true)
+    eq(ns.diamond:IsShown(), true)
+    W.key("1", false)
+    eq(last(W).unit, "target", grouped and "in a party" or "alone")
+    clean(W)
+  end
 end)
 
 test("KeyBars: Hold to Aim set in the settings reaches the button", function()

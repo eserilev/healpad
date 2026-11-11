@@ -94,7 +94,11 @@ local PICK = [[
     elseif tap == "tank" then
       unit = owner:GetAttribute("tank")
     elseif tap == "focus" then
+      -- no friendly focus: your target, if that's a friend
       unit = "focus"
+      if SecureCmdOptionParse("[@focus,help,nodead] yes; no") ~= "yes" then
+        unit = "target"
+      end
     elseif tap == "target" then
       unit = "target"
     end
