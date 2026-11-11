@@ -6,7 +6,6 @@ local K = ns.kit
 local look = ns.registerLook("glass", {})
 
 local W, H = 140, 28
-local AT = { UP = { 0, 68 }, RIGHT = { 170, 0 }, DOWN = { 0, -68 }, LEFT = { -170, 0 }, SELF = { 0, 0 } }
 local GOLD = { 1, 0.83, 0.35, 1 }
 
 local function makeBar(c)
@@ -96,16 +95,18 @@ function look.build(stage, fx)
 end
 
 function look.layout(spread)
-  local k = 1 + (spread - 3) * 0.12
+  -- the gaps grow with Spread; the bars never touch
+  local hx, vy = W + 16 + spread * 6, H + 14 + spread * 5
+  local off = { UP = { 0, vy }, RIGHT = { hx, 0 }, DOWN = { 0, -vy }, LEFT = { -hx, 0 }, SELF = { 0, 0 } }
   for d, f in pairs(look.spots) do
-    f.at = { AT[d][1] * k, AT[d][2] * k }
+    f.at = off[d]
     f:ClearAllPoints()
     f:SetPoint("CENTER", look.frame, "CENTER", f.at[1], f.at[2])
   end
   for d, ch in pairs(look.chevrons) do
     local v = K.DIR_VEC[d]
-    -- halfway out, between the middle bar's edge and the next bar
-    local reach = v[1] ~= 0 and (AT[d][1] * k * v[1] + W / 2) / 2 or (AT[d][2] * k * v[2] + H / 2) / 2 + 2
+    -- in the middle of the gap between the middle bar and the next one
+    local reach = v[1] ~= 0 and hx / 2 or vy / 2
     local mx, my = v[1] * reach, v[2] * reach
     local px, py = -v[2], v[1]
     local tipX, tipY = mx + v[1] * 3, my + v[2] * 3

@@ -38,6 +38,8 @@ local OPEN = [[
       tu = owner:GetAttribute("last")
     elseif tap == "focus" then
       tu = "focus"
+    elseif tap == "target" then
+      tu = "target"
     end
     local swap
     if tu and tu ~= "player" then
@@ -93,6 +95,8 @@ local PICK = [[
       unit = owner:GetAttribute("tank")
     elseif tap == "focus" then
       unit = "focus"
+    elseif tap == "target" then
+      unit = "target"
     end
     -- A tap only heals a friend who's alive: an enemy focus, or nobody
     -- there, and it's you.

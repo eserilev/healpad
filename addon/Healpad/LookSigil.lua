@@ -20,13 +20,12 @@ local function makeGem(c, dir)
   med:SetSize(G, G)
   med:SetPoint("CENTER")
   f.med = med
-  f.crit = K.glow(med, G + 56, "BACKGROUND", 0, 1, 0.25, 0.15, 0)
+  -- a red disc just outside the rim, pulsing when they are low
+  f.crit = K.disc(med, G + 12, "BACKGROUND", 0)
   f.crit:SetPoint("CENTER")
-  K.pulse(f.crit, 0.35, 1, 0.55)
-  if hub then
-    f.halo = K.glow(med, 140, "BACKGROUND", 1, 0.67, 0.76, 1, 1)
-    f.halo:SetPoint("CENTER")
-  end
+  f.crit:SetColorTexture(1, 1, 1, 1)
+  f.crit:SetVertexColor(1, 0.16, 0.1, 0)
+  K.pulse(f.crit, 0.3, 0.85, 0.55)
   f.rim = K.disc(med, G, "BACKGROUND", 2)
   f.rim:SetPoint("CENTER")
   f.rim:SetColorTexture(unpack(RIM))
@@ -63,8 +62,6 @@ local function makeGem(c, dir)
     f.icon:SetPoint("CENTER")
     f.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
   else
-    f.shine = K.glow(core, 84, "BORDER", 0, 1, 1, 1, 0.35)
-    f.shine:SetPoint("CENTER")
     f.edge = K.diamond(core, 34, "ARTWORK", 0)
     f.edge:SetPoint("CENTER")
     f.stone = K.diamond(core, 30, "ARTWORK", 1)
@@ -80,7 +77,7 @@ local function makeGem(c, dir)
   f.dispel = K.dispelPip(core, 13)
   f.dispel:SetPoint("TOPRIGHT", -6, -6)
   f.name = f.body:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  f.name:SetPoint("TOP", f, "BOTTOM", 0, -2)
+  f.name:SetPoint("TOP", f, "BOTTOM", 0, -14)
   f.name:SetWidth(140)
   f.name:SetWordWrap(false)
   f.entrance = K.entrance(f)
@@ -96,18 +93,20 @@ function look.build(stage, fx)
   -- points at the compass marks
   look.runes = CreateFrame("Frame", nil, c)
   look.runes:SetAllPoints()
-  look.outer = look.runes:CreateTexture(nil, "BACKGROUND", nil, 0)
-  look.outer:SetTexture(K.RING)
-  look.outer:SetBlendMode("ADD")
-  look.outer:SetVertexColor(0.55, 0.62, 1, 0.4)
-  look.outer:SetPoint("CENTER")
-  K.spin(look.outer, 60)
-  look.inner = look.runes:CreateTexture(nil, "BACKGROUND", nil, 1)
-  look.inner:SetTexture(K.RING)
-  look.inner:SetBlendMode("ADD")
-  look.inner:SetVertexColor(0.55, 0.62, 1, 0.28)
-  look.inner:SetPoint("CENTER")
-  K.spin(look.inner, 90, true)
+  -- two thin circles drawn as short lines: the outer whole, the inner dashed
+  look.circles = {}
+  for ci, n in ipairs({ 64, 40 }) do
+    local segs = {}
+    for i = 1, n do
+      if ci == 1 or i % 2 == 1 then
+        local l = look.runes:CreateLine(nil, "BACKGROUND", nil, 1)
+        l:SetThickness(ci == 1 and 1.5 or 1)
+        l:SetColorTexture(0.59, 0.67, 1, ci == 1 and 0.35 or 0.25)
+        segs[#segs + 1] = { l = l, i = i, n = n }
+      end
+    end
+    look.circles[ci] = segs
+  end
   look.dots = {}
   for i = 1, 40 do
     local t = look.runes:CreateTexture(nil, "BACKGROUND", nil, 2)
@@ -123,7 +122,7 @@ function look.build(stage, fx)
   end
   -- the beam: a soft wide band and a bright thread
   look.beam = {}
-  for i, w in ipairs({ 30, 4 }) do
+  for i, w in ipairs({ 10, 3 }) do
     local l = c:CreateLine(nil, "BACKGROUND", nil, 4 + i)
     l:SetThickness(w)
     l:SetColorTexture(0.63, 0.75, 1, i == 1 and 0.3 or 0.75)
@@ -165,8 +164,15 @@ function look.layout(spread)
     f:SetPoint("CENTER", look.frame, "CENTER", f.at[1], f.at[2])
   end
   local ring = r + 34
-  look.outer:SetSize(ring * 2 + 12, ring * 2 + 12)
-  look.inner:SetSize(r * 1.3, r * 1.3)
+  for ci, segs in ipairs(look.circles) do
+    local cr = ci == 1 and ring - 10 or r * 0.62
+    for _, sg in ipairs(segs) do
+      local a1 = (sg.i - 1) / sg.n * 2 * math.pi
+      local a2 = sg.i / sg.n * 2 * math.pi
+      sg.l:SetStartPoint("CENTER", look.runes, cr * math.sin(a1), cr * math.cos(a1))
+      sg.l:SetEndPoint("CENTER", look.runes, cr * math.sin(a2), cr * math.cos(a2))
+    end
+  end
   for i, t in ipairs(look.dots) do
     local a = (i - 1) / #look.dots * 2 * math.pi
     t:ClearAllPoints()
@@ -194,7 +200,6 @@ function look.draw(f, src, ctx)
   if f.stone then
     local r, g, b = K.classColor(src)
     f.stone:SetVertexColor(r, g, b, 1)
-    f.shine:SetVertexColor(r, g, b, f.shine.on and 0.9 or 0.35)
     pcall(f.stone.SetDesaturated, f.stone, f.dim)
   end
 end
@@ -209,11 +214,9 @@ function look.aim(sel)
     f.rim:SetColorTexture(unpack(on and RIM_ON or RIM))
     f.name:SetTextColor(unpack(f.dim and NAME_FAR or (on and NAME_ON or NAME)))
     if f.edge then
-      f.shine.on = on
       f.edge:SetVertexColor(on and 1 or 0.54, on and 0.88 or 0.45, on and 0.48 or 0.25, 1)
     end
   end
-  look.spots.SELF.halo:SetAlpha(sel == "SELF" and 1 or 0.2)
   for _, l in ipairs(look.beam) do
     K.fadeTo(l, sel == "SELF" and 0 or 1, 0.15)
   end

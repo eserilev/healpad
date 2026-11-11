@@ -736,7 +736,7 @@ local function buildButtonsTab(parent)
   tapLabel:SetText("Tap to heal")
   tapLabel:SetPoint("TOPLEFT")
   d.taps = {}
-  local tw = (detailW - 18) / 4
+  local tw = (detailW - 24) / #ns.TAPS
   for i, tap in ipairs(ns.TAPS) do
     local b = redButton(d.tapBox, tw, 28, ns.TAP_LABEL[tap])
     b:SetPoint("TOPLEFT", (i - 1) * (tw + 6), -20)

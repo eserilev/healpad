@@ -277,6 +277,21 @@ test("tap heals the tank: the tank sits in the middle, you in the tank's place",
   clean(W)
 end)
 
+test("a tap set to Target heals your target if it's a friend, else you", function()
+  local W = game({ party = false, saved = { aim = { PAD3 = { tap = "target" } } } })
+  W.combat = true
+  W.units.target = { name = "Pal", hp = 1, max = 2, friendly = true }
+  W.tap("PAD3")
+  eq(last(W).unit, "target", "a friendly target")
+  W.units.target = { name = "Wolf", hp = 1, max = 2, friendly = false }
+  W.tap("PAD3")
+  eq(last(W).unit, "player", "an enemy target: you")
+  W.units.target = nil
+  W.tap("PAD3")
+  eq(last(W).unit, "player", "no target: you")
+  clean(W)
+end)
+
 test("solo: a tap set to Focus heals your focus if it's a friend, else you; Tank and Last healed heal you", function()
   local W = game({ party = false, saved = { aim = { PAD3 = { tap = "focus" }, PAD1 = { tap = "tank" } } } })
   W.combat = true
@@ -783,6 +798,7 @@ test("settings: pad drives the tabs; A sets Hold to Aim; nav keys go back on clo
   eq(ns.heals[1]:GetAttribute("hp-key"), "PAD3")
   W.tap("PADDRIGHT")
   W.tap("PADDDOWN")
+  W.tap("PADDRIGHT")
   W.tap("PADDRIGHT")
   W.tap("PADDRIGHT")
   W.tap("PAD1")

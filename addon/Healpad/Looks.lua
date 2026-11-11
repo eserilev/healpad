@@ -57,8 +57,8 @@ K.POINTS = {
   crit = {
     { 0, 1, 0.16, 0.1, 1 },
     { 0.25, 1, 0.16, 0.1, 1 },
-    { 0.2501, 1, 0.16, 0.1, 0 },
-    { 1, 1, 0.16, 0.1, 0 },
+    { 0.2501, 0, 0, 0, 0 },
+    { 1, 0, 0, 0, 0 },
   },
   -- the Compass's missing health: red, brown, ink, gone at full health
   miss = {
@@ -303,7 +303,8 @@ function K.hot(pip, src)
   end
   pip:SetShown(src.hot == true)
   if src.hot then
-    pip.icon:SetTexture(ns.spellIcon(ns.previewSpell))
+    local icon = ns.previewSpell and ns.spellIcon(ns.previewSpell)
+    pip.icon:SetTexture((icon and icon ~= 134400) and icon or "Interface\\Icons\\Spell_Holy_Renew")
   end
 end
 

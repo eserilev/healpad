@@ -209,6 +209,8 @@ local function tapPlace(page)
     unit = ctl:GetAttribute("last")
   elseif tap == "focus" then
     unit = "focus"
+  elseif tap == "target" then
+    unit = "target"
   end
   if unit and UnitExists(unit) then
     for _, d in ipairs(ns.DIRS) do
@@ -293,20 +295,6 @@ function ns.redraw()
   end
 end
 
--- A heal went out: the look marks the person it went to.
-local function showCast(unit)
-  if not look then
-    return
-  end
-  local at = "SELF"
-  for d, u in pairs(drawn) do
-    if u == unit then
-      at = d
-    end
-  end
-  run(look.cast, at, lastSpell and ns.spellName(lastSpell) or "")
-end
-
 -- Health, auras and the like come as events; range has none, so a slow tick
 -- looks again while the menu is up.
 local ticker = CreateFrame("Frame")
@@ -359,11 +347,6 @@ ctl:HookScript("OnAttributeChanged", function(_, name, value)
   if name == "state" then
     root:SetShown(value == "aim" or previewing)
     ns.redraw()
-  elseif name == "castn" then
-    local unit = ctl:GetAttribute("castunit")
-    if unit then
-      showCast(unit)
-    end
   elseif name == "sel" or name == "page" then
     ns.redraw()
   end
