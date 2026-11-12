@@ -140,6 +140,8 @@ globals:
     any: true
   UISpecialFrames:
     any: true
+  UNKNOWNOBJECT:
+    any: true
   UnitClass:
     any: true
   UnitExists:

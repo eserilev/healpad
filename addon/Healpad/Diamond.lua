@@ -341,7 +341,9 @@ function ns.redraw()
   local pages = ctl:GetAttribute("pages") or 1
   local sample = previewing and ctl:GetAttribute("state") ~= "aim" and (not IsInGroup() or ns.stage ~= nil)
   local held = ctl:GetAttribute("state") == "aim"
-  local sel = (ns.stage and ns.stage.sel) or ctl:GetAttribute("sel") or tapPlace(page, sample)
+  -- Who sits where (Game): the tap target in the middle, you in their place.
+  local swap = page == 1 and ctl:GetAttribute("swap") or nil
+  local sel = (ns.stage and ns.stage.sel) or ctl:GetAttribute("sel") or (swap and "SELF") or tapPlace(page, sample)
   if ns.plusOn() and not held and not previewing and not ns.stage then
     sel = nil -- the plus at rest: nobody lit, nobody dimmed
   end
@@ -354,6 +356,11 @@ function ns.redraw()
   local ctx = { spell = spell, sel = sel }
   for _, d in ipairs(ns.DIRS) do
     local from = d
+    if swap and d == "SELF" then
+      from = swap
+    elseif swap and d == swap then
+      from = "SELF"
+    end
     local src
     drawn[d] = nil
     if sample and SAMPLE[from] then
@@ -376,6 +383,9 @@ function ns.redraw()
       end
     else
       local unit = ctl:GetAttribute("u" .. page .. "-" .. from)
+      if from == "SELF" and swap then
+        unit = "player"
+      end
       if unit and UnitExists(unit) then
         src = { kind = "unit", unit = unit }
         drawn[d] = unit

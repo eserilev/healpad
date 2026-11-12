@@ -909,7 +909,13 @@ function M.new()
       end
     end,
   })
+  -- "Unknown" until the game has a member's data (x.unknown).
+  G.UNKNOWNOBJECT = "Unknown"
   G.GetUnitName = function(u)
+    local x = W.units[u]
+    if x and x.unknown then
+      return G.UNKNOWNOBJECT
+    end
     return G.UnitName(u)
   end
   G.UnitExists = function(u)

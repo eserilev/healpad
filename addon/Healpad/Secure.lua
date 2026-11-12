@@ -29,6 +29,29 @@ local OPEN = [[
       return false
     end
     owner:SetAttribute("held", name)
+    -- The menu shown only while you hold (Party Frames: Game): the middle is
+    -- whoever a tap heals; when that's someone in it, they trade places with
+    -- you for this hold. Seats that belong to people (Plus) never move.
+    local swap
+    if not owner:GetAttribute("personseats") then
+      local tu
+      if tap == "tank" then
+        tu = owner:GetAttribute("tank")
+      elseif tap == "last" then
+        tu = owner:GetAttribute("last")
+      elseif tap == "focus" then
+        tu = "focus"
+      elseif tap == "target" then
+        tu = "target"
+      end
+      if tu and tu ~= "player" then
+        if owner:GetAttribute("u1-UP") == tu then swap = "UP"
+        elseif owner:GetAttribute("u1-RIGHT") == tu then swap = "RIGHT"
+        elseif owner:GetAttribute("u1-DOWN") == tu then swap = "DOWN"
+        elseif owner:GetAttribute("u1-LEFT") == tu then swap = "LEFT" end
+      end
+    end
+    owner:SetAttribute("swap", swap)
     owner:SetAttribute("sel", nil)
     owner:SetAttribute("page", 1)
     owner:ClearBindings()
@@ -93,7 +116,19 @@ local CAST_NOTE = [[
 local PICK = [[
   local unit
   local sel = owner:GetAttribute("sel")
-  if sel then
+  local swap = owner:GetAttribute("swap")
+  owner:SetAttribute("swap", nil)
+  if sel and swap and (owner:GetAttribute("page") or 1) == 1 then
+    if sel == swap then
+      sel = nil
+      unit = "player"
+    elseif sel == "SELF" then
+      sel = nil
+    end
+  end
+  if unit then
+    -- you, from your traded place
+  elseif sel then
     unit = owner:GetAttribute("u" .. (owner:GetAttribute("page") or 1) .. "-" .. sel)
   else
 ]] .. TAP_UNIT .. [[
@@ -469,6 +504,7 @@ local RESET = [[
   c:ClearBindings()
   c:SetAttribute("held", nil)
   c:SetAttribute("sel", nil)
+  c:SetAttribute("swap", nil)
   c:SetAttribute("armtap", nil)
   c:SetAttribute("grp", nil)
   c:SetAttribute("grpkey", nil)
@@ -777,10 +813,16 @@ function ns.applyRoster()
     local seats, mine = ns.buildSeats(members, seatNames)
     seatNames = ns.seatNames(seats)
     local order = ns.pageGroups(seats, mine)
-    local pages = {}
-    if solo then
-      -- alone: only you; in today's menu your target sits up
-      pages[1] = { SELF = "player", UP = not ns.plusOn() and not ns.isButtons() and "target" or nil }
+    -- Plus and Buttons: seats that belong to people; the menu while held
+    -- (Game): as it always was, by role, with unit tokens, the tap's person
+    -- trading places with you.
+    local person = ns.plusOn() or ns.isButtons()
+    ctl:SetAttribute("personseats", person or nil)
+    local pages, tankUnit = {}, nil
+    if not person then
+      pages, tankUnit = ns.buildPages(members, solo)
+    elseif solo then
+      pages[1] = { SELF = "player" }
     else
       for p, g in ipairs(order) do
         local page = {}
@@ -790,6 +832,8 @@ function ns.applyRoster()
         end
         pages[p] = page
       end
+      local tank = ns.findTank(members)
+      tankUnit = tank and ns.seatUnit(tank) or nil
     end
     for p = 1, 8 do
       for _, d in ipairs(ns.DIRS) do
@@ -797,8 +841,7 @@ function ns.applyRoster()
       end
     end
     ctl:SetAttribute("pages", #pages)
-    local tank = ns.findTank(members)
-    ctl:SetAttribute("tank", tank and ns.seatUnit(tank) or nil)
+    ctl:SetAttribute("tank", tankUnit)
     -- Buttons: the party's rows, and every group's rows in a raid
     local raid = IsInRaid()
     local own = solo and { "player" } or {}
@@ -1064,6 +1107,12 @@ ns.on("PLAYER_LOGIN", function()
   end
 end)
 ns.on("GROUP_ROSTER_UPDATE", ns.applyRoster)
+-- A member's name arrives late ("Unknown" until then): seat them by it.
+ns.on("UNIT_NAME_UPDATE", function(unit)
+  if type(unit) == "string" and (unit:match("^party%d$") or unit:match("^raid%d+$")) then
+    ns.applyRoster()
+  end
+end)
 ns.on("PLAYER_ROLES_ASSIGNED", ns.applyRoster)
 ns.on("PLAYER_REGEN_ENABLED", ns.applyRoster)
 for _, e in ipairs({

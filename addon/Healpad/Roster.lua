@@ -1,4 +1,11 @@
--- Who sits where. A seat belongs to a person: it is handed out out of combat,
+-- Who sits where.
+--
+-- The menu that shows only while you hold a heal (Radial, Party Frames:
+-- Game) is as it always was: tank up, you in the middle, the others by role
+-- and name, by unit token, rebuilt out of combat (ns.buildPages).
+--
+-- The frames that stay on screen (Plus, Buttons) seat people instead: a
+-- seat belongs to a person: it is handed out out of combat,
 -- in the game's party (or raid) order, and kept. Someone who leaves frees
 -- their seat and nobody else moves; someone new takes a free seat. Nothing
 -- moves in combat: a seat whose person left goes dark until the fight ends.
@@ -21,7 +28,9 @@ ns.SEAT_BY_NAME = true
 ns.SEAT_DIRS = { "SELF", "UP", "RIGHT", "DOWN", "LEFT" }
 ns.SEAT_OF_DIR = { SELF = 1, UP = 2, RIGHT = 3, DOWN = 4, LEFT = 5 }
 
--- What a seat's secure attributes hold for a member.
+-- What a seat's secure attributes hold for a member: you are "player";
+-- someone whose name the game doesn't know yet ("Unknown"), or whose name
+-- another member shares, keeps the unit token.
 function ns.seatUnit(m)
   if m.me then
     return "player"
@@ -32,8 +41,79 @@ function ns.seatUnit(m)
   return m.unit
 end
 
+---------------------------------------------------------------- the menu while held
+
+local ROLE_ORDER = { TANK = 1, HEALER = 2, DAMAGER = 3, NONE = 4 }
+local AROUND = { "UP", "RIGHT", "DOWN", "LEFT" }
+
+local function before(a, b)
+  local ra, rb = ROLE_ORDER[a.role] or 4, ROLE_ORDER[b.role] or 4
+  if ra ~= rb then
+    return ra < rb
+  end
+  local na, nb = a.name or a.unit, b.name or b.unit
+  if na ~= nb then
+    return na < nb
+  end
+  return a.unit < b.unit
+end
+
+-- members: { unit, role, name, group, me } for everyone in the group.
+-- Returns pages { [dir] = unit token }, and the first tank's unit or nil.
+function ns.buildPages(members, solo)
+  if solo then
+    return { { UP = "target", SELF = "player" } }, nil
+  end
+  local groups, mine = {}, nil
+  local tank
+  for _, m in ipairs(members) do
+    local g = m.group or 1
+    groups[g] = groups[g] or {}
+    table.insert(groups[g], m)
+    if m.me then
+      mine = g
+    end
+    if m.role == "TANK" and not m.me and (not tank or before(m, tank)) then
+      tank = m
+    end
+  end
+  local order = {}
+  if mine then
+    table.insert(order, mine)
+  end
+  for g = 1, 8 do
+    if groups[g] and g ~= mine then
+      table.insert(order, g)
+    end
+  end
+  local pages = {}
+  for _, g in ipairs(order) do
+    local list, page = {}, {}
+    for _, m in ipairs(groups[g]) do
+      if m.me then
+        page.SELF = m.unit
+      else
+        table.insert(list, m)
+      end
+    end
+    table.sort(list, before)
+    for i, m in ipairs(list) do
+      local dir = AROUND[i] or (not page.SELF and "SELF")
+      if dir then
+        page[dir] = m.unit
+      end
+    end
+    table.insert(pages, page)
+  end
+  return pages, tank and tank.unit
+end
+
+---------------------------------------------------------------- seats that belong to people
+
 -- members: { unit, name, group, me, role } in the game's order.
--- prev: the last seats, { [group] = { [seat] = name } } (or nil).
+-- prev: the last seats, { [group] = { [seat] = { name, unit } } } (or nil):
+-- a member keeps a seat by name, or by unit token while the game didn't
+-- know their name.
 -- Returns seats { [group] = { [seat] = member } } and your group.
 function ns.buildSeats(members, prev)
   prev = prev or {}
@@ -57,10 +137,11 @@ function ns.buildSeats(members, prev)
     end
     local was = prev[g] or {}
     for i = 1, 5 do
-      local name = was[i]
-      if name and not res[i] then
+      local w = was[i]
+      if w and not res[i] then
         for _, m in ipairs(list) do
-          if not placed[m] and m.name == name then
+          local same = (w.name and m.name == w.name) or (not w.name and m.unit == w.unit)
+          if not placed[m] and same then
             res[i] = m
             placed[m] = true
             break
@@ -84,13 +165,13 @@ function ns.buildSeats(members, prev)
   return seats, mine
 end
 
--- The names in seats, to keep them next time.
+-- Who is in each seat, to keep them there next time.
 function ns.seatNames(seats)
   local out = {}
   for g, res in pairs(seats) do
     out[g] = {}
     for i, m in pairs(res) do
-      out[g][i] = m.name
+      out[g][i] = { name = m.name, unit = m.unit }
     end
   end
   return out
@@ -134,14 +215,31 @@ local function role(unit)
   return "NONE"
 end
 
--- The full name ("Name" or "Name-Realm"); nil when the game can't say.
+-- The full name ("Name" or "Name-Realm"); nil when the game can't say yet
+-- (it says "Unknown" until it has the member's data).
 local function name(unit)
   local ok, n = pcall(function()
     return GetUnitName(unit, true) .. ""
   end)
-  if ok and n ~= "" then
+  if ok and n ~= "" and n ~= UNKNOWNOBJECT and n ~= "Unknown" then
     return n
   end
+end
+
+-- No two members share a name as a seat's unit: both keep their tokens.
+local function unshare(members)
+  local count = {}
+  for _, m in ipairs(members) do
+    if m.name then
+      count[m.name] = (count[m.name] or 0) + 1
+    end
+  end
+  for _, m in ipairs(members) do
+    if m.name and count[m.name] > 1 then
+      m.name = nil
+    end
+  end
+  return members
 end
 
 -- The members of the player's group as the game reports them now, and
@@ -157,7 +255,7 @@ function ns.readRoster()
         { unit = unit, role = role(unit), name = name(unit), group = group or 1, me = UnitIsUnit(unit, "player") }
       )
     end
-    return members, false
+    return unshare(members), false
   end
   if IsInGroup() then
     table.insert(members, { unit = "player", role = role("player"), name = name("player"), group = 1, me = true })
@@ -167,7 +265,7 @@ function ns.readRoster()
         table.insert(members, { unit = unit, role = role(unit), name = name(unit), group = 1 })
       end
     end
-    return members, false
+    return unshare(members), false
   end
   return members, true
 end
