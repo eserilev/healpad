@@ -52,6 +52,7 @@ function M.new()
     downTarget = {},
     frames = {},
     fontStrings = {},
+    textures = {},
     mods = { shift = false, ctrl = false, alt = false },
     units = {},
     raid = nil,
@@ -151,6 +152,9 @@ function M.new()
   end
   function Frame:SetTexture(t)
     self.texture = t
+  end
+  function Frame:SetAtlas(a)
+    self.atlas = a
   end
   function Frame:SetFormattedText(fmt, ...)
     local args = {}
@@ -286,7 +290,9 @@ function M.new()
     return fs
   end
   function Frame:CreateTexture()
-    return newRegion(self)
+    local t = newRegion(self)
+    table.insert(W.textures, t)
+    return t
   end
   function Frame:SetScript(name, fn)
     self.scripts[name] = fn

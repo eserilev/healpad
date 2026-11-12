@@ -823,6 +823,9 @@ function ns.applyRoster()
     if ns.redraw then
       ns.redraw()
     end
+    if ns.redrawGrid then
+      ns.redrawGrid()
+    end
   end)
 end
 

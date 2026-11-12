@@ -14,6 +14,7 @@ local FILES = {
   "LookClassic.lua",
   "Diamond.lua",
   "Seats.lua",
+  "Grid.lua",
   "Options.lua",
   "Test.lua",
   "Probe.lua",
@@ -1976,6 +1977,99 @@ local function buttons(opts)
   local ns = W.load(DIR, FILES, saved)
   return W, ns
 end
+
+test("Buttons frames: a column of five; a tapped heal lights them gold with each row's button", function()
+  local W = Wow.new()
+  setup(W)
+  party(W)
+  local pf, raidFrames = gameFrames(W)
+  local ns = W.load(DIR, FILES, { mode = "buttons", aim = { PAD3 = { tap = "player" } } })
+  local cells = ns.gridCells
+  eq(ns.grid:IsShown(), true, "Buttons draws its frames")
+  eq(ns.diamond:IsShown(), false, "no plus")
+  eq(pf:GetParent(), W.G.HealpadHiddenFrames, "the game's party frames away")
+  eq(raidFrames:GetParent(), W.G.HealpadHiddenFrames, "and its raid frames")
+  W.update(0.6)
+  eq(cells[1][1].name.text, "Me", "row 1: you")
+  eq(cells[1][2].name.text, "Brakka")
+  eq(cells[1][5].name.text, "Zed")
+  eq(cells[2][1]:IsShown(), false, "one column in a party")
+  eq(ns.gridHeads[1]:IsShown(), false, "no group heads in a party")
+  eq(cells[1][2].label:IsShown(), false, "no labels at rest")
+  eq(cells[1][2].gold:IsShown(), false)
+  local seat = W.G.HealpadGridSeat1x2
+  eq(seat:GetAttribute("unit"), "Brakka", "the seat button is the person")
+  eq(seat:GetAttribute("*type1"), "target")
+  eq(seat:GetAttribute("*type2"), "togglemenu")
+  eq(W.G.ClickCastFrames[seat], true)
+  W.combat = true
+  W.tap("PAD3")
+  eq(cells[1][2].label.text, "B", "row 2's button")
+  eq(cells[1][5].label.text, "Down", "row 5: d-pad down")
+  eq(cells[1][2].gold:IsShown(), true, "lit gold")
+  local title
+  for _, fs in ipairs(W.fontStrings) do
+    if fs.text == "Healing Touch (Rank 2)" and under(fs, ns.grid) then
+      title = fs
+    end
+  end
+  eq(title ~= nil, true, "the heal's name above the frames")
+  for r = 1, 5 do
+    local f = cells[1][r]
+    eq(f.name.width + f.label:GetStringWidth() + 6 <= 132, true, "name and label fit, row " .. r)
+  end
+  W.tap("PAD2")
+  eq(cells[1][2].label:IsShown(), false, "the labels go after the heal")
+  eq(cells[1][2].gold:IsShown(), false)
+  W.combat = false
+  ns.db.mode = "radial"
+  ns.applyMode()
+  eq(ns.grid:IsShown(), false)
+  eq(W.G.HealpadGridSeats:IsShown(), false)
+  eq(pf:GetParent(), W.G.UIParent, "the game's frames back")
+  eq(raidFrames:GetParent(), W.G.UIParent)
+  clean(W)
+end)
+
+test("Buttons frames: a raid's eight groups; Full and Row labels; a held group lit, the rest dim; Locked", function()
+  local W, ns = buttons({ raid = true, after = "locked" })
+  local cells, heads = ns.gridCells, ns.gridHeads
+  W.update(0.6)
+  for g = 1, 8 do
+    eq(heads[g]:IsShown(), true, "group " .. g .. " always there")
+    eq(cells[g][1]:IsShown(), true)
+  end
+  eq(cells[2][1].name.text, "Rusk")
+  eq(cells[5][1].name.text, "", "an empty place")
+  W.combat = true
+  W.tap("PAD3")
+  eq(cells[1][1].label.text, "LB + A", "Full: the whole combo")
+  eq(cells[5][5].label.text, "Up + Start")
+  eq(cells[3][2].label.text, "LT + B")
+  W.key("PADRSHOULDER", true)
+  eq(heads[2].num.textColor[2], 0.82, "the held group's head in gold")
+  eq(cells[1][1]:GetAlpha(), 0.55, "other groups dim")
+  eq(cells[2][1]:GetAlpha(), 1)
+  W.key("PADRSHOULDER", false)
+  eq(cells[1][1]:GetAlpha(), 1)
+  local lock
+  for _, t in ipairs(W.textures) do
+    if t.atlas == "AdventureMapIcon-Lock" then
+      lock = t
+    end
+  end
+  eq(lock:IsShown(), true, "Locked: the lock beside the heal's name")
+  W.tap("PADBACK")
+  eq(lock:IsShown(), false)
+  W.combat = false
+  ns.db.labels = "row"
+  W.combat = true
+  W.tap("PAD3")
+  eq(cells[1][1].label.text, "A", "Row: just the row")
+  eq(cells[5][5].label.text, "Start")
+  W.tap("PADBACK")
+  clean(W)
+end)
 
 test("Buttons: a tap of a heal waits; the next press is the person; Once clears", function()
   local W, ns = buttons()

@@ -276,6 +276,30 @@ local function padGlyph(base)
   end
 end
 
+-- A controller button as the game draws it for the controller in use (its
+-- own button art: Xbox, PlayStation or Switch), as text markup at size;
+-- the button's short name when the game has no art for it.
+local SHORT = {
+  PADDUP = "Up",
+  PADDRIGHT = "Right",
+  PADDDOWN = "Down",
+  PADDLEFT = "Left",
+  PADFORWARD = "Start",
+  PADBACK = "Back",
+  PADLSTICK = "L3",
+  PADRSTICK = "R3",
+}
+function ns.padIcon(key, size)
+  size = size or 16
+  local ok, atlas = pcall(function()
+    return InputIconTextureSetUtility.GetNormalActiveInputIconButtonTexture(key)
+  end)
+  if ok and type(atlas) == "string" and atlas ~= "" then
+    return string.format("|A:%s:%d:%d|a", atlas, size, size)
+  end
+  return padGlyph(key) or SHORT[key] or PAD[key] or key
+end
+
 function ns.keyLabel(key)
   if not key then
     return ""

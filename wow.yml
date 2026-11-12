@@ -84,6 +84,8 @@ globals:
     any: true
   InCombatLockdown:
     any: true
+  InputIconTextureSetUtility:
+    any: true
   IsInGroup:
     any: true
   IsInRaid:

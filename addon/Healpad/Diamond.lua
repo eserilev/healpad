@@ -100,14 +100,20 @@ local function grabbable()
   end
 end
 function ns.showMoving(on)
-  moving = on == true
+  moving = on == true and not ns.isButtons()
   box:SetShown(moving)
   grabbable()
+  if ns.gridMoving then
+    ns.gridMoving(on == true)
+  end
 end
 
 -- Where the menu is on the screen, in UIParent's units: left, right, top,
 -- bottom; nil when the game can't tell yet.
 function ns.menuBox()
+  if ns.isButtons() and ns.gridBox then
+    return ns.gridBox()
+  end
   local ok, l, r, t, b = pcall(function()
     return bounds:GetLeft(), bounds:GetRight(), bounds:GetTop(), bounds:GetBottom()
   end)
@@ -225,6 +231,9 @@ function ns.layout()
   if look then
     look.layout(ns.db and ns.db.spacing or 1)
   end
+  if ns.layoutGrid then
+    ns.layoutGrid()
+  end
   if ns.placeSeats then
     ns.placeSeats()
   end
@@ -233,6 +242,9 @@ end
 -- Whether the menu shows now: always with the plus, while you hold a heal,
 -- or as the settings' preview.
 local function wanted()
+  if ns.isButtons() then
+    return false -- Buttons draws its own frames (Grid.lua)
+  end
   return previewing or ns.plusOn() or ctl:GetAttribute("state") == "aim"
 end
 
