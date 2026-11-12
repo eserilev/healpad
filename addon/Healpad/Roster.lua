@@ -269,3 +269,64 @@ function ns.readRoster()
   end
   return members, true
 end
+
+---------------------------------------------------------------- drawing by token
+
+-- The secure seats name people; what is drawn reads them through their
+-- unit token now (the game's aura and unit reads take tokens), kept up to
+-- date as the roster changes, in combat too: addon code only reads.
+local tokenOf = {}
+
+local function plainName(unit)
+  local ok, n = pcall(GetUnitName, unit, true)
+  if not ok or type(n) ~= "string" then
+    return nil
+  end
+  if issecretvalue then
+    local okS, s = pcall(issecretvalue, n)
+    if not okS or s then
+      return nil
+    end
+  end
+  return n
+end
+
+function ns.mapTokens()
+  local fresh = {}
+  local list = {}
+  if IsInRaid() then
+    for i = 1, 40 do
+      list[#list + 1] = "raid" .. i
+    end
+  else
+    for i = 1, 4 do
+      list[#list + 1] = "party" .. i
+    end
+  end
+  for _, u in ipairs(list) do
+    if UnitExists(u) then
+      local n = plainName(u)
+      if n then
+        fresh[n] = u
+      end
+    end
+  end
+  tokenOf = fresh
+end
+
+local TOKEN = { player = true, target = true, focus = true }
+-- The unit token to draw a seat's unit with: tokens as they are, a name as
+-- that person's token now; nil when they're gone.
+function ns.displayUnit(unit)
+  if type(unit) ~= "string" then
+    return nil
+  end
+  if TOKEN[unit] or unit:match("^party%d$") or unit:match("^raid%d+$") then
+    return unit
+  end
+  return tokenOf[unit]
+end
+
+ns.on("GROUP_ROSTER_UPDATE", ns.mapTokens)
+ns.on("UNIT_NAME_UPDATE", ns.mapTokens)
+ns.on("PLAYER_LOGIN", ns.mapTokens)

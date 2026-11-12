@@ -810,6 +810,7 @@ local seatNames
 function ns.applyRoster()
   ns.afterCombat("roster", function()
     local members, solo = ns.readRoster()
+    ns.mapTokens()
     local seats, mine = ns.buildSeats(members, seatNames)
     seatNames = ns.seatNames(seats)
     local order = ns.pageGroups(seats, mine)

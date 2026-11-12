@@ -309,7 +309,8 @@ local function tapPlace(page, sample)
   if unit and UnitExists(unit) then
     for _, d in ipairs(ns.DIRS) do
       local u = ctl:GetAttribute("u" .. page .. "-" .. d)
-      if u and (u == unit or UnitIsUnit(u, unit)) then
+      local shown = ns.displayUnit(u)
+      if u and (u == unit or (shown and UnitIsUnit(shown, unit))) then
         return d
       end
     end
@@ -386,9 +387,10 @@ function ns.redraw()
       if from == "SELF" and swap then
         unit = "player"
       end
-      if unit and UnitExists(unit) then
-        src = { kind = "unit", unit = unit }
-        drawn[d] = unit
+      local shown = ns.displayUnit(unit)
+      if shown and UnitExists(shown) then
+        src = { kind = "unit", unit = shown }
+        drawn[d] = shown
       elseif unit == "target" then
         src = { kind = "empty", name = "Target" }
       elseif unit then

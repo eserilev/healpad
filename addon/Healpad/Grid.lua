@@ -332,8 +332,9 @@ function ns.redrawGrid()
         end
       elseif inUse then
         local unit = unitAt(raid, g, r)
-        if unit and UnitExists(unit) then
-          src = { kind = "unit", unit = unit }
+        local token = ns.displayUnit(unit)
+        if token and UnitExists(token) then
+          src = { kind = "unit", unit = token }
         elseif unit or raid then
           -- an empty place in a raid's group, or someone gone mid-fight
           src = { kind = "empty", name = (unit and ns.SEAT_BY_NAME) and unit or "" }

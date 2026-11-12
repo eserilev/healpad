@@ -1113,6 +1113,18 @@ function M.new()
       if W.aurasRefused and W.combat then
         error("auras are hidden in combat")
       end
+      -- UnitTokenRestrictedForAddOns: a token, never a name
+      if
+        not (
+          unit == "player"
+          or unit == "target"
+          or unit == "focus"
+          or unit:match("^party%d$")
+          or unit:match("^raid%d+$")
+        )
+      then
+        error("bad unit: " .. tostring(unit))
+      end
       local x = W.units[unit]
       if not x then
         return nil

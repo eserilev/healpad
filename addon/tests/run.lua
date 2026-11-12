@@ -2154,6 +2154,27 @@ test("Plus: two members with one name keep their units", function()
   clean(W)
 end)
 
+test("Plus: frames read people through their unit token, which follows them in combat", function()
+  local W, ns = plusGame()
+  W.units.party3.debuff = "Magic" -- Ann, down
+  W.update(0.6)
+  eq(ns.spots.UP.face.portrait, "party1", "drawn by token")
+  eq(ns.spots.DOWN.edge:IsShown(), true, "auras read by token")
+  W.combat = true
+  -- Kira leaves; the game renumbers: Ann is party2 now, Zed party3
+  W.units.party2, W.units.party3, W.units.party4 = W.units.party3, W.units.party4, nil
+  W.fire("GROUP_ROSTER_UPDATE")
+  W.update(0.6)
+  eq(W.G.HealpadPlusSeatDOWN:GetAttribute("unit"), "Ann", "the seat button still names Ann")
+  eq(ns.spots.DOWN.face.portrait, "party2", "Ann drawn through her new token")
+  eq(ns.spots.DOWN.name.text, "Ann")
+  eq(ns.spots.DOWN.edge:IsShown(), true, "her debuff still hers")
+  eq(ns.spots.LEFT.name.text, "Zed")
+  eq(ns.spots.RIGHT.body.alpha, 0.45, "Kira's seat dark")
+  W.combat = false
+  clean(W)
+end)
+
 test("Plus: alone, only you", function()
   local W = Wow.new()
   setup(W)
