@@ -58,6 +58,8 @@ globals:
     any: true
   GetCursorPosition:
     any: true
+  GetCVar:
+    any: true
   geterrorhandler:
     any: true
   GetMacroSpell:
@@ -73,6 +75,8 @@ globals:
   GetRaidRosterInfo:
     any: true
   GetTime:
+    any: true
+  GetUnitName:
     any: true
   HealpadDB:
     any: true
@@ -140,6 +144,8 @@ globals:
     any: true
   UnitGroupRolesAssigned:
     any: true
+  UnitHasIncomingResurrection:
+    any: true
   UnitHealth:
     any: true
   UnitHealthMax:
@@ -163,6 +169,8 @@ globals:
   UnitPowerMax:
     any: true
   UnitPowerType:
+    any: true
+  UnitThreatSituation:
     any: true
   wipe:
     any: true

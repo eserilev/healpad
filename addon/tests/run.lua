@@ -15,6 +15,7 @@ local FILES = {
   "Diamond.lua",
   "Options.lua",
   "Test.lua",
+  "Probe.lua",
   "Showcase.lua",
 }
 local DIR = "addon/Healpad"
@@ -1750,6 +1751,26 @@ test("/hp test in Gamepad Mode reports the controller bar", function()
     log
   )
   eq(#W.casts, 0, "nothing cast")
+  clean(W)
+end)
+
+test("probe: reads the party in and out of combat, and the key catcher comes and goes", function()
+  local W, ns = game()
+  ns.probe()
+  W.tick()
+  W.combat = true
+  W.tick()
+  W.combat = false
+  ns.probe("stop")
+  local p = ns.db.probe
+  eq(p.samples.rest, 1, "a sample out of combat")
+  eq(p.samples.combat, 1, "a sample in combat")
+  assert(p.reads.combat["group health"], "group health read in combat")
+  assert(p.reads.rest["group by name exists"] or p.reads.rest["group by name"], "a party member read by name")
+  ns.probe("keys")
+  eq(p.before.PAD1 ~= nil, true, "PAD1's own binding noted")
+  W.runTimers()
+  assert(p.keysNotPressedOrLost:find("PAD1"), "nothing pressed")
   clean(W)
 end)
 

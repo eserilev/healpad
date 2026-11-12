@@ -1078,6 +1078,12 @@ SlashCmdList.HEALPAD = function(msg)
     end
     return
   end
+  if cmd == "probe" then
+    if ns.probe then
+      ns.probe(msg:lower():match("^%s*probe%s+(%S+)"))
+    end
+    return
+  end
   if cmd == "shots" then
     if msg:lower():match("page") then
       if ns.showcase then

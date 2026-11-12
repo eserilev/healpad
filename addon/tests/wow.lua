@@ -1088,11 +1088,28 @@ function M.new()
   end
   G._G = G
   W.timers, W.shots, W.reloaded = {}, 0, false
+  W.tickers = {}
   G.C_Timer = {
     After = function(_, fn)
       table.insert(W.timers, fn)
     end,
+    -- A ticker: W.tick() runs each live one once.
+    NewTicker = function(_, fn)
+      local t = { fn = fn }
+      function t.Cancel()
+        t.dead = true
+      end
+      table.insert(W.tickers, t)
+      return t
+    end,
   }
+  function W.tick()
+    for _, t in ipairs(W.tickers) do
+      if not t.dead then
+        t.fn()
+      end
+    end
+  end
   function W.runTimers()
     while #W.timers > 0 do
       table.remove(W.timers, 1)()

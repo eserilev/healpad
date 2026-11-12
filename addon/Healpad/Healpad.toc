@@ -20,4 +20,5 @@ LookClassic.lua
 Diamond.lua
 Options.lua
 Test.lua
+Probe.lua
 Showcase.lua
