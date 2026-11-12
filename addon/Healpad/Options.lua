@@ -529,7 +529,7 @@ local function drawHeals()
     end
   end
   ui.empty:SetShown(#rows == 0)
-  setText(ui.headLeft, ns.isButtons() and "Tap, then pick" or "Hold for menu", ROW_W - 2 * RP - CYCLER_W - 8)
+  setText(ui.headLeft, ns.isButtons() and "Buttons" or "Hold for menu", ROW_W - 2 * RP - CYCLER_W - 8)
   ui.headLeft:SetShown(#rows > 0)
   ui.headRight:SetShown(#rows > 0)
 end

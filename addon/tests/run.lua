@@ -1593,6 +1593,7 @@ test("settings: Buttons: no word with aim, KeyBars or Style; every word fits", f
   local ns = W.load(DIR, FILES, { mode = "buttons", aim = { PAD3 = { tap = "player" } } })
   ns.openOptions()
   local d = ns.optionsDebug()
+  eq(d.ui.headLeft:GetText(), "Buttons", "a bare heading over the heals")
   W.tap("PADRSHOULDER")
   local words = panelTexts(W)
   for _, t in ipairs(words) do
@@ -2193,6 +2194,56 @@ test("Plus: frames read people through their unit token, which follows them in c
   clean(W)
 end)
 
+test("Plus in a raid: on another group's page the seat buttons step aside until you let go", function()
+  local W = Wow.new()
+  setup(W)
+  W.raid = {}
+  for i, p in ipairs({ { "Me", 1 }, { "Odo", 1 }, { "Rusk", 2 } }) do
+    W.raid[i] = { name = p[1], group = p[2] }
+    W.units["raid" .. i] = { name = p[1], hp = 50, max = 100 }
+  end
+  W.units.player = W.units.raid1
+  local ns = W.load(DIR, FILES, { frames = "plus", aim = { PAD3 = { tap = "player" } } })
+  local seats = W.G.HealpadPlusSeats
+  eq(seats:IsShown(), true)
+  W.combat = true
+  W.key("PAD3", true)
+  W.tap("PADRSHOULDER")
+  eq(ns.ctl:GetAttribute("page"), 2)
+  eq(seats:IsShown(), false, "group 2's page: no clicks to group 1's people")
+  W.tap("PADRSHOULDER")
+  eq(seats:IsShown(), true, "your page again")
+  W.tap("PADRSHOULDER")
+  W.key("PAD3", false)
+  eq(seats:IsShown(), true, "let go: back")
+  clean(W)
+end)
+
+test("Plus back to Game: the game's party frames lay themselves out again", function()
+  local W, ns, pf = plusGame()
+  local got
+  pf:SetScript("OnEvent", function(_, e)
+    got = e
+  end)
+  ns.db.frames = "game"
+  ns.applyMode()
+  eq(got, "GROUP_ROSTER_UPDATE")
+  clean(W)
+end)
+
+test("markers: no color from the game: out of combat the debuff's type gives it", function()
+  local W, ns = plusGame()
+  W.noDispelColor = true
+  W.units.party1.debuff = "Poison"
+  W.update(0.6)
+  eq(ns.spots.UP.edge:IsShown(), true)
+  eq(ns.spots.UP.edge.lines[1].vertex[2], 0.6, "poison green")
+  W.combat = true
+  W.update(0.6)
+  eq(ns.spots.UP.edge:IsShown(), false, "in combat: nothing rather than a guess")
+  clean(W)
+end)
+
 test("Plus: alone, only you", function()
   local W = Wow.new()
   setup(W)
@@ -2305,6 +2356,7 @@ test("Buttons frames: a column of five; a tapped heal lights them gold with each
   eq(W.G.ClickCastFrames[seat], true)
   W.combat = true
   W.tap("PAD3")
+  W.update(0)
   eq(cells[1][2].label.text, "B", "row 2's button")
   eq(cells[1][5].label.text, "Down", "row 5: d-pad down")
   eq(cells[1][2].gold:IsShown(), true, "lit gold")
@@ -2320,6 +2372,7 @@ test("Buttons frames: a column of five; a tapped heal lights them gold with each
     eq(f.name.width + f.label:GetStringWidth() + 6 <= 132, true, "name and label fit, row " .. r)
   end
   W.tap("PAD2")
+  W.update(0)
   eq(cells[1][2].label:IsShown(), false, "the labels go after the heal")
   eq(cells[1][2].gold:IsShown(), false)
   W.combat = false
@@ -2344,14 +2397,17 @@ test("Buttons frames: a raid's eight groups; Full and Row labels; a held group l
   eq(cells[5][1].name.text, "", "an empty place")
   W.combat = true
   W.tap("PAD3")
+  W.update(0)
   eq(cells[1][1].label.text, "LB + A", "Full: the whole combo")
   eq(cells[5][5].label.text, "Up + Start")
   eq(cells[3][2].label.text, "LT + B")
   W.key("PADRSHOULDER", true)
+  W.update(0)
   eq(heads[2].num.textColor[2], 0.82, "the held group's head in gold")
   eq(cells[1][1]:GetAlpha(), 0.55, "other groups dim")
   eq(cells[2][1]:GetAlpha(), 1)
   W.key("PADRSHOULDER", false)
+  W.update(0)
   eq(cells[1][1]:GetAlpha(), 1)
   local lock
   for _, t in ipairs(W.textures) do
@@ -2361,14 +2417,17 @@ test("Buttons frames: a raid's eight groups; Full and Row labels; a held group l
   end
   eq(lock:IsShown(), true, "Locked: the lock beside the heal's name")
   W.tap("PADBACK")
+  W.update(0)
   eq(lock:IsShown(), false)
   W.combat = false
   ns.db.labels = "row"
   W.combat = true
   W.tap("PAD3")
+  W.update(0)
   eq(cells[1][1].label.text, "A", "Row: just the row")
   eq(cells[5][5].label.text, "Start")
   W.tap("PADBACK")
+  W.update(0)
   clean(W)
 end)
 

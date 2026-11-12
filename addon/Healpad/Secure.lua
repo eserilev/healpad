@@ -71,6 +71,11 @@ local CLOSE = [[
     owner:ClearBindings()
     owner:SetAttribute("held", nil)
     owner:SetAttribute("state", "idle")
+    -- the plus's seat buttons back (a page other than yours hid them)
+    local ps = owner:GetFrameRef("plusseats")
+    if ps and owner:GetAttribute("plusmode") then
+      ps:Show()
+    end
   end
 ]]
 -- Who a tap heals (tap is the heal's choice): sets unit, you at worst.
@@ -562,6 +567,10 @@ local RESET = [[
   c:SetAttribute("grpkey", nil)
   c:SetAttribute("armed", nil)
   c:SetAttribute("state", "idle")
+  local ps = c:GetFrameRef("plusseats")
+  if ps and c:GetAttribute("plusmode") then
+    ps:Show()
+  end
 ]]
 
 ns.CANCEL_SNIPPET = [[
@@ -587,6 +596,16 @@ ns.PAGE_SNIPPET = [[
   if p > n then p = 1 elseif p < 1 then p = n end
   c:SetAttribute("page", p)
   c:SetAttribute("sel", nil)
+  -- The plus's seat buttons are your own group's: on another group's page
+  -- a click there would reach the wrong person, so they go until page 1.
+  local ps = self:GetFrameRef("plusseats")
+  if ps and c:GetAttribute("plusmode") then
+    if p == 1 then
+      ps:Show()
+    else
+      ps:Hide()
+    end
+  end
 ]]
 
 -- Binds each heal button's key in the bar states where it casts that spell.

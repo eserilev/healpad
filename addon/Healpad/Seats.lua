@@ -56,8 +56,13 @@ for _, d in ipairs(ns.SEAT_DIRS) do
   ns.plusSeats[d] = ns.seatButton("HealpadPlusSeat" .. d, plus)
 end
 
+SecureHandlerSetFrameRef(ns.ctl, "plusseats", plus)
+SecureHandlerSetFrameRef(_G.HealpadPageNext, "plusseats", plus)
+SecureHandlerSetFrameRef(_G.HealpadPagePrev, "plusseats", plus)
+
 local function placePlus()
   local on = ns.plusOn()
+  ns.ctl:SetAttribute("plusmode", on or nil)
   if not on then
     plus:Hide()
     return
@@ -162,9 +167,20 @@ local function give(name)
     return
   end
   taken[name] = nil
-  pcall(rec.frame.SetParent, rec.frame, rec.parent)
+  local f = rec.frame
+  pcall(f.SetParent, f, rec.parent)
   for _, e in ipairs(rec.events) do
-    pcall(rec.frame.RegisterEvent, rec.frame, e)
+    pcall(f.RegisterEvent, f, e)
+  end
+  -- what changed while it was away: it lays itself out again, as on a
+  -- roster change (out of combat only, like all of this)
+  for _, e in ipairs(rec.events) do
+    if e == "GROUP_ROSTER_UPDATE" then
+      local ok, onEvent = pcall(f.GetScript, f, "OnEvent")
+      if ok and type(onEvent) == "function" then
+        pcall(onEvent, f, "GROUP_ROSTER_UPDATE")
+      end
+    end
   end
 end
 

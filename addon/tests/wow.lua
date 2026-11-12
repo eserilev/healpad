@@ -638,7 +638,12 @@ function M.new()
     -- the most recent override binding wins
     local b = W.secureBinds[key]
     local o = W.overrides[key]
-    if o and (not b or (o.seq or 0) > (b.seq or 0)) then
+    -- a priority binding beats one without; else the most recent wins
+    if o and b and (o.priority and true or false) ~= (b.priority and true or false) then
+      if o.priority then
+        b = o
+      end
+    elseif o and (not b or (o.seq or 0) > (b.seq or 0)) then
       b = o
     end
     if b then
@@ -1200,6 +1205,9 @@ function M.new()
       return nil
     end,
     GetAuraDispelTypeColor = function()
+      if W.noDispelColor then
+        error("no color")
+      end
       return {
         GetRGBA = function()
           return hidden(0.2), hidden(0.6), hidden(1), hidden(1)

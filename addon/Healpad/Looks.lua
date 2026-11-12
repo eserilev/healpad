@@ -294,6 +294,14 @@ function K.missing(fs, src)
   end)
 end
 
+-- The colors of the debuff types, as the curve below gives them.
+local DISPEL = {
+  Magic = { 0.2, 0.6, 1 },
+  Curse = { 0.6, 0, 1 },
+  Disease = { 0.6, 0.4, 0 },
+  Poison = { 0, 0.6, 0 },
+}
+
 local dispelCurve
 local function dispelColors()
   if dispelCurve ~= nil then
@@ -717,7 +725,7 @@ function K.markers(f, src, status)
     setCount(icon.count, unit, a)
     icon:Show()
     if i == 1 then
-      pcall(function()
+      local ok = pcall(function()
         local color = C_UnitAuras.GetAuraDispelTypeColor(unit, a.auraInstanceID, dispelColors())
         f.edge:SetColor(color:GetRGBA())
         f.edge:Show()
@@ -726,6 +734,16 @@ function K.markers(f, src, status)
           f.tint:Show()
         end
       end)
+      -- no color from the game: out of combat the debuff's type says it
+      local c = not ok and not InCombatLockdown() and not K.secret(a.dispelName) and DISPEL[a.dispelName]
+      if c then
+        f.edge:SetColor(c[1], c[2], c[3], 1)
+        f.edge:Show()
+        if f.tint then
+          f.tint:SetVertexColor(c[1], c[2], c[3], 1)
+          f.tint:Show()
+        end
+      end
     end
   end
   -- your heals over time

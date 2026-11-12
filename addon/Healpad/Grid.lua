@@ -414,9 +414,11 @@ function ns.gridBox()
   return l * k, r * k, (t or 0) * k, (b or 0) * k
 end
 
+-- A press changes several of these at once: drawn once, on the next frame.
+local soon = false
 ns.ctl:HookScript("OnAttributeChanged", function(_, name)
   if name == "state" or name == "armed" or name == "grp" or name == "lockmode" then
-    ns.redrawGrid()
+    soon = true
   end
 end)
 
@@ -427,7 +429,8 @@ ticker:SetScript("OnUpdate", function(_, elapsed)
     return
   end
   since = since + elapsed
-  if (dirty and since > 0.1) or since > 0.5 then
+  if soon or (dirty and since > 0.1) or since > 0.5 then
+    soon = false
     since = 0
     ns.redrawGrid()
   end
