@@ -19,10 +19,13 @@ local function clickCast(b)
   ClickCastFrames[b] = true
 end
 
--- A secure unit button: left click targets, right click the menu.
+-- A secure unit button: left click targets, right click the menu (with a
+-- modifier held too: *type1).
 function ns.seatButton(name, parent)
   local b = CreateFrame("Button", name, parent, "SecureUnitButtonTemplate")
   b:RegisterForClicks("AnyUp")
+  b:SetAttribute("type1", "target")
+  b:SetAttribute("type2", "togglemenu")
   b:SetAttribute("*type1", "target")
   b:SetAttribute("*type2", "togglemenu")
   b:Hide()
@@ -42,7 +45,10 @@ end
 
 ---------------------------------------------------------------- the plus
 
+-- Under the drawn frames (which take no clicks), so a click reaches them;
+-- while the settings move the frames, the drawn ones take the mouse.
 local plus = CreateFrame("Frame", "HealpadPlusSeats", UIParent, "SecureFrameTemplate")
+plus:SetFrameStrata("LOW")
 plus:SetSize(1, 1)
 plus:Hide()
 ns.plusSeats = {}

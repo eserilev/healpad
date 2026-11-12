@@ -2095,6 +2095,18 @@ test("Plus: someone leaves in combat: their seat goes dark, nothing secure is to
   clean(W)
 end)
 
+test("Plus: the settings never fade your party frames out", function()
+  local W, ns = plusGame()
+  ns.openOptions()
+  local d = ns.optionsDebug()
+  W.tap("PADDDOWN") -- B, not set to Healpad
+  eq(d.st.li, 2)
+  eq(ns.diamond:GetAlpha(), 1, "still there")
+  ns.optionsPanel():Hide()
+  eq(ns.diamond:IsShown(), true)
+  clean(W)
+end)
+
 test("Plus: alone, only you", function()
   local W = Wow.new()
   setup(W)

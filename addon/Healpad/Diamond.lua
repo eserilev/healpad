@@ -348,7 +348,9 @@ function ns.redraw()
   local spell = heldSpell() or ns.previewSpell
   lastSpell = spell or lastSpell
   title:SetText(spell and ns.spellLabel(spell) or "")
-  pageText:SetText(pages > 1 and ("Group " .. page .. " / " .. pages) or "")
+  -- the group's page while a heal is held (the plus at rest shows your own)
+  local paging = pages > 1 and (held or previewing or not ns.plusOn())
+  pageText:SetText(paging and ("Group " .. page .. " / " .. pages) or "")
   local ctx = { spell = spell, sel = sel }
   for _, d in ipairs(ns.DIRS) do
     local from = d
@@ -442,7 +444,8 @@ end
 -- Faded out while the settings are on a heal that doesn't open the menu; a
 -- real hold always shows it.
 local function fade(seconds)
-  local out = previewing and dimmed and ctl:GetAttribute("state") ~= "aim"
+  -- the plus is your party frames: it never fades out
+  local out = previewing and dimmed and ctl:GetAttribute("state") ~= "aim" and not ns.plusOn()
   ns.kit.fadeTo(root, out and 0 or 1, seconds)
 end
 function ns.previewDim(on)
