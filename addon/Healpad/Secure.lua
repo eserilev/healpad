@@ -346,23 +346,41 @@ ns.KB_POST = [[
 -- place on the bar, gpkey<n>: the key that presses it). A row casts the
 -- waiting heal from this button: its type is the spell for this one click
 -- (GP_POST puts the action back). The trigger held picks the bar, so the
--- bar a row reaches says the group (gpbargrp). LB, RB and Start aren't bar
--- buttons: in a raid they work only when Healpad's bindings win.
+-- bar a row reaches says the group (gpbargrp).
+--
+-- What the fallback can't do: with no trigger held, A, B, X and Y press
+-- the top bar's face buttons, which are the game's own (interact, inspect,
+-- back, jump) with their own click scripts: no spell can be cast from
+-- them, so a waiting heal only swallows those presses. Without Healpad's
+-- bindings winning, a party's rows on A, B, X and Y with no trigger held
+-- are therefore not reachable in Gamepad Mode (rows with LT or RT held
+-- are), and neither are LB, RB and Start (groups 1-2, row 5 in a raid) or
+-- Back (cancel): they aren't bar buttons at all.
 local GP_BUTTONS = [[
     local armed = owner:GetAttribute("armed")
+    -- the game's own buttons (interact, inspect, back, jump): never a cast;
+    -- while a heal waits their press does nothing
+    if owner:GetAttribute("gpown-" .. name) then
+      if not armed then
+        return
+      end
+      if down then
+        owner:SetAttribute("gpflip-" .. name, true)
+      end
+      return false
+    end
     local key = n and owner:GetAttribute("gpkey" .. n)
     if armed and key then
       local raid = owner:GetAttribute("raid")
       local hold = raid and owner:GetAttribute("gridg-" .. key)
       if hold then
+        -- held; its release comes back through the flip and lets go
         if down then
+          owner:SetAttribute("gpflip-" .. name, true)
           if not owner:GetAttribute("grp") then
             owner:SetAttribute("grpkey", name)
             owner:SetAttribute("grp", hold)
           end
-        elseif owner:GetAttribute("grpkey") == name then
-          owner:SetAttribute("grp", nil)
-          owner:SetAttribute("grpkey", nil)
         end
         return false
       end
@@ -372,6 +390,11 @@ local GP_BUTTONS = [[
           return false
         end
         owner:SetAttribute("gpflip-" .. name, true)
+        -- only a plain action button (a spell or nothing in its slot) casts
+        -- the heal; a flyout or anything else: the press does nothing
+        if self:GetAttribute("type") ~= "action" or (kind ~= nil and kind ~= "spell") then
+          return false
+        end
         local g = owner:GetAttribute("gpbargrp-" .. name)
 ]] .. ROW_UNIT .. [[
         owner:SetAttribute("gptype-" .. name, self:GetAttribute("type"))
@@ -415,14 +438,20 @@ ns.GP_PRE = [[
   if owner:GetAttribute("gpflip-" .. name) then
     if not down then
       owner:SetAttribute("gpflip-" .. name, nil)
+      -- a group held through this button lets go with it
+      if owner:GetAttribute("grpkey") == name then
+        owner:SetAttribute("grp", nil)
+        owner:SetAttribute("grpkey", nil)
+      end
     end
     return false
   end
-  local spell
+  local spell, kind
   local id = self:GetID() or 0
   if id > 0 and self:GetAttribute("type") == "action" then
     local page = self:GetAttribute("actionpage") or GetActionBarPage() or 1
-    local kind, sid = GetActionInfo(id + (page - 1) * 12)
+    local sid
+    kind, sid = GetActionInfo(id + (page - 1) * 12)
     if kind == "spell" then
       spell = sid
     end
@@ -926,6 +955,41 @@ end
 -- from addon code: that would taint them.
 local gpWrapped = {}
 local gpAttrs = {}
+-- Sits in every button of the controller bar (out of combat). The game
+-- sets the top bar's face buttons' own click scripts after it loads
+-- (MainActionBarFrame.lua SetupNonbindableActions), which drops a wrap made
+-- before: each time, a button whose click script isn't Healpad's wrap any
+-- more is wrapped again.
+local function wrapGamepad()
+  if not ns.gamepadMode() then
+    return
+  end
+  local bars = {}
+  for _, bar in ipairs(ns.GP_BARS) do
+    table.insert(bars, bar)
+  end
+  table.insert(bars, { id = "stance", frame = "stanceBar", offset = 32 })
+  for _, bar in ipairs(bars) do
+    for n = 1, 8 do
+      local f, name = ns.gamepadButton(bar, n)
+      local now
+      if f then
+        local okS, script = pcall(f.GetScript, f, "OnClick")
+        now = okS and script or nil
+      end
+      if f and name and (not gpWrapped[f] or gpWrapped[f] ~= now) then
+        local ok, err = pcall(SecureHandlerWrapScript, f, "OnClick", ctl, ns.GP_PRE, ns.GP_POST)
+        if ok then
+          local okW, wrapper = pcall(f.GetScript, f, "OnClick")
+          gpWrapped[f] = okW and wrapper or true
+        else
+          ns.log("gamepad wrap " .. name .. ": " .. tostring(err))
+        end
+      end
+    end
+  end
+end
+
 local function applyGamepad()
   for _, a in ipairs(gpAttrs) do
     ctl:SetAttribute(a, nil)
@@ -938,24 +1002,12 @@ local function applyGamepad()
     ctl:SetAttribute(a, v)
     table.insert(gpAttrs, a)
   end
-  local bars = {}
-  for _, bar in ipairs(ns.GP_BARS) do
-    table.insert(bars, bar)
-  end
-  table.insert(bars, { id = "stance", frame = "stanceBar", offset = 32 })
-  for _, bar in ipairs(bars) do
-    for n = 1, 8 do
-      -- The top bar's face buttons are the game's own (interact, jump...)
-      -- and cast nothing: Healpad sits in them for Buttons mode's rows only.
-      local f, name = ns.gamepadButton(bar, n)
-      if f and name and not gpWrapped[f] then
-        local ok, err = pcall(SecureHandlerWrapScript, f, "OnClick", ctl, ns.GP_PRE, ns.GP_POST)
-        if ok then
-          gpWrapped[f] = true
-        else
-          ns.log("gamepad wrap " .. name .. ": " .. tostring(err))
-        end
-      end
+  -- the game's own top-bar face buttons (interact, inspect, back, jump):
+  -- a waiting heal swallows their presses (they never cast)
+  for n = 5, 8 do
+    local _, name = ns.gamepadButton(ns.GP_BARS[1], n)
+    if name then
+      set("gpown-" .. name, true)
     end
   end
   set("gpdpad", (ns.db.aimWith or "dpad") == "dpad" or nil)
@@ -1043,6 +1095,7 @@ end
 -- force: redo it even when nothing seems to have changed.
 function ns.applyKeys(force)
   ns.afterCombat("keys", function()
+    wrapGamepad()
     local binds = ns.readBinds()
     local sig = signature(binds)
     ns.binds = binds

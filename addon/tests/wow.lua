@@ -496,7 +496,12 @@ function M.new()
     if W.combat then
       table.insert(W.blocked, "SecureHandlerWrapScript")
     end
-    frame.wrap = { header = header, pre = pre, post = post }
+    -- The wrap takes the place of the click script and calls the one it
+    -- found; a later SetScript replaces the wrap (and drops it).
+    local wrap = { header = header, pre = pre, post = post, inner = frame.scripts.OnClick }
+    wrap.fn = function() end
+    frame.wrap = wrap
+    frame.scripts.OnClick = wrap.fn
   end
   G.SecureHandlerExecute = function(frame, body)
     if W.combat then
@@ -550,7 +555,20 @@ function M.new()
   W.keyDownCvar = true -- the game's ActionButtonUseKeyDown
   function W.click(f, down)
     local message
-    if f.wrap then
+    local wrapped = f.wrap ~= nil and f.scripts.OnClick == f.wrap.fn
+    local own = wrapped and f.wrap.inner or (not wrapped and f.scripts.OnClick) or nil
+    if own and f.template ~= "" then
+      -- a secure button the game gave its own click script (Jump, Back...)
+      if wrapped then
+        local res = runSnippet(f.wrap.pre, { owner = f.wrap.header }, f, "LeftButton", down)
+        if res == false then
+          return
+        end
+      end
+      own(f, "LeftButton", down)
+      return
+    end
+    if wrapped then
       local res, msg = runSnippet(f.wrap.pre, { owner = f.wrap.header }, f, "LeftButton", down)
       if res == false then
         for _, fn in ipairs(f.hooks.OnClick or {}) do
@@ -584,7 +602,7 @@ function M.new()
     elseif f.template == "" and down and f.scripts.OnClick then
       f.scripts.OnClick(f, "LeftButton", down) -- a plain button: clicks on the press
     end
-    if f.wrap and f.wrap.post and message ~= nil then
+    if wrapped and f.wrap.post and message ~= nil then
       runSnippetAs(
         "self, message, button, down",
         f.wrap.post,
@@ -823,6 +841,7 @@ function M.new()
       return W.gpPage
     end
     refreshIds()
+    W.gpSetup()
     -- MainActionBarFrame.lua PressActionButton, with PageUnit's bar choice.
     function main.PressActionButton(self, n, button, down)
       local owners = self.buttonOwners
@@ -859,6 +878,23 @@ function M.new()
     W.contextBinds.PADLSHOULDER = "GAMEPADLEFTTARGETMODIFIER"
     W.contextBinds.PADRSHOULDER = "GAMEPADRIGHTTARGETMODIFIER"
     return main
+  end
+  -- MainActionBarFrame.lua SetupNonbindableActions: the top bar's face
+  -- buttons get the game's own click scripts (interact, inspect, back,
+  -- jump), replacing whatever was there. The game runs it once it has
+  -- loaded; a test may run it again later.
+  function W.gpSetup()
+    local top = G.GamepadMainActionBarFrame.PageUnit.actionBars.topBar.actionButtons
+    for n, what in pairs({ [5] = "INTERACT", [6] = "INSPECT", [7] = "BACK", [8] = "JUMP" }) do
+      top[n]:SetScript("OnClick", function(_, _, down)
+        if down then
+          table.insert(W.gpRan, what)
+          if what == "BACK" then
+            W.units.target = nil -- SpellStopCasting, SpellStopTargeting or ClearTarget
+          end
+        end
+      end)
+    end
   end
   -- A Gamepad Mode binding runs.
   W.gpRan = {}

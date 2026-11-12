@@ -2558,20 +2558,30 @@ test("Buttons in Gamepad Mode: a bar heal waits; rows reach Healpad through the 
   W.tap("PAD2")
   eq(last(W).unit, "Brakka")
   eq(c:GetAttribute("armed"), nil)
-  -- Gamepad Mode's bindings win: B reaches the bar's button, still row 2
+  -- Gamepad Mode's bindings win: B with no trigger is the game's own Back
+  -- button, which can't cast: the press does nothing (and clears nothing)
   W.contextFirst = true
+  W.units.target = W.units.party3
   W.key("PADLTRIGGER", true)
   W.tap("SHIFT-PAD1")
   W.key("PADLTRIGGER", false)
   eq(c:GetAttribute("armed"), 5186)
   W.tap("PAD2")
+  eq(#W.casts, 1, "B alone: no cast")
+  eq(c:GetAttribute("armed"), 5186, "still waiting")
+  eq(W.units.target ~= nil, true, "Back didn't run: the target stays")
+  eq(table.concat(W.gpRan, ","):find("BACK"), nil)
+  -- with LT held, B reaches the left bar: row 2 from that button
+  W.key("PADLTRIGGER", true)
+  W.tap("PAD2")
+  W.key("PADLTRIGGER", false)
   eq(#W.casts, 2)
   eq(last(W).unit, "Brakka", "through the bar's button")
   eq(last(W).spell, 5186)
-  local top = W.G.GamepadMainActionBarFrame.PageUnit.actionBars.topBar.actionButtons[7]
-  eq(top.attrs.type, "action", "the game's button as it was")
-  eq(top.attrs.spell, nil)
-  eq(top.attrs.unit, nil)
+  local left = W.G.GamepadMainActionBarFrame.PageUnit.actionBars.leftBar.actionButtons[7]
+  eq(left.attrs.type, "action", "the game's button as it was")
+  eq(left.attrs.spell, nil)
+  eq(left.attrs.unit, nil)
   -- a press that is no row, while waiting: nothing
   W.key("PADLTRIGGER", true)
   W.tap("SHIFT-PAD1")
@@ -2579,11 +2589,16 @@ test("Buttons in Gamepad Mode: a bar heal waits; rows reach Healpad through the 
   W.tap("PADDUP")
   eq(#W.casts, 2, "d-pad up does nothing")
   W.tap("PAD1")
-  eq(last(W).unit, "player", "A: row 1")
+  eq(#W.casts, 2, "A alone is the game's Jump: nothing")
+  eq(table.concat(W.gpRan, ","):find("JUMP"), nil)
+  W.key("PADLTRIGGER", true)
+  W.tap("PAD1")
+  W.key("PADLTRIGGER", false)
+  eq(last(W).unit, "player", "LT + A: row 1 (the grid wins over the heal there)")
   clean(W)
 end)
 
-test("Buttons in Gamepad Mode, raid: a held d-pad direction and the trigger's bar say the group", function()
+local function gamepadRaid(after)
   local W = Wow.new()
   setup(W)
   W.raid = {}
@@ -2594,28 +2609,75 @@ test("Buttons in Gamepad Mode, raid: a held d-pad direction and the trigger's ba
   W.units.player = W.units.raid1
   W.gamepad()
   W.actions[W.gpStorage(1, 16)] = { "spell", 5186 }
-  local ns =
-    W.load(DIR, FILES, { mode = "buttons", after = "locked", aim = {}, aimPad = { [5186] = { tap = "player" } } })
-  local c = ns.ctl
+  local ns = W.load(DIR, FILES, { mode = "buttons", after = after, aim = {}, aimPad = { [5186] = { tap = "player" } } })
   W.contextFirst = true -- Gamepad Mode's bindings win: every press reaches the bar
-  W.combat = true
+  return W, ns
+end
+local function armLTA(W)
   W.key("PADLTRIGGER", true)
   W.tap("SHIFT-PAD1")
   W.key("PADLTRIGGER", false)
+end
+
+test("Buttons in Gamepad Mode, raid: a held d-pad direction and the trigger's bar say the group", function()
+  local W, ns = gamepadRaid("locked")
+  local c = ns.ctl
+  W.combat = true
+  armLTA(W)
   eq(c:GetAttribute("armed"), 5186)
-  W.tap("PAD1")
-  eq(#W.casts, 0, "A with no group: nothing")
   W.key("PADDUP", true)
   eq(c:GetAttribute("grp"), 5, "d-pad up held: group 5")
   W.tap("PAD1")
-  eq(last(W).unit, "Zara")
+  eq(#W.casts, 0, "A alone is the game's Jump button: swallowed, no cast")
+  W.key("PADLTRIGGER", true)
+  W.tap("PAD1")
+  W.key("PADLTRIGGER", false)
+  eq(last(W).unit, "Zara", "d-pad up held first, then LT + A: group 5, row 1")
   W.key("PADDUP", false)
-  eq(c:GetAttribute("grp"), nil)
+  eq(c:GetAttribute("grp"), nil, "let go")
   W.key("PADLTRIGGER", true)
   W.tap("PAD2")
   W.key("PADLTRIGGER", false)
   eq(last(W).unit, "Ulla", "LT picks the left bar: group 3, B: row 2")
   eq(#W.casts, 2)
+  clean(W)
+end)
+
+test("Buttons in Gamepad Mode, raid, Once: letting go of a d-pad group after the heal arms nothing", function()
+  local W, ns = gamepadRaid("once")
+  local c = ns.ctl
+  W.actions[W.gpStorage(1, 2)] = { "spell", 5186 } -- the heal on d-pad up too
+  W.combat = true
+  armLTA(W)
+  W.key("PADDUP", true)
+  W.key("PADLTRIGGER", true)
+  W.tap("PAD1")
+  W.key("PADLTRIGGER", false)
+  eq(last(W).unit, "Zara")
+  eq(c:GetAttribute("armed"), nil, "Once: done")
+  W.key("PADDUP", false)
+  eq(c:GetAttribute("armed"), nil, "the release didn't arm the heal on d-pad up")
+  eq(c:GetAttribute("grp"), nil)
+  eq(#W.casts, 1)
+  clean(W)
+end)
+
+test("Gamepad Mode: the game setting its buttons' own scripts later doesn't drop Healpad", function()
+  local W, ns = gamepadRaid("locked")
+  W.contextFirst = true
+  W.gpSetup() -- the game sets Back, Jump... again, over Healpad's wrap
+  W.fire("PLAYER_ENTERING_WORLD")
+  local back = W.G.GamepadMainActionBarFrame.PageUnit.actionBars.topBar.actionButtons[7]
+  eq(back.scripts.OnClick, back.wrap.fn, "wrapped again")
+  W.units.target = W.units.raid2
+  W.combat = true
+  armLTA(W)
+  W.tap("PAD2")
+  eq(W.units.target ~= nil, true, "Back swallowed while a heal waits")
+  W.setStop(true) -- (Back can't cancel in this fallback; dying does)
+  W.setStop(false)
+  W.tap("PAD2")
+  eq(W.units.target, nil, "nothing waits: B is the game's Back again")
   clean(W)
 end)
 
