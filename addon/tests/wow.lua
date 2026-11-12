@@ -354,6 +354,7 @@ function M.new()
   -- a key, the most recent one wins, and clearing an owner's bindings
   -- uncovers what another owner bound there. W.secureBinds is the winner.
   W.bindStack = {}
+  W.seq = 0
   local function restack(key)
     local list = W.bindStack[key] or {}
     W.secureBinds[key] = list[#list]
@@ -383,7 +384,8 @@ function M.new()
     assert(W.inSecure, "SetBindingClick outside a snippet")
     unbind(self, key)
     W.bindStack[key] = W.bindStack[key] or {}
-    table.insert(W.bindStack[key], { owner = self, target = name, priority = priority, button = button })
+    W.seq = W.seq + 1
+    table.insert(W.bindStack[key], { owner = self, target = name, priority = priority, button = button, seq = W.seq })
     restack(key)
   end
 
@@ -607,7 +609,12 @@ function M.new()
     if W.contextFirst and W.gamepadMode and W.contextBinds[key] then
       return { context = W.contextBinds[key] }
     end
-    local b = W.secureBinds[key] or W.overrides[key]
+    -- the most recent override binding wins
+    local b = W.secureBinds[key]
+    local o = W.overrides[key]
+    if o and (not b or (o.seq or 0) > (b.seq or 0)) then
+      b = o
+    end
     if b then
       return b.target
     end
@@ -648,7 +655,8 @@ function M.new()
     if W.combat then
       table.insert(W.blocked, "SetOverrideBindingClick " .. key)
     end
-    W.overrides[key] = { owner = owner, target = name, priority = priority }
+    W.seq = W.seq + 1
+    W.overrides[key] = { owner = owner, target = name, priority = priority, seq = W.seq }
   end
   G.ClearOverrideBindings = function(owner)
     if W.combat then

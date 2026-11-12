@@ -2,8 +2,10 @@
 --   Heals: one row per heal on your buttons. Ticked, holding the button
 --          opens the menu; not ticked, it casts as it always did. On the
 --          right, who a quick tap heals.
---   Menu:  its style, size and spacing, what selects a person, what
---          cancels, and where it sits.
+--   Menu:  the mode (Radial or Buttons), and for it: the look, size and
+--          spacing, the party frames, what happens after a heal, the
+--          labels, what selects a person, what cancels, and where it sits.
+--          Settings that don't apply to the mode don't show.
 -- While the window is open the real menu is its preview: where it will be,
 -- as big and in the look it will have. The window keeps to the side of the
 -- screen the menu leaves free.
@@ -17,6 +19,8 @@ local PAD = 6 -- inside the window's inset
 local INSET_X, INSET_TOP, INSET_BOTTOM = 4, 24, 4
 local ROW_W = W - INSET_X - 6 - 2 * PAD
 local ROW_H, HEAD_H, RP = 44, 22, 8 -- a row, the headings over the heals, a row's own margin
+local TILE_ROW_H = 70 -- a row of picture tiles
+local TILE_W, TILE_H, TILE_GAP = 96, 62, 8
 local MAX_ROWS = 7 -- heals shown at once; the rest scroll
 local ARROW = 22
 local TAP_W = 94 -- the tap choice between its arrows
@@ -31,14 +35,28 @@ local BTN_W, BTN_GAP = 96, 8
 local EDGE = 12 -- the window's gap from the screen's edge
 local TABS = { "heals", "menu" }
 local TAB_LABEL = { heals = "Heals", menu = "Menu" }
-local MENU_ROWS = { "look", "size", "spacing", "pick", "cancel", "pos" }
+local MENU_ROWS = { "mode", "look", "size", "spacing", "frames", "after", "labels", "pick", "cancel", "pos" }
 local MENU_LABEL = {
-  look = "Style",
+  mode = "Mode",
+  look = "Look",
   size = "Size",
   spacing = "Spacing",
+  frames = "Party Frames",
+  after = "After a heal",
+  labels = "Labels",
   pick = "Select person with",
   cancel = "Cancel heal with",
-  pos = "Menu position",
+  pos = "Position",
+}
+-- Rows that only one mode has.
+local ONLY =
+  { look = "radial", spacing = "radial", frames = "radial", pick = "radial", after = "buttons", labels = "buttons" }
+-- Rows picked by two picture tiles: the setting, its choices, their words.
+local TILES = {
+  mode = { db = "mode", list = ns.MODES, label = { radial = "Radial", buttons = "Buttons" } },
+  frames = { db = "frames", list = ns.FRAMES, label = { plus = "Plus", game = "Game" } },
+  after = { db = "after", list = ns.AFTERS, label = { once = "Once", locked = "Locked" } },
+  labels = { db = "labels", list = ns.LABELS, label = { row = "Row", full = "Full" } },
 }
 local SIZE_MIN, SIZE_MAX = 0.6, 1.6
 local GOLD = { 1, 0.82, 0 }
@@ -52,7 +70,7 @@ local panel
 local ui = {}
 -- li: the heal row, top: the first heal shown, mi: the Menu row, sub: Move (1)
 -- or Reset (2); keys: driven by the pad or keys (the focus shows)
-local st = { tab = "heals", li = 1, top = 1, mi = 1, sub = 1, keys = false, moving = false, side = "left" }
+local st = { tab = "heals", li = 1, top = 1, mkey = "mode", sub = 1, keys = false, moving = false, side = "left" }
 local rows = {} -- the heals: { bind = b }
 local fitted = {} -- every label that steps its font down to fit: { fs, room }
 
@@ -243,8 +261,42 @@ local function cancelTaken(key)
   return ns.db.aim[key] ~= nil
 end
 
-local function centred()
-  return math.floor((ns.db.x or 0) + 0.5) == 0 and math.floor((ns.db.y or 0) + 0.5) == 0
+-- The Menu rows the mode has, in order.
+local function menuRows()
+  local mode = ns.db and ns.db.mode or "radial"
+  local list = {}
+  for _, key in ipairs(MENU_ROWS) do
+    if not ONLY[key] or ONLY[key] == mode then
+      table.insert(list, key)
+    end
+  end
+  return list
+end
+local function menuIndex()
+  local list = menuRows()
+  for i, key in ipairs(list) do
+    if key == st.mkey then
+      return i, list
+    end
+  end
+  return 1, list
+end
+
+-- Where the frames in use sit and their size: the menu, the plus or the
+-- Buttons frames each have their own.
+local function placeKeys()
+  local _, _, _, p = ns.place()
+  return p
+end
+local function atDefault()
+  local p = placeKeys()
+  local x, y = ns.db[p.x] or p.dx, ns.db[p.y] or p.dy
+  return math.floor(x - p.dx + 0.5) == 0 and math.floor(y - p.dy + 0.5) == 0
+end
+local function nudge(dx, dy)
+  local p = placeKeys()
+  ns.db[p.x] = (ns.db[p.x] or p.dx) + dx
+  ns.db[p.y] = (ns.db[p.y] or p.dy) + dy
 end
 
 ---------------------------------------------------------------- what the controls do
@@ -274,15 +326,45 @@ local function stepTap(i, d)
   ns.applyKeys(true)
 end
 
+-- A tile row: d -1 is the left tile, 1 the right; 0 the other one.
+local function pick(key, d)
+  local t = TILES[key]
+  local db = ns.db
+  local v
+  if d == 0 then
+    v = db[t.db] == t.list[1] and t.list[2] or t.list[1]
+  else
+    v = d < 0 and t.list[1] or t.list[2]
+  end
+  if db[t.db] == v then
+    return
+  end
+  db[t.db] = v
+  if key == "mode" or key == "frames" then
+    st.moving = false
+    if ns.showMoving then
+      ns.showMoving(false)
+    end
+    ns.applyMode()
+  elseif key == "after" then
+    ns.applyKeys(true)
+  elseif key == "labels" and ns.redrawGrid then
+    ns.redrawGrid()
+  end
+end
+
 local function step(key, d)
   if InCombatLockdown() then
     return
   end
   local db = ns.db
-  if key == "look" then
+  if TILES[key] then
+    pick(key, d)
+  elseif key == "look" then
     ns.setLook(wrap(ns.LOOKS, db.look, d))
   elseif key == "size" then
-    db.scale = clamp(ns.tenth((db.scale or 1) + d * 0.1), SIZE_MIN, SIZE_MAX)
+    local p = placeKeys()
+    db[p.scale] = clamp(ns.tenth((db[p.scale] or p.size) + d * 0.1), SIZE_MIN, SIZE_MAX)
     ns.layout()
   elseif key == "spacing" then
     db.spacing = clamp(ns.tenth((db.spacing or 1) + d * 0.1), ns.SPACING_MIN, ns.SPACING_MAX)
@@ -292,15 +374,17 @@ local function step(key, d)
     ns.applyKeys(true)
   elseif key == "cancel" then
     -- a pad button that holds for the menu can't cancel: skipped
-    local c = db.cancel
-    for _ = 1, #ns.CANCELS do
-      c = wrap(ns.CANCELS, c, d)
+    local list = ns.cancels()
+    local field = ns.isButtons() and "btnCancel" or "cancel"
+    local c = db[field]
+    for _ = 1, #list do
+      c = wrap(list, c, d)
       if not cancelTaken(c) then
         break
       end
     end
     if not cancelTaken(c) then
-      db.cancel = c
+      db[field] = c
       ns.applyKeys(true)
     end
   end
@@ -320,8 +404,9 @@ local function press(which)
   end
   if which == 1 then
     setMoving(not st.moving)
-  elseif not centred() then
-    ns.db.x, ns.db.y = 0, 0
+  elseif not atDefault() then
+    local p = placeKeys()
+    ns.db[p.x], ns.db[p.y] = p.dx, p.dy
     setMoving(false)
     st.sub = 1
     ns.layout()
@@ -387,7 +472,21 @@ local function drawTabs()
   end
   ui.heals:SetShown(st.tab == "heals")
   ui.menu:SetShown(st.tab == "menu")
-  local inset = 2 * PAD + math.max(HEAD_H + math.max(1, visibleRows()) * ROW_H, #MENU_ROWS * ROW_H)
+  -- the Menu rows the mode has, one under another
+  local y = PAD
+  local shown = {}
+  for _, key in ipairs(menuRows()) do
+    shown[key] = true
+  end
+  for _, f in ipairs(ui.mlist) do
+    f:SetShown(shown[f.key] == true)
+    if shown[f.key] then
+      f:ClearAllPoints()
+      f:SetPoint("TOPLEFT", ui.menu, "TOPLEFT", PAD, -y)
+      y = y + f.h
+    end
+  end
+  local inset = 2 * PAD + math.max(HEAD_H + math.max(1, visibleRows()) * ROW_H, y - PAD)
   panel:SetSize(W, inset + INSET_TOP + INSET_BOTTOM)
 end
 
@@ -434,14 +533,41 @@ local function drawHeals()
   ui.headRight:SetShown(#rows > 0)
 end
 
+-- The words a cancel choice shows: A, B, X, Y in their colors, or the
+-- controller's own button art.
+local function cancelText(key)
+  if CANCEL_NAME[key] then
+    return keyText(CANCEL_NAME[key])
+  end
+  return ns.padIcon(key, 18)
+end
+
+local function drawTiles(f)
+  local t = TILES[f.key]
+  local v = ns.db[t.db]
+  for i, tile in ipairs(f.tiles) do
+    local on = t.list[i] == v
+    tile.edge:SetShown(on)
+    tile.word:SetTextColor(unpack(on and GOLD or { 0.75, 0.73, 0.68 }))
+    tile.pic:SetAlpha(on and 1 or 0.55)
+    if tile.draw then
+      tile.draw(tile)
+    end
+  end
+end
+
 local function drawMenu()
   local db = ns.db
   local m = ui.mrows
+  for key in pairs(TILES) do
+    drawTiles(m[key])
+  end
   setText(m.look.ctl.value, ns.LOOK_LABEL[db.look] or db.look, m.look.ctl.midW - 4)
-  setMeter(m.size.ctl, db.scale or 1, SIZE_MIN, SIZE_MAX)
+  local scale = ns.place()
+  setMeter(m.size.ctl, scale, SIZE_MIN, SIZE_MAX)
   setMeter(m.spacing.ctl, db.spacing or 1, ns.SPACING_MIN, ns.SPACING_MAX)
   setText(m.pick.ctl.value, ns.AIMER_LABEL[db.aimWith] or db.aimWith, m.pick.ctl.midW - 4)
-  setText(m.cancel.ctl.value, keyText(CANCEL_NAME[db.cancel] or db.cancel), m.cancel.ctl.midW - 4)
+  setText(m.cancel.ctl.value, cancelText(ns.cancelKey()), m.cancel.ctl.midW - 4)
   local move, reset = m.pos.move, m.pos.reset
   move:SetText(st.moving and "Done" or "Move")
   if st.moving then
@@ -449,7 +575,7 @@ local function drawMenu()
   else
     move:UnlockHighlight()
   end
-  reset:SetEnabled(not centred())
+  reset:SetEnabled(not atDefault())
   local okF, fs = pcall(move.GetFontString, move)
   if okF and type(fs) == "table" and fs.SetTextColor then
     fs:SetTextColor(unpack(st.moving and { 1, 1, 1 } or GOLD))
@@ -466,7 +592,7 @@ local function drawFocus()
       focusHeal = f
     end
   end
-  local focusMenu = ui.mlist[st.mi]
+  local focusMenu = ui.mrows[st.mkey]
   local function light(list, focus)
     for _, f in ipairs(list) do
       f.lit:SetShown(st.keys and f == focus and f.key ~= "pos")
@@ -535,7 +661,11 @@ refresh = function()
   if st.tab ~= "menu" and st.moving then
     setMoving(false)
   end
-  if st.sub == 2 and centred() then
+  -- the row the pad was on went with the mode: back to Mode
+  if ONLY[st.mkey] and ONLY[st.mkey] ~= ns.db.mode then
+    st.mkey = "mode"
+  end
+  if st.sub == 2 and atDefault() then
     st.sub = 1
   end
   st.li = clamp(st.li, 1, math.max(1, #rows))
@@ -584,13 +714,13 @@ local function nav(btn, fromKeys)
   if st.moving and btn ~= "LB" and btn ~= "RB" then
     local by = 20
     if btn == "UP" then
-      ns.db.y = ns.db.y + by
+      nudge(0, by)
     elseif btn == "DOWN" then
-      ns.db.y = ns.db.y - by
+      nudge(0, -by)
     elseif btn == "LEFT" then
-      ns.db.x = ns.db.x - by
+      nudge(-by, 0)
     elseif btn == "RIGHT" then
-      ns.db.x = ns.db.x + by
+      nudge(by, 0)
     elseif btn == "A" or btn == "B" then
       setMoving(false)
     end
@@ -617,7 +747,8 @@ local function nav(btn, fromKeys)
     if st.tab == "heals" then
       st.li = clamp(st.li + d, 1, math.max(1, #rows))
     else
-      st.mi = clamp(st.mi + d, 1, #MENU_ROWS)
+      local i, list = menuIndex()
+      st.mkey = list[clamp(i + d, 1, #list)]
       st.sub = 1
     end
     return refresh()
@@ -630,7 +761,7 @@ local function nav(btn, fromKeys)
       toggle(st.li)
     end
   else
-    local key = MENU_ROWS[st.mi]
+    local key = st.mkey
     if key == "pos" then
       if d then
         st.sub = clamp(st.sub + d, 1, 2)
@@ -640,7 +771,7 @@ local function nav(btn, fromKeys)
     elseif d then
       step(key, d)
     elseif btn == "A" then
-      step(key, 1)
+      step(key, TILES[key] and 0 or 1)
     end
   end
   refresh()
@@ -688,8 +819,7 @@ glide:SetScript("OnUpdate", function(_, elapsed)
   if dx == 0 and dy == 0 then
     return
   end
-  ns.db.x = ns.db.x + dx * SPEED * elapsed
-  ns.db.y = ns.db.y + dy * SPEED * elapsed
+  nudge(dx * SPEED * elapsed, dy * SPEED * elapsed)
   ns.layout()
   dock()
 end)
@@ -865,6 +995,100 @@ local function buildHeals(parent)
   return t
 end
 
+-- Pictures on the tiles: small shapes, nothing that moves.
+local function shape(pic, x, y, w, h, color, layer)
+  local t = pic:CreateTexture(nil, layer or "ARTWORK")
+  t:SetPoint("TOPLEFT", pic, "TOPLEFT", x, -y)
+  t:SetSize(w, h)
+  t:SetColorTexture(unpack(color))
+  return t
+end
+local DARK, GREEN, FRAME = { 0.16, 0.15, 0.13, 1 }, { 0.27, 0.75, 0.24, 1 }, { 0.42, 0.39, 0.33, 1 }
+-- A little party frame: a dark box with a green bar.
+local function miniFrame(pic, x, y, w, h)
+  shape(pic, x, y, w, h, FRAME)
+  shape(pic, x + 1, y + 1, w - 2, h - 2, DARK, "ARTWORK")
+  shape(pic, x + 2, y + h - 4, (w - 4) * 0.7, 2, GREEN, "OVERLAY")
+end
+local PICTURES = {
+  radial = function(pic)
+    for _, at in ipairs({ { 41, 2 }, { 25, 15 }, { 57, 15 }, { 41, 28 } }) do
+      shape(pic, at[1], at[2], 14, 10, FRAME)
+    end
+    shape(pic, 41, 15, 14, 10, { GOLD[1], GOLD[2], GOLD[3], 1 })
+  end,
+  buttons = function(pic)
+    for i = 0, 2 do
+      shape(pic, 24, 4 + i * 11, 40, 8, FRAME)
+      shape(pic, 68, 5 + i * 11, 6, 6, { GOLD[1], GOLD[2], GOLD[3], 1 })
+    end
+  end,
+  plus = function(pic)
+    for _, at in ipairs({ { 36, 1 }, { 14, 14 }, { 36, 14 }, { 58, 14 }, { 36, 27 } }) do
+      miniFrame(pic, at[1], at[2], 22, 11)
+    end
+  end,
+  game = function(pic)
+    for i = 0, 3 do
+      miniFrame(pic, 10, 1 + i * 10, 26, 9)
+    end
+  end,
+  once = function(pic)
+    for i = 0, 2 do
+      shape(pic, 28, 4 + i * 11, 40, 8, i == 1 and { GOLD[1], GOLD[2], GOLD[3], 1 } or FRAME)
+    end
+  end,
+  locked = function(pic)
+    for i = 0, 2 do
+      shape(pic, 22, 4 + i * 11, 40, 8, { GOLD[1], GOLD[2], GOLD[3], 1 })
+    end
+    local l = pic:CreateTexture(nil, "ARTWORK")
+    l:SetPoint("TOPLEFT", pic, "TOPLEFT", 66, -10)
+    l:SetSize(14, 18)
+    if not pcall(l.SetAtlas, l, "AdventureMapIcon-Lock") then
+      l:SetTexture("Interface\\PetBattles\\PetBattle-LockIcon")
+    end
+  end,
+}
+-- Labels: the picture is the label itself, in the controller's button art.
+local LABEL_TEXT = {
+  row = function()
+    return ns.padIcon("PAD1", 20)
+  end,
+  full = function()
+    return ns.padIcon("PADLSHOULDER", 20) .. " + " .. ns.padIcon("PAD1", 20)
+  end,
+}
+
+local function tile(f, key, i)
+  local t = TILES[key]
+  local v = t.list[i]
+  local b = hit(f)
+  b:SetSize(TILE_W, TILE_H)
+  local bg = b:CreateTexture(nil, "BACKGROUND")
+  bg:SetAllPoints()
+  bg:SetColorTexture(0.06, 0.055, 0.05, 0.9)
+  b.edge = ns.outline(b, b, 0, 2)
+  b.edge:SetColor(GOLD[1], GOLD[2], GOLD[3], 1)
+  b.pic = CreateFrame("Frame", nil, b)
+  b.pic:SetSize(TILE_W, 40)
+  b.pic:SetPoint("TOP", b, "TOP", 0, -2)
+  if PICTURES[v] then
+    PICTURES[v](b.pic)
+  elseif LABEL_TEXT[v] then
+    local fs = text(b.pic, "GameFontHighlight", 14)
+    fs:SetPoint("CENTER")
+    b.draw = function()
+      setText(fs, LABEL_TEXT[v](), TILE_W - 8)
+    end
+  end
+  b.word = text(b, "GameFontNormal", 13)
+  b.word:SetPoint("BOTTOM", b, "BOTTOM", 0, 5)
+  setText(b.word, t.label[v], TILE_W - 8)
+  b.value = v
+  return b
+end
+
 local function buildMenu(parent)
   local t = CreateFrame("Frame", nil, parent)
   t:SetAllPoints()
@@ -872,14 +1096,32 @@ local function buildMenu(parent)
   for i, key in ipairs(MENU_ROWS) do
     local f = row(t, PAD + (i - 1) * ROW_H)
     f.key = key
+    f.h = TILES[key] and TILE_ROW_H or ROW_H
+    f:SetHeight(f.h)
     f.label = text(f, "GameFontNormal", 15)
     f.label:SetPoint("LEFT", f, "LEFT", RP, 0)
     f.label:SetJustifyH("LEFT")
-    setText(f.label, MENU_LABEL[key], LABEL_W)
+    local room = TILES[key] and (ROW_W - 2 * RP - (2 * TILE_W + TILE_GAP) - 8) or LABEL_W
+    setText(f.label, MENU_LABEL[key], room)
     local function focusHere()
-      st.mi = i
+      st.mkey = key
     end
-    if key == "pos" then
+    if TILES[key] then
+      f.tiles = {}
+      for n = 1, 2 do
+        local b = tile(f, key, n)
+        b:SetPoint("RIGHT", f, "RIGHT", -RP - (2 - n) * (TILE_W + TILE_GAP), 0)
+        b:SetScript(
+          "OnClick",
+          clicked(function()
+            focusHere()
+            step(key, n == 1 and -1 or 1)
+          end)
+        )
+        hovers(f, b)
+        f.tiles[n] = b
+      end
+    elseif key == "pos" then
       f.move = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
       f.reset = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
       for n, b in ipairs({ f.move, f.reset }) do
@@ -1018,7 +1260,13 @@ local function build()
       ns.preview(false)
     end
     if ns.db then
-      ns.db.x, ns.db.y = math.floor(ns.db.x + 0.5), math.floor(ns.db.y + 0.5)
+      for _, p in pairs(ns.PLACES) do
+        for _, k in ipairs({ p.x, p.y }) do
+          if type(ns.db[k]) == "number" then
+            ns.db[k] = math.floor(ns.db[k] + 0.5)
+          end
+        end
+      end
     end
   end)
   table.insert(UISpecialFrames, "HealpadOptions")
@@ -1058,7 +1306,7 @@ function ns.optionsDebug()
       if st.tab == "heals" then
         return st.li
       end
-      local key = MENU_ROWS[st.mi]
+      local key = st.mkey
       if key == "pos" then
         return st.sub == 2 and "reset" or "move"
       end

@@ -104,6 +104,16 @@ local function last(W)
   return W.casts[#W.casts]
 end
 
+-- The game's party frames, as this client makes them.
+local function gameFrames(W)
+  local pf = W.G.CreateFrame("Frame", "PartyFrame", W.G.UIParent)
+  pf:RegisterEvent("GROUP_ROSTER_UPDATE")
+  pf:RegisterEvent("VARIABLES_LOADED")
+  local raid = W.G.CreateFrame("Frame", "CompactRaidFrameManager", W.G.UIParent)
+  raid:RegisterEvent("GROUP_ROSTER_UPDATE")
+  return pf, raid
+end
+
 test("your bindings: pad buttons with spells, keyboard heals only, LT combos named", function()
   local W, ns = game()
   local keys = {}
@@ -1137,15 +1147,21 @@ test("settings: Menu: the labels; every control as wide, arrows in two columns",
   W.tap("PADRSHOULDER")
   local d = ns.optionsDebug()
   local labels, values = {}, {}
-  for i, f in ipairs(d.ui.mlist) do
-    labels[i] = f.label:GetText()
-    if f.ctl then
+  for _, f in ipairs(d.ui.mlist) do
+    if f:IsShown() then
+      labels[#labels + 1] = f.label:GetText()
+    end
+    if f:IsShown() and f.ctl then
       eq(f.ctl:GetWidth(), d.layout.CTL_W, f.key .. " as wide as the rest")
       eq(f.ctl.left:GetWidth(), f.ctl.right:GetWidth())
       values[#values + 1] = plainText(f.ctl.value:GetText())
     end
   end
-  eq(table.concat(labels, ","), "Style,Size,Spacing,Select person with,Cancel heal with,Menu position")
+  eq(
+    table.concat(labels, ","),
+    "Mode,Look,Size,Spacing,Party Frames,Select person with,Cancel heal with,Position",
+    "Radial's rows"
+  )
   eq(table.concat(values, ","), "Classic,100%,100%,D-pad,B")
   local pos = d.ui.mrows.pos
   eq(pos.move:GetWidth() * 2 + 8, d.layout.CTL_W, "Move and Reset as wide as a control")
@@ -1163,9 +1179,11 @@ test("settings: Menu: Left and Right change each row, A steps on, clicks too", f
   W.tap("PADRSHOULDER")
   local d = ns.optionsDebug()
   local m = d.ui.mrows
+  eq(d.focus(), "mode")
+  W.tap("PADDDOWN")
   eq(d.focus(), "look")
   W.tap("PADDRIGHT")
-  eq(ns.db.look, "medallions", "Style")
+  eq(ns.db.look, "medallions", "Look")
   eq(ns.look.name, "medallions", "the menu shows it")
   eq(m.look.ctl.value:GetText(), "Medallions")
   W.tap("PADDLEFT")
@@ -1205,6 +1223,8 @@ test("settings: Menu: Left and Right change each row, A steps on, clicks too", f
   eq(ns.db.spacing, 0.6, "stops at 60%")
   click(m.spacing.ctl.mid)
   eq(ns.db.spacing, 0.7, "a click on the bar steps on")
+  W.tap("PADDDOWN")
+  eq(d.focus(), "frames")
   W.tap("PADDDOWN")
   eq(d.focus(), "pick")
   W.tap("PADDRIGHT")
@@ -1283,7 +1303,7 @@ test("settings: Menu position: Move becomes Done, the d-pad and sticks nudge, Re
   }
   W.update(0.5)
   eq(ns.db.x, 0, "no Move, no moving")
-  for _ = 1, 5 do
+  for _ = 1, 7 do
     W.tap("PADDDOWN")
   end
   eq(d.focus(), "move")
@@ -1402,6 +1422,199 @@ test("settings: the window keeps to the side of the screen the menu leaves free"
   eq(side(300, 1100, 1280, "right"), "right", "no room either side: stays")
   eq(side(300, 1100, 1280, "left"), "left")
   eq(side(nil, nil, 1280, "left"), "left", "unknown: stays")
+  clean(W)
+end)
+
+local function shownLabels(d)
+  local labels = {}
+  for _, f in ipairs(d.ui.mlist) do
+    if f:IsShown() then
+      labels[#labels + 1] = f.label:GetText()
+    end
+  end
+  return table.concat(labels, ",")
+end
+
+test("settings: Mode by picture, Radial or Buttons; each mode shows only its settings", function()
+  local W, ns = game()
+  ns.openOptions()
+  W.tap("PADRSHOULDER")
+  local d = ns.optionsDebug()
+  local m = d.ui.mrows
+  eq(d.focus(), "mode")
+  eq(m.mode.tiles[1].word:GetText(), "Radial")
+  eq(m.mode.tiles[2].word:GetText(), "Buttons")
+  eq(m.mode.tiles[1].edge:IsShown(), true, "Radial picked: the gold edge")
+  eq(m.mode.tiles[2].edge:IsShown(), false)
+  local h = W.G.HealpadOptions:GetHeight()
+  W.tap("PADDRIGHT")
+  eq(ns.db.mode, "buttons", "Right: Buttons")
+  eq(m.mode.tiles[2].edge:IsShown(), true)
+  eq(shownLabels(d), "Mode,Size,After a heal,Labels,Cancel heal with,Position", "Buttons' rows")
+  eq(ns.grid:IsShown(), true, "the Buttons frames show")
+  eq(ns.diamond:IsShown(), false, "no menu preview in Buttons")
+  eq(ns.ctl:GetAttribute("bmode"), true)
+  eq(plainText(m.cancel.ctl.value:GetText()), "Back", "Buttons cancels with Back")
+  eq(ns.db.cancel, "PAD2", "Radial's cancel kept")
+  eq(W.G.HealpadOptions:GetHeight() ~= h, true, "the window fits the rows")
+  W.tap("PADDDOWN")
+  eq(d.focus(), "size")
+  W.tap("PADDRIGHT")
+  eq(ns.db.gscale, 1.1, "Size is the Buttons frames' size")
+  eq(ns.db.scale, 1, "the menu's size kept")
+  eq(ns.grid.scale, 1.1)
+  W.tap("PADDDOWN")
+  eq(d.focus(), "after")
+  eq(m.after.tiles[1].word:GetText(), "Once")
+  eq(m.after.tiles[2].word:GetText(), "Locked")
+  W.tap("PAD1")
+  eq(ns.db.after, "locked", "A: the other tile")
+  eq(ns.ctl:GetAttribute("lockmode"), true)
+  W.tap("PADDLEFT")
+  eq(ns.db.after, "once")
+  eq(ns.ctl:GetAttribute("lockmode"), nil)
+  W.tap("PADDDOWN")
+  eq(d.focus(), "labels")
+  eq(m.labels.tiles[1].word:GetText(), "Row")
+  eq(m.labels.tiles[2].word:GetText(), "Full")
+  eq(m.labels.tiles[2].edge:IsShown(), true, "Full by default")
+  click(m.labels.tiles[1])
+  eq(ns.db.labels, "row", "a click on a tile")
+  W.tap("PADDUP")
+  W.tap("PADDUP")
+  W.tap("PADDUP")
+  eq(d.focus(), "mode")
+  W.tap("PADDLEFT")
+  eq(ns.db.mode, "radial")
+  eq(shownLabels(d), "Mode,Look,Size,Spacing,Party Frames,Select person with,Cancel heal with,Position")
+  eq(ns.grid:IsShown(), false)
+  eq(ns.diamond:IsShown(), true, "the menu preview back")
+  eq(plainText(m.cancel.ctl.value:GetText()), "B")
+  eq(ns.ctl:GetAttribute("bmode"), nil)
+  W.G.HealpadOptions:Hide()
+  clean(W)
+end)
+
+test("settings: Party Frames by picture: Plus or Game", function()
+  local W, ns = game()
+  local pf = gameFrames(W)
+  ns.openOptions()
+  W.tap("PADRSHOULDER")
+  local d = ns.optionsDebug()
+  local m = d.ui.mrows
+  eq(m.frames.tiles[1].word:GetText(), "Plus")
+  eq(m.frames.tiles[2].word:GetText(), "Game")
+  eq(m.frames.tiles[2].edge:IsShown(), true, "Game by default")
+  for _ = 1, 4 do
+    W.tap("PADDDOWN")
+  end
+  eq(d.focus(), "frames")
+  W.tap("PADDLEFT")
+  eq(ns.db.frames, "plus")
+  eq(pf:GetParent(), W.G.HealpadHiddenFrames, "the game's party frames away")
+  W.G.HealpadOptions:Hide()
+  eq(ns.diamond:IsShown(), true, "the plus stays when the window closes")
+  ns.openOptions()
+  W.tap("PADRSHOULDER")
+  W.tap("PAD1")
+  eq(ns.db.frames, "game", "A: the other tile")
+  W.G.HealpadOptions:Hide()
+  eq(ns.diamond:IsShown(), false)
+  eq(pf:GetParent(), W.G.UIParent)
+  clean(W)
+end)
+
+test("settings: Cancel heal with: Buttons offers only buttons off the grid", function()
+  local W, ns = game({ saved = { mode = "buttons", aim = { PAD3 = { tap = "player" } } } })
+  ns.openOptions()
+  W.tap("PADRSHOULDER")
+  local d = ns.optionsDebug()
+  for _ = 1, 4 do
+    W.tap("PADDDOWN")
+  end
+  eq(d.focus(), "cancel")
+  local seen = {}
+  for _ = 1, 7 do
+    W.tap("PADDRIGHT")
+    seen[#seen + 1] = ns.db.btnCancel
+  end
+  eq(
+    table.concat(seen, ","),
+    "PADLSTICK,PADRSTICK,PADPADDLE1,PADPADDLE2,PADPADDLE3,PADPADDLE4,PADBACK",
+    "Back, the stick clicks and the paddles"
+  )
+  eq(ns.db.cancel, "PAD2", "Radial's own kept")
+  W.tap("PADDRIGHT")
+  W.G.HealpadOptions:Hide()
+  W.combat = true
+  W.tap("PAD3")
+  eq(W.secureBinds.PADLSTICK.target, "HealpadCancel", "the new cancel")
+  W.tap("PADLSTICK")
+  eq(ns.ctl:GetAttribute("armed"), nil)
+  clean(W)
+end)
+
+test("settings: a saved setting that isn't one of its mode's choices becomes that mode's default", function()
+  local W, ns = game({
+    saved = { mode = "grid", frames = "both", after = "twice", labels = "big", cancel = "PADBACK", btnCancel = "PAD1" },
+  })
+  eq(ns.db.mode, "radial")
+  eq(ns.db.frames, "game")
+  eq(ns.db.after, "once")
+  eq(ns.db.labels, "full")
+  eq(ns.db.cancel, "PAD2", "Radial's default")
+  eq(ns.db.btnCancel, "PADBACK", "A is on the grid: Buttons' default")
+  clean(W)
+  W, ns = game({ saved = { cancel = "PAD4", btnCancel = "PADRSTICK", aim = {} } })
+  eq(ns.db.cancel, "PAD4", "kept")
+  eq(ns.db.btnCancel, "PADRSTICK", "kept")
+  clean(W)
+end)
+
+test("settings: Buttons: no word with aim, KeyBars or Style; every word fits", function()
+  local W = Wow.new()
+  setup(W)
+  party(W)
+  withKeyBars(W)
+  local ns = W.load(DIR, FILES, { mode = "buttons", aim = { PAD3 = { tap = "player" } } })
+  ns.openOptions()
+  local d = ns.optionsDebug()
+  W.tap("PADRSHOULDER")
+  local words = panelTexts(W)
+  for _, t in ipairs(words) do
+    eq(t:find("KeyBars") == nil, true, "no KeyBars: " .. t)
+    eq(t:lower():find("aim") == nil, true, "no aim: " .. t)
+    eq(t:find("Style") == nil, true, "no Style: " .. t)
+  end
+  for _, f in ipairs(d.fitted) do
+    eq(f.fs:GetStringWidth() <= f.room, true, tostring(f.fs:GetText()) .. " fits " .. f.room)
+  end
+  ns.optionsPanel():Hide()
+  clean(W)
+end)
+
+test("settings: Position in Buttons moves the Buttons frames; Reset puts them back", function()
+  local W, ns = game({ saved = { mode = "buttons", aim = {} } })
+  ns.openOptions()
+  W.tap("PADRSHOULDER")
+  local d = ns.optionsDebug()
+  for _ = 1, 5 do
+    W.tap("PADDDOWN")
+  end
+  eq(d.focus(), "move")
+  W.tap("PAD1")
+  W.tap("PADDRIGHT")
+  W.tap("PADDDOWN")
+  W.tap("PAD1")
+  eq(ns.db.gx, 24 + 20, "moved right")
+  eq(ns.db.gy, -150 - 20, "and down")
+  eq(ns.db.x, 0, "the menu's place kept")
+  W.tap("PADDRIGHT")
+  eq(d.focus(), "reset")
+  W.tap("PAD1")
+  eq(ns.db.gx, 24)
+  eq(ns.db.gy, -150)
+  ns.optionsPanel():Hide()
   clean(W)
 end)
 
@@ -1810,16 +2023,6 @@ test("/hp test in Gamepad Mode reports the controller bar", function()
 end)
 
 ---------------------------------------------------------------- Party Frames: Plus
-
--- The game's party frames, as this client makes them.
-local function gameFrames(W)
-  local pf = W.G.CreateFrame("Frame", "PartyFrame", W.G.UIParent)
-  pf:RegisterEvent("GROUP_ROSTER_UPDATE")
-  pf:RegisterEvent("VARIABLES_LOADED")
-  local raid = W.G.CreateFrame("Frame", "CompactRaidFrameManager", W.G.UIParent)
-  raid:RegisterEvent("GROUP_ROSTER_UPDATE")
-  return pf, raid
-end
 
 local function plusGame(opts)
   opts = opts or {}
