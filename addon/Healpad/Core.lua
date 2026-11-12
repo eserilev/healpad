@@ -14,6 +14,16 @@ ns.DIRS = { "UP", "RIGHT", "DOWN", "LEFT", "SELF" }
 ns.AIMERS = { "dpad", "lstick", "rstick" }
 ns.AIMER_LABEL = { dpad = "D-pad", rstick = "Right stick", lstick = "Left stick" }
 ns.CANCELS = { "PAD1", "PAD2", "PAD3", "PAD4" }
+-- Buttons mode: the grid takes A, B, X, Y, the shoulders, triggers, d-pad
+-- and Start, so its cancel is one of the buttons left.
+ns.BTN_CANCELS = { "PADBACK", "PADLSTICK", "PADRSTICK", "PADPADDLE1", "PADPADDLE2", "PADPADDLE3", "PADPADDLE4" }
+
+-- The settings picked by tiles: Mode, Party Frames (Radial), After a heal
+-- and Labels (Buttons). The first of each is the left tile.
+ns.MODES = { "radial", "buttons" }
+ns.FRAMES = { "plus", "game" }
+ns.AFTERS = { "once", "locked" }
+ns.LABELS = { "row", "full" }
 
 local PREFIX = "|cff7fe3e3Healpad|r: "
 function ns.say(msg)
@@ -66,7 +76,64 @@ local DEFAULTS = {
   x = 0,
   y = 0,
   look = "classic",
+  mode = "radial",
+  frames = "game",
+  after = "once",
+  labels = "full",
+  btnCancel = "PADBACK",
 }
+-- Where the always-on frames sit, from the screen's top left corner, and
+-- their size: the plus (its middle) and the Buttons grid (its top left),
+-- each in the old party frames' place.
+ns.PLACES = {
+  plus = { scale = "pscale", x = "px", y = "py", dx = 250, dy = -310, size = 0.7 },
+  grid = { scale = "gscale", x = "gx", y = "gy", dx = 24, dy = -150, size = 1 },
+  menu = { scale = "scale", x = "x", y = "y", dx = 0, dy = 0, size = 1 },
+}
+
+local function oneOf(list, v)
+  for _, x in ipairs(list) do
+    if x == v then
+      return true
+    end
+  end
+  return false
+end
+ns.oneOf = oneOf
+
+-- Buttons mode: tap a heal, then press the person.
+function ns.isButtons()
+  return ns.db ~= nil and ns.db.mode == "buttons"
+end
+-- Radial with Party Frames on Plus: the plus is always on screen.
+function ns.plusOn()
+  return ns.db ~= nil and ns.db.mode ~= "buttons" and ns.db.frames == "plus"
+end
+-- Which frames are on screen all the time: "plus", "grid" or nil (the
+-- menu shows only while you hold a heal).
+function ns.placeName()
+  if ns.isButtons() then
+    return "grid"
+  end
+  return ns.plusOn() and "plus" or "menu"
+end
+-- The place in use: its scale, and its x and y as saved.
+function ns.place(name)
+  local p = ns.PLACES[name or ns.placeName()]
+  local db = ns.db or {}
+  return db[p.scale] or p.size, db[p.x] or p.dx, db[p.y] or p.dy, p
+end
+
+-- The cancel choices of the mode in use, and the cancel button now.
+function ns.cancels()
+  return ns.isButtons() and ns.BTN_CANCELS or ns.CANCELS
+end
+function ns.cancelKey()
+  if ns.isButtons() then
+    return ns.db.btnCancel
+  end
+  return ns.db.cancel
+end
 
 -- Spacing: how far apart the people sit, 0.6 to 1.4 of the usual room
 -- between them. Before 0.4 it was Spread, 1 to 5 (3 the usual); a saved
@@ -102,6 +169,26 @@ function ns.setupDB()
   db.spacing = ns.spacingOf(db)
   if ns.looks and not ns.looks[db.look] then
     db.look = DEFAULTS.look
+  end
+  if not oneOf(ns.MODES, db.mode) then
+    db.mode = DEFAULTS.mode
+  end
+  if not oneOf(ns.FRAMES, db.frames) then
+    db.frames = DEFAULTS.frames
+  end
+  if not oneOf(ns.AFTERS, db.after) then
+    db.after = DEFAULTS.after
+  end
+  if not oneOf(ns.LABELS, db.labels) then
+    db.labels = DEFAULTS.labels
+  end
+  -- A cancel that isn't one of its mode's choices is that mode's default;
+  -- each mode keeps its own.
+  if not oneOf(ns.CANCELS, db.cancel) then
+    db.cancel = DEFAULTS.cancel
+  end
+  if not oneOf(ns.BTN_CANCELS, db.btnCancel) then
+    db.btnCancel = DEFAULTS.btnCancel
   end
   db.aim = db.aim or {} -- [binding key] = { tap = "player" }: that key holds to aim
   db.aimSpell = db.aimSpell or {} -- [KeyBars cast value] = { tap }: that spell holds to aim on KeyBars keys

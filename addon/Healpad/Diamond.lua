@@ -283,10 +283,8 @@ function ns.redraw()
   end
   local page = ctl:GetAttribute("page") or 1
   local pages = ctl:GetAttribute("pages") or 1
-  -- Who sits where: the tap target in the middle, you in their place.
-  local swap = page == 1 and ctl:GetAttribute("swap") or nil
   local sample = previewing and ctl:GetAttribute("state") ~= "aim" and (not IsInGroup() or ns.stage ~= nil)
-  local sel = (ns.stage and ns.stage.sel) or ctl:GetAttribute("sel") or (swap and "SELF") or tapPlace(page, sample)
+  local sel = (ns.stage and ns.stage.sel) or ctl:GetAttribute("sel") or tapPlace(page, sample)
   local spell = heldSpell() or ns.previewSpell
   lastSpell = spell or lastSpell
   title:SetText(spell and ns.spellLabel(spell) or "")
@@ -294,11 +292,6 @@ function ns.redraw()
   local ctx = { spell = spell, sel = sel }
   for _, d in ipairs(ns.DIRS) do
     local from = d
-    if swap and d == "SELF" then
-      from = swap
-    elseif swap and d == swap then
-      from = "SELF"
-    end
     local src
     drawn[d] = nil
     if sample and SAMPLE[from] then
@@ -321,9 +314,6 @@ function ns.redraw()
       end
     else
       local unit = ctl:GetAttribute("u" .. page .. "-" .. from)
-      if from == "SELF" and swap then
-        unit = "player"
-      end
       if unit and UnitExists(unit) then
         src = { kind = "unit", unit = unit }
         drawn[d] = unit

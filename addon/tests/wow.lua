@@ -333,22 +333,41 @@ function M.new()
   function Frame:GetFrameRef(label)
     return self.refs and self.refs[label]
   end
-  function Frame:ClearBindings()
-    for key, b in pairs(W.secureBinds) do
-      if b.owner == self then
-        W.secureBinds[key] = nil
+  -- Override bindings stack by owner: each owner has at most one binding on
+  -- a key, the most recent one wins, and clearing an owner's bindings
+  -- uncovers what another owner bound there. W.secureBinds is the winner.
+  W.bindStack = {}
+  local function restack(key)
+    local list = W.bindStack[key] or {}
+    W.secureBinds[key] = list[#list]
+  end
+  local function unbind(owner, key)
+    local list = W.bindStack[key]
+    if not list then
+      return
+    end
+    for i = #list, 1, -1 do
+      if list[i].owner == owner then
+        table.remove(list, i)
       end
+    end
+    restack(key)
+  end
+  function Frame:ClearBindings()
+    for key in pairs(W.bindStack) do
+      unbind(self, key)
     end
   end
   function Frame:ClearBinding(key)
     assert(W.inSecure, "ClearBinding outside a snippet")
-    if W.secureBinds[key] and W.secureBinds[key].owner == self then
-      W.secureBinds[key] = nil
-    end
+    unbind(self, key)
   end
-  function Frame:SetBindingClick(priority, key, name)
+  function Frame:SetBindingClick(priority, key, name, button)
     assert(W.inSecure, "SetBindingClick outside a snippet")
-    W.secureBinds[key] = { owner = self, target = name, priority = priority }
+    unbind(self, key)
+    W.bindStack[key] = W.bindStack[key] or {}
+    table.insert(W.bindStack[key], { owner = self, target = name, priority = priority, button = button })
+    restack(key)
   end
 
   G.CreateFrame = function(kind, name, parent, template)
@@ -404,7 +423,10 @@ function M.new()
       if s:find("bonusbar", 1, true) then
         return W.bar
       end
-      local u = s:match("^%[@([%w]+),help,nodead%] yes; no$")
+      if s:find("[dead]", 1, true) then
+        return W.stop and "1" or "0"
+      end
+      local u = s:match("^%[@([^,%]]+),help,nodead%] yes; no$")
       if u then
         local t = W.units[u]
         if u == "target" then
@@ -471,13 +493,21 @@ function M.new()
   -- The bar changes (a form, a page): drivers update and their snippets run.
   function W.setBar(state)
     W.bar = state
+    W.drive()
+  end
+  -- Dead, mounted or on a possess bar (true), or back (false).
+  function W.setStop(on)
+    W.stop = on
+    W.drive()
+  end
+  function W.drive()
     for _, d in ipairs(W.drivers) do
       W.inSecure = true
       d.frame:SetAttribute("state-" .. d.name, G.SecureCmdOptionParse(d.cond))
       W.inSecure = false
       local body = d.frame.attrs["_onstate-" .. d.name]
       if body then
-        runSnippet(body, {}, d.frame)
+        runSnippetAs("self, stateid, newstate", body, {}, d.frame, d.name, d.frame.attrs["state-" .. d.name])
       end
     end
   end
@@ -485,6 +515,16 @@ function M.new()
     frame.refs = frame.refs or {}
     frame.refs[label] = ref
   end
+
+  local function registered(f, what)
+    for _, c in ipairs(f.clicks or {}) do
+      if c == what then
+        return true
+      end
+    end
+    return false
+  end
+  W.registered = registered
 
   -- A click from a binding: the wrap, the template action, then the hooks.
   W.keyDownCvar = true -- the game's ActionButtonUseKeyDown
@@ -519,7 +559,7 @@ function M.new()
           table.insert(W.casts, { spell = spell, unit = unit, combat = W.combat })
         end
       end
-    elseif f.template:find("SecureHandlerClickTemplate") and down then
+    elseif f.template:find("SecureHandlerClickTemplate") and (down or registered(f, "AnyUp")) then
       runSnippet(f.attrs._onclick, {}, f, "LeftButton", down)
     elseif f.template == "" and down and f.scripts.OnClick then
       f.scripts.OnClick(f, "LeftButton", down) -- a plain button: clicks on the press
@@ -830,6 +870,22 @@ function M.new()
     end
     return v
   end
+  -- A group member can be named in place of a unit token.
+  setmetatable(W.units, {
+    __index = function(t, k)
+      if type(k) ~= "string" then
+        return nil
+      end
+      for _, x in pairs(t) do
+        if type(x) == "table" and x.name == k then
+          return x
+        end
+      end
+    end,
+  })
+  G.GetUnitName = function(u)
+    return G.UnitName(u)
+  end
   G.UnitExists = function(u)
     return u ~= nil and W.units[u] ~= nil
   end
@@ -991,8 +1047,10 @@ function M.new()
       end
     end,
     IsSpellInRange = function(_, unit)
-      if W.rangeOut[unit] then
-        return hidden(false)
+      for k, out in pairs(W.rangeOut) do
+        if out and W.units[k] ~= nil and W.units[k] == W.units[unit] then
+          return hidden(false)
+        end
       end
       return hidden(true)
     end,
