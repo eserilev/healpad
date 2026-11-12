@@ -1067,23 +1067,91 @@ function M.new()
       return hidden(true)
     end,
   }
-  G.C_UnitAuras = {
-    GetAuraDataByIndex = function(unit, _, filter)
-      local x = W.units[unit]
-      if filter and filter:find("HELPFUL") then
-        return x and x.hot and { auraInstanceID = 8, icon = 136081 } or nil
+  -- A unit's auras: hot (true) or hots (a list) for your HoTs, debuff (a
+  -- dispel type) or debuffs (a list of { type, stacks }), mine (a list of
+  -- your own buffs on you: { name, id, duration }), has[name] for any buff.
+  -- In combat the stacks and times are secret.
+  local function auras(x, filter)
+    if filter:find("HARMFUL") then
+      if x.debuffs then
+        return x.debuffs
       end
-      local d = x and x.debuff
-      return d and { auraInstanceID = 7, dispelName = d } or nil
+      return x.debuff and { { x.debuff, 1 } } or {}
+    end
+    if filter:find("RAID_IN_COMBAT") then
+      if x.hots then
+        return x.hots
+      end
+      return x.hot and { {} } or {}
+    end
+    return x.mine or {}
+  end
+  W.auraReads = 0
+  G.C_UnitAuras = {
+    GetAuraDataByIndex = function(unit, n, filter)
+      W.auraReads = W.auraReads + 1
+      if W.aurasRefused and W.combat then
+        error("auras are hidden in combat")
+      end
+      local x = W.units[unit]
+      if not x then
+        return nil
+      end
+      local a = auras(x, filter or "HELPFUL")[n]
+      if not a then
+        return nil
+      end
+      if filter and filter:find("HARMFUL") then
+        return { auraInstanceID = 70 + n, dispelName = a[1], applications = hidden(a[2] or 1), icon = 136066 }
+      end
+      if filter and filter:find("RAID_IN_COMBAT") then
+        return { auraInstanceID = 80 + n, icon = 136081, duration = hidden(12), expirationTime = hidden(110) }
+      end
+      return {
+        auraInstanceID = 90 + n,
+        name = a.name,
+        spellId = a.id,
+        icon = 136078,
+        duration = a.duration,
+        sourceUnit = "player",
+      }
+    end,
+    GetAuraDataBySpellName = function(unit, name)
+      local x = W.units[unit]
+      if x and ((x.has and x.has[name]) or x == W.units.player) then
+        return { name = name }
+      end
+      return nil
     end,
     GetAuraDispelTypeColor = function()
       return {
         GetRGBA = function()
-          return 0.2, 0.6, 1, 1
+          return hidden(0.2), hidden(0.6), hidden(1), hidden(1)
         end,
       }
     end,
+    GetAuraApplicationDisplayCount = function(unit, id)
+      local x = W.units[unit]
+      local list = x and auras(x, id < 80 and "HARMFUL" or "RAID_IN_COMBAT") or {}
+      local a = list[id - (id < 80 and 70 or 80)]
+      local n = a and a[2] or 1
+      return hidden(n > 1 and tostring(n) or "")
+    end,
+    GetAuraDuration = function()
+      return { duration = true }
+    end,
   }
+  G.UnitThreatSituation = function(u)
+    local x = W.units[u]
+    if W.threatSecret then
+      return secret(x and x.threat or 0)
+    end
+    return x and x.threat or 0
+  end
+  G.UnitHasIncomingResurrection = function(u)
+    local x = W.units[u]
+    return hidden(x and x.rez or false)
+  end
   G.C_CurveUtil = {
     CreateColorCurve = function()
       local c = { points = {} }

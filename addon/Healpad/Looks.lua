@@ -294,27 +294,6 @@ function K.missing(fs, src)
   end)
 end
 
--- Your own heal over time on them: its icon on the pip.
-function K.hot(pip, src)
-  if src.unit then
-    local unit = src.unit
-    local ok = pcall(function()
-      local aura = C_UnitAuras.GetAuraDataByIndex(unit, 1, "HELPFUL|PLAYER|RAID_IN_COMBAT")
-      if not aura then
-        error("none")
-      end
-      pip.icon:SetTexture(aura.icon)
-    end)
-    pip:SetShown(ok)
-    return
-  end
-  pip:SetShown(src.hot == true)
-  if src.hot then
-    local icon = ns.previewSpell and ns.spellIcon(ns.previewSpell)
-    pip.icon:SetTexture((icon and icon ~= 134400) and icon or "Interface\\Icons\\Spell_Holy_Renew")
-  end
-end
-
 local dispelCurve
 local function dispelColors()
   if dispelCurve ~= nil then
@@ -334,29 +313,105 @@ local function dispelColors()
   return dispelCurve
 end
 
--- A debuff you can remove: the pip in the debuff's color.
-function K.dispel(pip, src)
-  if src.unit then
-    local unit = src.unit
-    local ok = pcall(function()
-      local aura = C_UnitAuras.GetAuraDataByIndex(unit, 1, "HARMFUL|RAID")
-      if not aura then
-        error("none")
+-- Aura n of a filter on a unit, or nil. Every read is guarded: the game
+-- may refuse a party member's auras to addons in combat.
+local function aura(unit, n, filter)
+  local ok, a = pcall(C_UnitAuras.GetAuraDataByIndex, unit, n, filter)
+  if ok and type(a) == "table" then
+    return a
+  end
+end
+
+-- An aura's icon on a little square (debuff and HoT icons).
+local function setIcon(icon, a)
+  if not pcall(icon.tex.SetTexture, icon.tex, a.icon) then
+    icon.tex:SetColorTexture(0.3, 0.3, 0.3, 1)
+  end
+end
+
+-- The stack count: the game's own words for it (secret-safe), else the
+-- number when it's plain and more than one.
+local function setCount(fs, unit, a)
+  local ok = pcall(function()
+    fs:SetText(C_UnitAuras.GetAuraApplicationDisplayCount(unit, a.auraInstanceID, 2))
+  end)
+  if not ok then
+    local n = a.applications
+    fs:SetText((type(n) == "number" and not K.secret(n) and n > 1) and tostring(n) or "")
+  end
+end
+
+-- The clock on a HoT: from the aura's duration object, which may be set
+-- while secret; else from plain times; else no clock.
+local function setClock(cd, unit, a)
+  local ok = pcall(function()
+    cd:SetCooldownFromDurationObject(C_UnitAuras.GetAuraDuration(unit, a.auraInstanceID))
+  end)
+  if not ok then
+    ok = pcall(function()
+      local d, e = a.duration, a.expirationTime
+      if K.secret(d) or K.secret(e) or type(d) ~= "number" or d <= 0 then
+        error("no time")
       end
-      local c = dispelColors()
-      local color = c and C_UnitAuras.GetAuraDispelTypeColor(unit, aura.auraInstanceID, c)
-      if not color then
-        error("none")
-      end
-      pip:SetColor(color:GetRGBA())
+      cd:SetCooldown(e - d, d)
     end)
-    pip:SetShown(ok)
+  end
+  cd:SetShown(ok)
+end
+
+-- Shown or hidden by a yes or no that may be secret: a secret one goes to
+-- the game as the region's alpha.
+function K.showIf(region, v)
+  if K.secret(v) then
+    region:Show()
+    if not pcall(region.SetAlphaFromBoolean, region, v, 1, 0) then
+      region:Hide()
+    end
     return
   end
-  local on = src.dispel ~= nil and (not ns.stage or ns.stage.dispel ~= false)
-  pip:SetShown(on)
-  if on then
-    pip:SetColor(unpack(src.dispel))
+  region:SetAlpha(1)
+  region:SetShown(v == true)
+end
+
+-- Your own long buffs (an hour's Mark of the Wild, Fortitude...), learned
+-- from what you cast on yourself: classes here have their own spells, so
+-- none is named. { [name] = icon }, kept in the saved settings.
+function K.learnBuffs()
+  if InCombatLockdown() or not ns.db then
+    return
+  end
+  ns.db.buffs = ns.db.buffs or {}
+  for i = 1, 40 do
+    local a = aura("player", i, "HELPFUL|PLAYER")
+    if not a then
+      break
+    end
+    pcall(function()
+      if K.secret(a.duration) or K.secret(a.spellId) then
+        return
+      end
+      local mine = a.sourceUnit == "player"
+      if mine and type(a.duration) == "number" and a.duration >= 600 and ns.isHeal(a.spellId) then
+        local name = C_Spell.GetSpellName(a.spellId)
+        if name and not ns.db.buffs[name] then
+          ns.db.buffs[name] = a.icon or 136243
+        end
+      end
+    end)
+  end
+end
+
+-- The icon of one of your buffs this person lacks, out of combat; nil
+-- when they have them all (or in combat, or when the game won't say).
+function K.missingBuff(unit)
+  if InCombatLockdown() or not (ns.db and ns.db.buffs) then
+    return nil
+  end
+  for name, icon in pairs(ns.db.buffs) do
+    local ok, a = pcall(C_UnitAuras.GetAuraDataBySpellName, unit, name, "HELPFUL")
+    if ok and a == nil then
+      return icon
+    end
   end
 end
 
@@ -427,38 +482,239 @@ function K.glow(parent, size, layer, sub, r, g, b, a)
   return t
 end
 
--- Your heal over time: its icon in a thin gold frame.
-function K.hotPip(parent, size)
+-- A thin edge around a region, colored by vertex color so a secret
+-- color can go straight to it. Hidden until shown.
+function K.edge(parent, region, pad, size)
+  local o = CreateFrame("Frame", nil, parent)
+  o:SetPoint("TOPLEFT", region, "TOPLEFT", -pad, pad)
+  o:SetPoint("BOTTOMRIGHT", region, "BOTTOMRIGHT", pad, -pad)
+  o.lines = {}
+  for i, side in ipairs({
+    { "TOPLEFT", "TOPRIGHT", "h" },
+    { "BOTTOMLEFT", "BOTTOMRIGHT", "h" },
+    { "TOPLEFT", "BOTTOMLEFT", "w" },
+    { "TOPRIGHT", "BOTTOMRIGHT", "w" },
+  }) do
+    local t = o:CreateTexture(nil, "OVERLAY", nil, 6)
+    t:SetPoint(side[1])
+    t:SetPoint(side[2])
+    if side[3] == "h" then
+      t:SetHeight(size)
+    else
+      t:SetWidth(size)
+    end
+    t:SetColorTexture(1, 1, 1, 1)
+    o.lines[i] = t
+  end
+  function o.SetColor(_, r, g, b, a)
+    for _, t in ipairs(o.lines) do
+      t:SetVertexColor(r, g, b, a)
+    end
+  end
+  o:Hide()
+  return o
+end
+
+-- A little aura icon: a dark rim, the icon, a stack count, and for a HoT a
+-- clock that empties as it runs out (no edge, no flash).
+local function auraIcon(parent, size, clock)
   local p = CreateFrame("Frame", nil, parent)
   p:SetSize(size, size)
-  local edge = p:CreateTexture(nil, "OVERLAY", nil, 5)
-  edge:SetAllPoints()
-  edge:SetColorTexture(0.79, 0.63, 0.3, 1)
-  p.icon = p:CreateTexture(nil, "OVERLAY", nil, 6)
-  p.icon:SetPoint("TOPLEFT", 1, -1)
-  p.icon:SetPoint("BOTTOMRIGHT", -1, 1)
-  p.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+  local rim = p:CreateTexture(nil, "OVERLAY", nil, 4)
+  rim:SetAllPoints()
+  rim:SetColorTexture(0, 0, 0, 1)
+  p.tex = p:CreateTexture(nil, "OVERLAY", nil, 5)
+  p.tex:SetPoint("TOPLEFT", 1, -1)
+  p.tex:SetPoint("BOTTOMRIGHT", -1, 1)
+  p.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+  if clock then
+    local ok, cd = pcall(CreateFrame, "Cooldown", nil, p, "CooldownFrameTemplate")
+    if ok and cd then
+      cd:SetAllPoints(p.tex)
+      pcall(cd.SetDrawEdge, cd, false)
+      pcall(cd.SetDrawBling, cd, false)
+      pcall(cd.SetHideCountdownNumbers, cd, true)
+      pcall(cd.SetReverse, cd, true)
+      cd:Hide()
+      p.clock = cd
+    end
+  end
+  p.count = p:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
+  p.count:SetPoint("BOTTOMRIGHT", 2, -2)
   p:Hide()
   return p
 end
 
--- A debuff you can remove: a small gem in its color, with a glow.
-function K.dispelPip(parent, size)
-  local p = CreateFrame("Frame", nil, parent)
-  p:SetSize(size, size)
-  local glow = K.glow(p, size * 2.4, "OVERLAY", 4, 1, 1, 1, 0.9)
-  glow:SetPoint("CENTER")
-  local edge = K.diamond(p, size * 0.8, "OVERLAY", 5)
-  edge:SetPoint("CENTER")
-  edge:SetVertexColor(0.04, 0.1, 0.2, 1)
-  local gem = K.diamond(p, size * 0.66, "OVERLAY", 6)
-  gem:SetPoint("CENTER")
-  function p.SetColor(_, r, g, b, a)
-    gem:SetVertexColor(r, g, b, a)
-    glow:SetVertexColor(r, g, b, a)
+-- Everything a person's frame shows besides health and name, on f:
+--   edge      the frame's edge in a removable debuff's color
+--   tint      the health bar's back in that color
+--   debuffs   two removable debuffs with their stacks
+--   hots      two of your HoTs with their clocks
+--   aggro     a red bar along the top while a mob is on them
+--   rez       a resurrection on the way, over the portrait
+--   buff      one of your buffs they lack (out of combat)
+-- spec: edge (the region to edge; default f.med), pad and line size; size
+-- of the icons; debuffs and hots ({ point, relative, relativePoint, x, y }
+-- of the first icon, the second beside it; debuffsGrow or hotsGrow -1: to
+-- its left); top (the
+-- region the aggro bar sits on), rez (the region it covers), buff (anchor).
+function K.indicators(f, spec)
+  local host = spec.host or f.med or f
+  local size = spec.size or 14
+  f.edge = K.edge(host, spec.edge or host, spec.pad or 1, spec.line or 2)
+  if f.health and f.health.back then
+    local tint = f.health:CreateTexture(nil, "BACKGROUND", nil, 1)
+    tint:SetAllPoints()
+    tint:SetColorTexture(1, 1, 1, 1)
+    tint:SetAlpha(0.6)
+    tint:Hide()
+    f.tint = tint
   end
-  p:Hide()
-  return p
+  local function row(anchor, clock, grow)
+    grow = grow or 1
+    local list = {}
+    for i = 1, 2 do
+      local icon = auraIcon(host, size, clock)
+      if i == 1 then
+        icon:SetPoint(anchor[1], anchor[2], anchor[3], anchor[4], anchor[5])
+      else
+        icon:SetPoint(grow > 0 and "LEFT" or "RIGHT", list[1], grow > 0 and "RIGHT" or "LEFT", 2 * grow, 0)
+      end
+      list[i] = icon
+    end
+    return list
+  end
+  f.debuffs = row(spec.debuffs, false, spec.debuffsGrow)
+  f.hots = row(spec.hots, true, spec.hotsGrow)
+  local top = spec.top or host
+  f.aggro = host:CreateTexture(nil, "OVERLAY", nil, 7)
+  f.aggro:SetPoint("BOTTOMLEFT", top, "TOPLEFT", 0, 1)
+  f.aggro:SetPoint("BOTTOMRIGHT", top, "TOPRIGHT", 0, 1)
+  f.aggro:SetHeight(3)
+  f.aggro:SetColorTexture(0.9, 0.08, 0.05, 1)
+  f.aggro:Hide()
+  local over = spec.rez or host
+  f.rez = host:CreateTexture(nil, "OVERLAY", nil, 7)
+  f.rez:SetSize(spec.rezSize or 22, spec.rezSize or 22)
+  f.rez:SetPoint("CENTER", over, "CENTER")
+  if not pcall(f.rez.SetAtlas, f.rez, "RaidFrame-Icon-Rez") then
+    f.rez:SetTexture("Interface\\RaidFrame\\Raid-Icon-Rez")
+  end
+  f.rez:Hide()
+  f.buff = K.disc(host, spec.buffSize or 10, "OVERLAY", 7)
+  local b = spec.buff or { "TOPRIGHT", host, "TOPRIGHT", -2, -2 }
+  f.buff:SetPoint(b[1], b[2], b[3], b[4], b[5])
+  f.buff:Hide()
+end
+
+local function hideAll(f)
+  f.edge:Hide()
+  if f.tint then
+    f.tint:Hide()
+  end
+  for _, icon in ipairs(f.debuffs) do
+    icon:Hide()
+  end
+  for _, icon in ipairs(f.hots) do
+    icon:Hide()
+  end
+  f.aggro:Hide()
+  f.rez:Hide()
+  f.buff:Hide()
+end
+
+-- An example person's markers (the settings' preview).
+local SAMPLE_ICON = "Interface\\Icons\\Spell_Holy_Renew"
+local function sampleMarkers(f, src, status)
+  local dispel = src.dispel ~= nil and (not ns.stage or ns.stage.dispel ~= false) and status == nil
+  if dispel then
+    f.edge:SetColor(unpack(src.dispel))
+    f.edge:Show()
+    if f.tint then
+      f.tint:SetVertexColor(unpack(src.dispel))
+      f.tint:Show()
+    end
+    local d = f.debuffs[1]
+    d.tex:SetTexture("Interface\\Icons\\Spell_Holy_DispelMagic")
+    d.count:SetText("")
+    d:Show()
+  end
+  if src.hot and status == nil then
+    local icon = ns.previewSpell and ns.spellIcon(ns.previewSpell)
+    local h = f.hots[1]
+    h.tex:SetTexture((icon and icon ~= 134400) and icon or SAMPLE_ICON)
+    h.count:SetText("")
+    h:Show()
+  end
+end
+
+-- Draws f's markers for src. status: K.status's word, nil when alive.
+function K.markers(f, src, status)
+  if not f.edge then
+    return
+  end
+  hideAll(f)
+  if not src.unit then
+    return sampleMarkers(f, src, status)
+  end
+  local unit = src.unit
+  if status == "dead" then
+    local ok, v = pcall(UnitHasIncomingResurrection, unit)
+    if ok then
+      K.showIf(f.rez, v)
+    end
+    return
+  end
+  if status then
+    return
+  end
+  -- debuffs you can remove: the first one's color on the edge and the bar
+  for i = 1, 2 do
+    local a = aura(unit, i, "HARMFUL|RAID")
+    if not a then
+      break
+    end
+    local icon = f.debuffs[i]
+    setIcon(icon, a)
+    setCount(icon.count, unit, a)
+    icon:Show()
+    if i == 1 then
+      pcall(function()
+        local color = C_UnitAuras.GetAuraDispelTypeColor(unit, a.auraInstanceID, dispelColors())
+        f.edge:SetColor(color:GetRGBA())
+        f.edge:Show()
+        if f.tint then
+          f.tint:SetVertexColor(color:GetRGBA())
+          f.tint:Show()
+        end
+      end)
+    end
+  end
+  -- your heals over time
+  for i = 1, 2 do
+    local a = aura(unit, i, "HELPFUL|PLAYER|RAID_IN_COMBAT")
+    if not a then
+      break
+    end
+    local icon = f.hots[i]
+    setIcon(icon, a)
+    setCount(icon.count, unit, a)
+    if icon.clock then
+      setClock(icon.clock, unit, a)
+    end
+    icon:Show()
+  end
+  -- aggro: only from a plain answer; a secret one can't become a yes or no
+  -- outside the game's own code, so in that case no bar.
+  local okT, threat = pcall(UnitThreatSituation, unit)
+  if okT and type(threat) == "number" and not K.secret(threat) then
+    f.aggro:SetShown(threat >= 2)
+  end
+  local missing = K.missingBuff(unit)
+  if missing then
+    f.buff:SetTexture(missing)
+    f.buff:Show()
+  end
 end
 
 -- The skull or the unplugged cable.
@@ -500,7 +756,7 @@ function K.healthBar(parent, w, h)
 end
 
 -- What every look shows of a person, on the parts its spot has: name, health
--- (bar and incoming), face, hot, dispel, state (icon), crit (pulse) and body
+-- (bar and incoming), face, markers (K.indicators), state (icon), crit and body
 -- (the frame that fades out of range). Returns the status and far.
 function K.person(f, src, ctx, farAlpha)
   local status = K.status(src)
@@ -518,20 +774,15 @@ function K.person(f, src, ctx, farAlpha)
     pcall(f.face.SetDesaturated, f.face, status ~= nil)
   end
   local alive = status == nil
-  if f.hot then
-    if alive then
-      K.hot(f.hot, src)
-    else
-      f.hot:Hide()
+  -- dead or offline: the bar empties
+  if f.health and (status == "dead" or status == "offline") then
+    f.health:SetMinMaxValues(0, 1)
+    f.health:SetValue(0)
+    if f.health.incoming then
+      f.health.incoming:SetValue(0)
     end
   end
-  if f.dispel then
-    if alive then
-      K.dispel(f.dispel, src)
-    else
-      f.dispel:Hide()
-    end
-  end
+  K.markers(f, src, status)
   if f.state then
     K.setState(f.state, status)
   end
@@ -772,3 +1023,12 @@ function K.entrance(f)
     g:Play()
   end
 end
+
+-- Your long buffs are learned out of combat, as they land on you.
+ns.on("PLAYER_LOGIN", K.learnBuffs)
+ns.on("PLAYER_REGEN_ENABLED", K.learnBuffs)
+ns.on("UNIT_AURA", function(unit)
+  if unit == "player" then
+    K.learnBuffs()
+  end
+end)

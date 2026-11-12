@@ -61,10 +61,19 @@ local function makeFrame(c)
   f.name:SetWordWrap(false)
   f.state = K.stateIcon(art, 26)
   f.state:SetPoint("CENTER", f.face, "CENTER")
-  f.hot = K.hotPip(art, 16)
-  f.hot:SetPoint("TOPLEFT", f.power, "BOTTOMLEFT", 0, -3)
-  f.dispel = K.dispelPip(art, 11)
-  f.dispel:SetPoint("LEFT", f.hot, "RIGHT", 6, 0)
+  K.indicators(f, {
+    host = art,
+    edge = med,
+    pad = 0,
+    size = 14,
+    debuffs = { "TOPLEFT", f.power, "BOTTOMLEFT", 0, -3 },
+    hots = { "TOPRIGHT", f.power, "BOTTOMRIGHT", 0, -3 },
+    hotsGrow = -1,
+    top = med,
+    rez = f.face,
+    rezSize = 26,
+    buff = { "BOTTOMRIGHT", f.face, "BOTTOMRIGHT", 2, -2 },
+  })
   f.entrance = K.entrance(f)
   return f
 end

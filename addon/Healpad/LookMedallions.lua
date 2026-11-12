@@ -33,10 +33,6 @@ local function makeSpot(c, dir)
   f.face:SetPoint("CENTER")
   f.state = K.stateIcon(med, S * 0.5)
   f.state:SetPoint("CENTER")
-  f.hot = K.hotPip(med, 22)
-  f.hot:SetPoint("BOTTOMRIGHT", med, "BOTTOMRIGHT", 4, 0)
-  f.dispel = K.dispelPip(med, 16)
-  f.dispel:SetPoint("TOPRIGHT", med, "TOPRIGHT", -1, 0)
   if dir == "SELF" then
     -- the held heal's icon, on the bottom of your medallion
     f.badge = CreateFrame("Frame", nil, med)
@@ -70,6 +66,18 @@ local function makeSpot(c, dir)
   shine:SetPoint("TOPRIGHT")
   shine:SetHeight(3)
   shine:SetColorTexture(1, 1, 1, 0.18)
+  K.indicators(f, {
+    host = med,
+    edge = f.health,
+    pad = 3,
+    size = 18,
+    debuffs = { "TOPLEFT", med, "TOPRIGHT", -10, 2 },
+    hots = { "BOTTOMLEFT", med, "BOTTOMRIGHT", -10, -2 },
+    top = med,
+    rez = f.face,
+    rezSize = 40,
+    buff = { "TOPLEFT", med, "TOPLEFT", 4, -4 },
+  })
   f.entrance = K.entrance(f)
   return f
 end

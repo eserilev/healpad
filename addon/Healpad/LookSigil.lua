@@ -67,10 +67,18 @@ local function makeGem(c, dir)
   end
   f.state = K.stateIcon(core, 30)
   f.state:SetPoint("CENTER")
-  f.hot = K.hotPip(core, 18)
-  f.hot:SetPoint("BOTTOMRIGHT", -2, 2)
-  f.dispel = K.dispelPip(core, 13)
-  f.dispel:SetPoint("TOPRIGHT", -6, -6)
+  K.indicators(f, {
+    host = core,
+    edge = core,
+    pad = -4,
+    size = 18,
+    debuffs = { "TOPLEFT", core, "TOPRIGHT", -14, -2 },
+    hots = { "BOTTOMLEFT", core, "BOTTOMRIGHT", -14, 2 },
+    top = core,
+    rez = core,
+    rezSize = 36,
+    buff = { "TOPLEFT", core, "TOPLEFT", 8, -8 },
+  })
   f.name = f.body:CreateFontString(nil, "OVERLAY", "GameFontNormal")
   f.name:SetPoint("TOP", f, "BOTTOM", 0, -14)
   f.name:SetWidth(140)

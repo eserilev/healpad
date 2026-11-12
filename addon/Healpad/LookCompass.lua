@@ -67,10 +67,18 @@ local function makeCard(c)
   f.health.back:SetColorTexture(0.24, 0.14, 0.05, 0.25)
   f.state = K.stateIcon(med, 30)
   f.state:SetPoint("RIGHT", -16, 5)
-  f.hot = K.hotPip(med, 14)
-  f.hot:SetPoint("TOPLEFT", 16, -30)
-  f.dispel = K.dispelPip(med, 11)
-  f.dispel:SetPoint("TOPLEFT", 36, -31)
+  K.indicators(f, {
+    host = med,
+    edge = med,
+    pad = 2,
+    size = 14,
+    debuffs = { "TOPLEFT", med, "TOPLEFT", 16, -27 },
+    hots = { "TOPLEFT", med, "TOPLEFT", 52, -27 },
+    top = med,
+    rez = f.state,
+    rezSize = 28,
+    buff = { "TOPRIGHT", med, "TOPRIGHT", -4, -4 },
+  })
   f.sel = ns.outline(med, med, 0, 2)
   f.sel:SetColor(1, 0.83, 0.35, 1)
   -- the shine that sweeps over a card when it is aimed
@@ -148,10 +156,18 @@ local function makeRose(c)
   K.gradient(pin, "VERTICAL", { 0.45, 0.28, 0.06, 1 }, { 1, 0.9, 0.6, 1 })
   f.state = K.stateIcon(med, 34)
   f.state:SetPoint("CENTER", 0, 26)
-  f.hot = K.hotPip(med, 18)
-  f.hot:SetPoint("BOTTOMRIGHT", -8, 8)
-  f.dispel = K.dispelPip(med, 13)
-  f.dispel:SetPoint("TOPRIGHT", -12, -12)
+  K.indicators(f, {
+    host = med,
+    edge = med,
+    pad = -6,
+    size = 18,
+    debuffs = { "TOPLEFT", med, "TOPRIGHT", -24, -8 },
+    hots = { "BOTTOMLEFT", med, "BOTTOMRIGHT", -24, 8 },
+    top = med,
+    rez = f.state,
+    rezSize = 34,
+    buff = { "TOPLEFT", med, "TOPLEFT", 10, -10 },
+  })
   f.name = f.body:CreateFontString(nil, "OVERLAY", "GameFontNormal")
   f.name:SetPoint("TOPRIGHT", f, "BOTTOM", -6, -6)
   f.name:SetJustifyH("RIGHT")

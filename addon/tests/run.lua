@@ -49,6 +49,7 @@ local BOOK = {
   { id = 1082, name = "Claw", sub = "Rank 1", helpful = false },
   { id = 7777, name = "Walk on Air", sub = "Racial", helpful = true, selfOnly = true },
   { id = 6807, name = "Maul", sub = "Rank 1", helpful = false },
+  { id = 1126, name = "Mark of the Wild", sub = "Rank 1", helpful = true },
 }
 
 local function party(W)
@@ -432,12 +433,31 @@ test("drawing in combat: bars get the secret values, nothing compares them", fun
   eq(Wow.isSecret(up.health.incoming.value), true, "incoming bar too")
   eq(Wow.isSecret(up.health.barColor[1]), true, "health color from the curve, secret")
   eq(up.face.portrait, "Brakka", "portrait")
-  eq(up.dispel:IsShown(), true, "dispel pip")
-  eq(up.glow, nil, "no outline for a dispel any more")
+  eq(up.edge:IsShown(), true, "a debuff you can remove: the edge in its color")
+  eq(Wow.isSecret(up.edge.lines[1].vertex[1]), true, "the color as the game gave it")
   eq(ns.spots.LEFT.name.text, "Zed")
   eq(ns.spots.LEFT.state:IsShown(), true, "dead: the skull")
   eq(ns.spots.LEFT.state.texture, ns.kit.SKULL)
   eq(Wow.isSecret(ns.spots.DOWN.body.alphaBool[1]), true, "range: the game fades it from the secret answer")
+  W.key("PAD3", false)
+  clean(W)
+end)
+
+test("markers: a secret threat shows no aggro; auras refused in combat fail safe", function()
+  local W, ns = game()
+  W.units.party1.threat = 3
+  W.units.party1.debuff = "Magic"
+  W.units.party1.hot = true
+  W.threatSecret = true
+  W.aurasRefused = true
+  W.combat = true
+  W.key("PAD3", true)
+  W.update(0.6)
+  local up = ns.spots.UP
+  eq(up.aggro:IsShown(), false, "a secret threat: no bar")
+  eq(up.edge:IsShown(), false, "no aura read: nothing shown")
+  eq(up.debuffs[1]:IsShown(), false)
+  eq(up.hots[1]:IsShown(), false)
   W.key("PAD3", false)
   clean(W)
 end)
@@ -507,9 +527,13 @@ end)
 -- Everyone in every state: a dispel and your HoT up, dead left, offline
 -- right, out of range and nearly dead down.
 local function troubled(W)
-  W.units.party1.debuff = "Magic"
-  W.units.party1.hot = true
+  W.units.party1.debuffs = { { "Magic", 3 }, { "Poison", 1 } }
+  W.units.party1.hots = { {}, {} }
+  W.units.party1.threat = 3
   W.units.party4.dead = true
+  W.units.party4.rez = true
+  W.units.player.mine = { { name = "Mark of the Wild", id = 1126, duration = 1800 } }
+  W.units.party3.has = { ["Mark of the Wild"] = true }
   W.units.party2.offline = true
   W.units.party3.hp = 10
   W.rangeOut.party3 = true
@@ -535,6 +559,7 @@ for _, name in ipairs({ "medallions", "sigil", "compass", "classic" }) do
   test("look " .. name .. ": draws everyone in every state, in and out of combat", function()
     local W, ns = game()
     troubled(W)
+    W.fire("UNIT_AURA", "player") -- Mark of the Wild lands on you: learned
     eq(ns.setLook(name), true)
     local s = ns.spots
     for _, combat in ipairs({ false, true }) do
@@ -544,12 +569,35 @@ for _, name in ipairs({ "medallions", "sigil", "compass", "classic" }) do
       eq(s.UP.name.text, "Brakka", "name")
       eq(s.SELF.name.text, "Me")
       eq(Wow.isSecret(s.UP.health.value), combat, "health bar value secret in combat")
-      eq(s.UP.dispel:IsShown(), true, "dispel pip")
-      eq(s.UP.hot:IsShown(), true, "HoT pip")
-      eq(s.UP.hot.icon.texture, 136081, "your HoT's icon")
+      eq(s.UP.edge:IsShown(), true, "dispel: the edge")
+      eq(Wow.isSecret(s.UP.edge.lines[1].vertex[1]), combat, "in the debuff's color, secret in combat")
+      if s.UP.tint then
+        eq(s.UP.tint:IsShown(), true, "dispel: the bar's back")
+      end
+      eq(s.UP.debuffs[1]:IsShown(), true, "the debuff's icon")
+      eq(s.UP.debuffs[2]:IsShown(), true, "two of them")
+      if combat then
+        eq(Wow.isSecret(s.UP.debuffs[1].count.text), true, "stacks as the game says them")
+      else
+        eq(s.UP.debuffs[1].count.text, "3", "stacks")
+        eq(s.UP.debuffs[2].count.text, "", "no count for one")
+      end
+      eq(s.UP.hots[1]:IsShown(), true, "your HoT")
+      eq(s.UP.hots[2]:IsShown(), true, "two of them")
+      eq(s.UP.hots[1].tex.texture, 136081, "your HoT's icon")
+      eq(s.UP.hots[1].clock:IsShown(), true, "with its clock")
+      eq(s.UP.aggro:IsShown(), true, "aggro")
+      eq(s.SELF.aggro:IsShown(), false)
+      eq(s.UP.buff:IsShown(), not combat, "missing your buff: out of combat only")
+      eq(s.DOWN.buff:IsShown(), false, "has your buff")
       eq(s.LEFT.state.texture, ns.kit.SKULL, "dead: skull")
       eq(s.LEFT.state:IsShown(), true)
-      eq(s.LEFT.dispel:IsShown(), false)
+      eq(s.LEFT.edge:IsShown(), false)
+      eq(s.LEFT.health.value, 0, "dead: the bar empties")
+      eq(s.LEFT.rez:IsShown(), true, "a resurrection on the way")
+      if combat then
+        eq(Wow.isSecret(s.LEFT.rez.alphaBool[1]), true, "from the game's secret answer")
+      end
       eq(s.RIGHT.state.texture, ns.kit.PLUG, "offline: unplugged")
       eq(s.RIGHT.state:IsShown(), true)
       eq(s.SELF.state:IsShown(), false, "you are fine")
@@ -583,8 +631,8 @@ for _, name in ipairs({ "medallions", "sigil", "compass", "classic" }) do
     W.key("PAD3", false)
     ns.openOptions()
     eq(ns.diamond:IsShown(), true, "preview")
-    eq(ns.spots.UP.hot:IsShown(), true, "sample HoT")
-    eq(ns.spots.RIGHT.dispel:IsShown(), true, "sample dispel")
+    eq(ns.spots.UP.hots[1]:IsShown(), true, "sample HoT")
+    eq(ns.spots.RIGHT.edge:IsShown(), true, "sample dispel")
     eq(ns.spots.LEFT.far, true, "sample out of range")
     eq(ns.spots.DOWN.crit, nil, "no red pulse in the preview")
     ns.optionsPanel():Hide()
