@@ -2532,6 +2532,49 @@ test(
   end
 )
 
+test("Buttons: a form change while a heal waits keeps the grid's keys on top", function()
+  local W, ns = buttons({ after = "locked" })
+  W.combat = true
+  W.tap("PAD3")
+  W.setBar("b1") -- cat form: the heal keys are bound again
+  eq(W.secureBinds.PAD1.target, "HealpadRow1x0", "A is still row 1, not the heal")
+  W.tap("PAD1")
+  eq(last(W).unit, "player")
+  eq(last(W).spell, 5186)
+  W.setBar("p1")
+  W.tap("PADBACK")
+  eq(W.secureBinds.PAD1.target:match("^HealpadHeal") ~= nil, true, "the heal again after cancel")
+  clean(W)
+end)
+
+test("Buttons: dead or mounted, a tapped heal doesn't wait", function()
+  local W, ns = buttons()
+  W.combat = true
+  W.mounted = true
+  W.tap("PAD3")
+  eq(ns.ctl:GetAttribute("armed"), nil, "mounted: nothing waits")
+  eq(W.secureBinds.PAD2, nil, "no keys taken")
+  W.mounted = false
+  W.tap("PAD3")
+  eq(ns.ctl:GetAttribute("armed"), 5186)
+  clean(W)
+end)
+
+test("Buttons raid, Locked: switching heals keeps the group held", function()
+  local W, ns = buttons({ raid = true, after = "locked" })
+  local c = ns.ctl
+  W.combat = true
+  W.tap("PAD3")
+  W.key("PADRSHOULDER", true)
+  W.tap("1")
+  eq(c:GetAttribute("armed"), 5185, "switched")
+  eq(c:GetAttribute("grp"), 2, "RB still held")
+  W.tap("PAD1")
+  eq(last(W).unit, "Rusk")
+  W.key("PADRSHOULDER", false)
+  clean(W)
+end)
+
 test("Buttons raid: arming forgets a group held before", function()
   local W, ns = buttons({ raid = true })
   local c = ns.ctl

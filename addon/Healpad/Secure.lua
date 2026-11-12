@@ -156,12 +156,12 @@ local DISARM = [[
 -- The heal spell (with tap) waits: the controller takes the grid's keys,
 -- the cancel button and every other controller button (they do nothing);
 -- a heal's own key stays a heal unless the grid needs it.
-local ARM = [[
+-- Dead, mounted, or the bar taken by a vehicle or possession.
+ns.STOP_DRIVER = "[dead][mounted][possessbar][vehicleui] 1; 0"
+
+-- The keys a waiting heal takes, bound again (newest wins).
+local ARM_BINDS = [[
     owner:ClearBindings()
-    owner:SetAttribute("grp", nil)
-    owner:SetAttribute("grpkey", nil)
-    owner:SetAttribute("armtap", tap)
-    owner:SetAttribute("armed", spell)
     local list = owner:GetAttribute("raid") and "br" or "bp"
     for i = 1, owner:GetAttribute(list .. "-n") or 0 do
       local k = owner:GetAttribute(list .. "k" .. i)
@@ -169,10 +169,33 @@ local ARM = [[
         owner:SetBindingClick(true, k, owner:GetAttribute(list .. "b" .. i))
       end
     end
+]]
+
+-- Dead, mounted or possessed: nothing waits. A heal tapped from rest
+-- forgets any group held; switching heals keeps the group you hold.
+local ARM = [[
+    if SecureCmdOptionParse("]] .. ns.STOP_DRIVER .. [[") == "1" then
+      return false
+    end
+    if not owner:GetAttribute("armed") then
+      owner:SetAttribute("grp", nil)
+      owner:SetAttribute("grpkey", nil)
+    end
+    owner:SetAttribute("armtap", tap)
+    owner:SetAttribute("armed", spell)
+]] .. ARM_BINDS .. [[
     owner:SetAttribute("state", "armed")
 ]]
 
 ns.ARM_SNIPPET = ARM
+-- Run on the controller (RunAttribute) after the heal keys were bound
+-- again while a heal waits, so the grid's keys are newest and win.
+ns.REARM_SNIPPET = [[
+  local owner = self
+  if owner:GetAttribute("armed") then
+]] .. ARM_BINDS .. [[
+  end
+]]
 
 -- The release of a heal in Buttons mode (spell, tap set): alone it heals
 -- you; the same heal again heals its tap choice; else it waits. Sets unit,
@@ -547,7 +570,6 @@ ns.CANCEL_SNIPPET = [[
 
 -- Dead, mounted, or the bar taken by a vehicle or possession: a waiting
 -- heal stops waiting (and Locked unlocks).
-ns.STOP_DRIVER = "[dead][mounted][possessbar][vehicleui] 1; 0"
 ns.STOP_SNIPPET = [[
   if newstate == "1" then
     local c = self:GetFrameRef("ctl")
@@ -584,7 +606,13 @@ ns.KEYS_SNIPPET = [[
       end
     end
   end
+  -- a heal waiting: its keys bound again over the heal keys just bound
+  if c:GetAttribute("armed") then
+    c:RunAttribute("_rearm")
+  end
 ]]
+
+ctl:SetAttribute("_rearm", ns.REARM_SNIPPET)
 
 local function clicker(name, snippet)
   local b = CreateFrame("Button", name, UIParent, "SecureHandlerClickTemplate")

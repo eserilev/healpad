@@ -380,6 +380,12 @@ function M.new()
     assert(W.inSecure, "ClearBinding outside a snippet")
     unbind(self, key)
   end
+  -- A handle runs a snippet kept in one of its attributes, as itself.
+  function Frame:RunAttribute(name, ...)
+    assert(W.inSecure, "RunAttribute outside a snippet")
+    local body = assert(self.attrs[name], "no snippet " .. name)
+    return W.runSnippetAs("self", body, {}, self, ...)
+  end
   function Frame:SetBindingClick(priority, key, name, button)
     assert(W.inSecure, "SetBindingClick outside a snippet")
     unbind(self, key)
@@ -444,7 +450,7 @@ function M.new()
         return W.bar
       end
       if s:find("[dead]", 1, true) then
-        return W.stop and "1" or "0"
+        return (W.stop or W.mounted) and "1" or "0"
       end
       local u = s:match("^%[@([^,%]]+),help,nodead%] yes; no$")
       if u then
@@ -476,16 +482,18 @@ function M.new()
         end,
       })
     )
+    local was = W.inSecure
     W.inSecure = true
     local out = (function(...)
       return { n = select("#", ...), ... }
     end)(pcall(fn, ...))
-    W.inSecure = false
+    W.inSecure = was
     if not out[1] then
       error(out[2], 0)
     end
     return unpack(out, 2, out.n)
   end
+  W.runSnippetAs = runSnippetAs
   local function runSnippet(body, env, ...)
     return runSnippetAs("self, button, down", body, env, ...)
   end
