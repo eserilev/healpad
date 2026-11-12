@@ -401,15 +401,53 @@ function K.learnBuffs()
   end
 end
 
--- The icon of one of your buffs this person lacks, out of combat; nil
--- when they have them all (or in combat, or when the game won't say).
+local function has(unit, name)
+  local ok, a = pcall(C_UnitAuras.GetAuraDataBySpellName, unit, name, "HELPFUL")
+  if not ok then
+    return nil -- the game won't say
+  end
+  return a ~= nil
+end
+
+-- Your buffs someone else in the group has right now: the ones you keep
+-- up on the party (Fortitude, Mark of the Wild), not ones you put on one
+-- person (Fear Ward, Thorns). Looked at twice a second at most.
+local kept, keptAt
+local function keptBuffs()
+  local now = GetTime()
+  if kept and keptAt and now - keptAt < 0.5 then
+    return kept
+  end
+  kept, keptAt = {}, now
+  local units = {}
+  if IsInRaid() then
+    for i = 1, 40 do
+      units[#units + 1] = "raid" .. i
+    end
+  else
+    for i = 1, 4 do
+      units[#units + 1] = "party" .. i
+    end
+  end
+  for name, icon in pairs(ns.db.buffs) do
+    for _, u in ipairs(units) do
+      if not kept[name] and UnitExists(u) and not UnitIsUnit(u, "player") and has(u, name) then
+        kept[name] = icon
+      end
+    end
+  end
+  return kept
+end
+
+-- The icon of a buff you keep up on the group that this person lacks, out
+-- of combat; nil when they have them all (or in combat, or when the game
+-- won't say).
 function K.missingBuff(unit)
   if InCombatLockdown() or not (ns.db and ns.db.buffs) then
     return nil
   end
-  for name, icon in pairs(ns.db.buffs) do
-    local ok, a = pcall(C_UnitAuras.GetAuraDataBySpellName, unit, name, "HELPFUL")
-    if ok and a == nil then
+  for name, icon in pairs(keptBuffs()) do
+    if has(unit, name) == false then
       return icon
     end
   end

@@ -471,6 +471,24 @@ test("markers: a secret threat shows no aggro; auras refused in combat fail safe
   clean(W)
 end)
 
+test("markers: a buff of yours shows missing only when someone else in the group has it", function()
+  local W, ns = game()
+  W.units.player.mine = { { name = "Mark of the Wild", id = 1126, duration = 1800 } }
+  W.fire("UNIT_AURA", "player")
+  W.key("PAD3", true)
+  W.update(0.6)
+  eq(ns.spots.UP.buff:IsShown(), false, "on you only (Thorns, Fear Ward): no dot")
+  W.key("PAD3", false)
+  W.units.party3.has = { ["Mark of the Wild"] = true }
+  W.update(0.6)
+  W.key("PAD3", true)
+  W.update(0.6)
+  eq(ns.spots.UP.buff:IsShown(), true, "kept up on the group: the one without it")
+  eq(ns.spots.DOWN.buff:IsShown(), false)
+  W.key("PAD3", false)
+  clean(W)
+end)
+
 ---------------------------------------------------------------- looks
 
 local function lookNames(ns)
