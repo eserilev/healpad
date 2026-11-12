@@ -18,6 +18,7 @@ LookSigil.lua
 LookCompass.lua
 LookClassic.lua
 Diamond.lua
+Seats.lua
 Options.lua
 Test.lua
 Probe.lua

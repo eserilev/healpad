@@ -34,6 +34,8 @@ globals:
     any: true
   ClearOverrideBindings:
     any: true
+  ClickCastFrames:
+    any: true
   CreateColor:
     any: true
   CreateFrame:

@@ -273,7 +273,8 @@ function look.aim(sel)
       local on = d == sel
       local k = on and 1.12 or (f.far and 0.9 or 1)
       K.scaleTo(f.med, k, 0.12)
-      K.fadeTo(f.med, on and 1 or (f.far and 0.55 or 0.86), 0.12)
+      -- sel nil: the plus at rest, nobody dimmed
+      K.fadeTo(f.med, on and 1 or (f.far and 0.55 or (sel == nil and 1 or 0.86)), 0.12)
       f.med:ClearAllPoints()
       f.med:SetPoint("CENTER", f, "CENTER", 0, on and 5 / k or 0)
       f.sel:SetShown(on)

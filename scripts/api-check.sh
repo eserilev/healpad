@@ -10,7 +10,7 @@ src=${1:?usage: scripts/api-check.sh <folder with ui and bir>}
 res=$src/bir/Resources
 
 # Names from other addons. Healpad reads them only when they exist.
-optional="KeyBarsAPI"
+optional="KeyBarsAPI ClickCastFrames"
 # Lua and the bit library, not the WoW API.
 # Enum is the client's table of enums; its members are checked through the docs.
 builtin="date geterrorhandler seterrorhandler Enum"

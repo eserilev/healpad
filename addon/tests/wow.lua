@@ -302,6 +302,17 @@ function M.new()
     self.events = self.events or {}
     self.events[e] = true
   end
+  function Frame:UnregisterEvent(e)
+    if self.events then
+      self.events[e] = nil
+    end
+  end
+  function Frame:IsEventRegistered(e)
+    return self.events ~= nil and self.events[e] == true
+  end
+  function Frame:GetParent()
+    return self.parent
+  end
   function Frame:RegisterForClicks(...)
     self.clicks = { ... }
   end
@@ -383,6 +394,7 @@ function M.new()
   G.UIParent = G.CreateFrame("Frame", "UIParent")
   G.WorldFrame = G.CreateFrame("Frame", "WorldFrame")
   function Frame:SetParent(p)
+    protectedChange(self, "SetParent")
     self.parent = p
   end
   function Frame:GetScale()

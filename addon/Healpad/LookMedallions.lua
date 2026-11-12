@@ -156,7 +156,8 @@ function look.aim(sel)
   for d, f in pairs(look.spots) do
     local on = d == sel
     K.scaleTo(f.med, on and 1.24 or (f.far and 0.86 or 1), 0.09)
-    K.fadeTo(f.med, on and 1 or (f.far and 0.62 or (sel == "SELF" and 0.92 or 0.72)), 0.12)
+    -- sel nil: the plus at rest, nobody dimmed
+    K.fadeTo(f.med, on and 1 or (f.far and 0.62 or (sel == nil and 1 or sel == "SELF" and 0.92 or 0.72)), 0.12)
     f.ring:SetShown(on)
     f:SetFrameLevel(on and 20 or 5)
   end

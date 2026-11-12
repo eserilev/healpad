@@ -13,6 +13,7 @@ local FILES = {
   "LookCompass.lua",
   "LookClassic.lua",
   "Diamond.lua",
+  "Seats.lua",
   "Options.lua",
   "Test.lua",
   "Probe.lua",
@@ -1756,6 +1757,133 @@ test("/hp test in Gamepad Mode reports the controller bar", function()
     log
   )
   eq(#W.casts, 0, "nothing cast")
+  clean(W)
+end)
+
+---------------------------------------------------------------- Party Frames: Plus
+
+-- The game's party frames, as this client makes them.
+local function gameFrames(W)
+  local pf = W.G.CreateFrame("Frame", "PartyFrame", W.G.UIParent)
+  pf:RegisterEvent("GROUP_ROSTER_UPDATE")
+  pf:RegisterEvent("VARIABLES_LOADED")
+  local raid = W.G.CreateFrame("Frame", "CompactRaidFrameManager", W.G.UIParent)
+  raid:RegisterEvent("GROUP_ROSTER_UPDATE")
+  return pf, raid
+end
+
+local function plusGame(opts)
+  opts = opts or {}
+  local W = Wow.new()
+  setup(W)
+  party(W)
+  local pf, raid = gameFrames(W)
+  local refreshed = 0
+  W.G.KeyBarsAPI = {
+    refreshFrames = function()
+      refreshed = refreshed + 1
+    end,
+  }
+  local saved = { frames = "plus", aim = { PAD3 = { tap = opts.tap or "player" } } }
+  local ns = W.load(DIR, FILES, saved)
+  return W, ns, pf, raid, function()
+    return refreshed
+  end
+end
+
+test("Plus: the plus is your party frames, always on, nobody lit at rest; the game's party frames away", function()
+  local W, ns, pf, raid, refreshed = plusGame()
+  eq(ns.diamond:IsShown(), true, "on at rest")
+  W.update(0.6)
+  for _, d in ipairs(ns.DIRS) do
+    eq(ns.spots[d].sel:IsShown(), false, d .. " not lit at rest")
+    eq(ns.spots[d].med.a or 1, 1, d .. " full color at rest")
+  end
+  eq(ns.spots.UP.name.text, "Brakka")
+  eq(pf:GetParent(), W.G.HealpadHiddenFrames, "the game's party frames put away")
+  eq(pf:IsEventRegistered("GROUP_ROSTER_UPDATE"), false, "and quiet")
+  eq(raid:GetParent(), W.G.UIParent, "raid frames left alone")
+  local up = W.G.HealpadPlusSeatUP
+  eq(up:GetAttribute("unit"), "Brakka", "the seat button is the person, by name")
+  eq(up:GetAttribute("*type1"), "target", "click targets")
+  eq(up:GetAttribute("*type2"), "togglemenu", "right click: the menu")
+  eq(up:IsShown(), true)
+  eq(W.G.HealpadPlusSeatSELF:GetAttribute("unit"), "player")
+  eq(W.G.ClickCastFrames[up], true, "click casting can use it")
+  eq(refreshed() > 0, true, "KeyBars told")
+  W.combat = true
+  W.key("PAD3", true)
+  W.tap("PADDLEFT")
+  W.update(0.3)
+  eq(ns.spots.LEFT.sel:IsShown(), true, "the picked one lit")
+  eq(ns.spots.UP.med.a, 0.75, "the others dimmed")
+  W.key("PAD3", false)
+  eq(last(W).unit, "Zed")
+  eq(ns.diamond:IsShown(), true, "still on after the heal")
+  W.update(0.3)
+  eq(ns.spots.LEFT.sel:IsShown(), false, "at rest again")
+  clean(W)
+end)
+
+test("Plus: someone leaves in combat: their seat goes dark, nothing secure is touched, nobody moves", function()
+  local W, ns = plusGame()
+  W.combat = true
+  W.units.party2 = nil
+  W.fire("GROUP_ROSTER_UPDATE")
+  W.update(0.6)
+  eq(W.G.HealpadPlusSeatRIGHT:GetAttribute("unit"), "Kira", "the seat keeps its person in combat")
+  eq(ns.spots.RIGHT:IsShown(), true, "the seat stays")
+  eq(ns.spots.RIGHT.body.alpha, 0.45, "dark")
+  eq(ns.spots.DOWN.name.text, "Ann", "nobody moved")
+  eq(#W.blocked, 0, "nothing protected changed in combat")
+  W.combat = false
+  W.fire("PLAYER_REGEN_ENABLED")
+  eq(W.G.HealpadPlusSeatRIGHT:IsShown(), false, "after combat the free seat's button goes")
+  eq(W.G.HealpadPlusSeatDOWN:GetAttribute("unit"), "Ann")
+  clean(W)
+end)
+
+test("Plus: alone, only you", function()
+  local W = Wow.new()
+  setup(W)
+  W.units.player = { name = "Me", hp = 90, max = 100 }
+  local ns = W.load(DIR, FILES, { frames = "plus", aim = { PAD3 = { tap = "player" } } })
+  W.update(0.6)
+  eq(ns.ctl:GetAttribute("u1-UP"), nil, "no target seat")
+  eq(ns.spots.SELF:IsShown(), true)
+  eq(ns.spots.UP:IsShown(), false)
+  eq(W.G.HealpadPlusSeatUP:IsShown(), false)
+  eq(W.G.HealpadPlusSeatSELF:IsShown(), true)
+  clean(W)
+end)
+
+test("Plus back to Game: the plus shows only while you hold, the game's party frames come back", function()
+  local W, ns, pf = plusGame()
+  ns.db.frames = "game"
+  ns.applyMode()
+  eq(ns.diamond:IsShown(), false, "hidden at rest")
+  eq(pf:GetParent(), W.G.UIParent, "the game's frames back")
+  eq(pf:IsEventRegistered("GROUP_ROSTER_UPDATE"), true)
+  eq(pf:IsEventRegistered("VARIABLES_LOADED"), true)
+  eq(W.G.HealpadPlusSeats:IsShown(), false, "no seat buttons")
+  W.combat = true
+  W.key("PAD3", true)
+  eq(ns.diamond:IsShown(), true, "a hold shows it")
+  W.key("PAD3", false)
+  eq(ns.diamond:IsShown(), false)
+  clean(W)
+end)
+
+test("Plus: a mode change in combat waits for the end of combat", function()
+  local W, ns, pf = plusGame()
+  W.combat = true
+  ns.db.frames = "game"
+  ns.applyMode()
+  eq(pf:GetParent(), W.G.HealpadHiddenFrames, "nothing moves in combat")
+  eq(#W.blocked, 0)
+  W.combat = false
+  W.fire("PLAYER_REGEN_ENABLED")
+  eq(pf:GetParent(), W.G.UIParent)
   clean(W)
 end)
 

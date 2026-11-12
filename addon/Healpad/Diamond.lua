@@ -2,6 +2,9 @@
 -- them is secure, so they can show, hide and move in combat. What it looks
 -- like is the chosen look's (Looks.lua and Look*.lua); this file says who
 -- sits where, who is aimed, and when it opens, redraws and casts.
+-- With Party Frames on Plus the same frames stay on screen as your party
+-- frames: at rest nobody is lit; a held heal lights the one picked. Clicks
+-- on them go to secure seat buttons laid over them (Seats.lua).
 local _, ns = ...
 
 local root = CreateFrame("Frame", "HealpadDiamond", UIParent)
@@ -27,6 +30,7 @@ fx:SetFrameLevel(50)
 local title = root:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
 local pageText = root:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 
+local ctl = ns.ctl
 local look -- the look in use
 local previewing = false
 local moving = false -- the settings' Move: the menu can be dragged
@@ -53,8 +57,16 @@ local function stopDrag()
   local ux, uy = UIParent:GetCenter()
   if x and ux then
     local k = root:GetEffectiveScale() / UIParent:GetEffectiveScale()
-    ns.db.x = math.floor(x * k - ux + 0.5)
-    ns.db.y = math.floor(y * k - uy + 0.5)
+    local _, _, _, p = ns.place()
+    if ns.plusOn() then
+      -- the plus counts from the screen's top left
+      local top = UIParent:GetTop() or uy * 2
+      ns.db[p.x] = math.floor(x * k + 0.5)
+      ns.db[p.y] = math.floor(y * k - top + 0.5)
+    else
+      ns.db[p.x] = math.floor(x * k - ux + 0.5)
+      ns.db[p.y] = math.floor(y * k - uy + 0.5)
+    end
   end
   ns.layout()
   if ns.refreshOptions then
@@ -143,7 +155,7 @@ local function applyLook()
   anchorAround(want.spots)
   want.frame:Show()
   -- the entrance is for a real hold; the settings' preview just shows it
-  opening = root:IsShown() and not previewing
+  opening = root:IsShown() and not previewing and not ns.plusOn()
   ns.layout()
   ns.redraw()
 end
@@ -163,14 +175,39 @@ function ns.setLook(name)
   return true
 end
 
--- Where you put it: an offset from the middle of the screen, in screen
--- units; a point's offsets count in the frame's own scale.
-function ns.layout()
-  local scale = ns.db and ns.db.scale or 1
-  local x, y = (ns.db and ns.db.x or 0) / scale, (ns.db and ns.db.y or 0) / scale
+-- Where the menu's middle is: the point of the screen it counts from, its
+-- offset in the menu's own scale, and the scale. The menu counts from the
+-- middle of the screen; the plus from the top left corner.
+function ns.rootPoint()
+  local scale, x, y = ns.place(ns.plusOn() and "plus" or "menu")
+  local from = ns.plusOn() and "TOPLEFT" or "CENTER"
   if ns.shotsCentered then
-    x, y = 0, 0 -- /hp shots page: the middle of the screen
+    from, x, y = "CENTER", 0, 0 -- /hp shots page: the middle of the screen
   end
+  return from, x / scale, y / scale, scale
+end
+
+-- Each person's place in the menu, from its middle, in the menu's units
+-- (as root:SetScale counts them): { x, y, w, h } by direction.
+function ns.spotPlaces()
+  local out = {}
+  if not look then
+    return out
+  end
+  local L = look.frame:GetScale() or 1
+  for d, f in pairs(look.spots) do
+    local at = f.at or { 0, 0 }
+    local k = f:GetScale() or 1
+    out[d] = { at[1] * L, CENTER_Y + at[2] * L, (f:GetWidth() or 0) * k * L, (f:GetHeight() or 0) * k * L }
+  end
+  return out
+end
+
+-- Where you put it: an offset from the middle of the screen (or for the
+-- plus, its top left), in screen units; a point's offsets count in the
+-- frame's own scale.
+function ns.layout()
+  local from, x, y, scale = ns.rootPoint()
   -- lifted onto WorldFrame for screenshots: the same size as on UIParent
   local lift = 1
   if root:GetParent() == WorldFrame then
@@ -181,18 +218,25 @@ function ns.layout()
   end
   root:SetScale(scale * lift)
   root:ClearAllPoints()
-  root:SetPoint("CENTER", UIParent, "CENTER", x, y)
+  root:SetPoint("CENTER", UIParent, from, x, y)
   fx:SetScale(scale)
   fx:ClearAllPoints()
-  fx:SetPoint("CENTER", UIParent, "CENTER", x, y)
+  fx:SetPoint("CENTER", UIParent, from, x, y)
   if look then
     look.layout(ns.db and ns.db.spacing or 1)
   end
+  if ns.placeSeats then
+    ns.placeSeats()
+  end
+end
+
+-- Whether the menu shows now: always with the plus, while you hold a heal,
+-- or as the settings' preview.
+local function wanted()
+  return previewing or ns.plusOn() or ctl:GetAttribute("state") == "aim"
 end
 
 ---------------------------------------------------------------- following the controller
-
-local ctl = ns.ctl
 
 -- What the held button keeps for the hold: on itself, or for one of the
 -- game's controller bar buttons on the controller.
@@ -284,7 +328,11 @@ function ns.redraw()
   local page = ctl:GetAttribute("page") or 1
   local pages = ctl:GetAttribute("pages") or 1
   local sample = previewing and ctl:GetAttribute("state") ~= "aim" and (not IsInGroup() or ns.stage ~= nil)
+  local held = ctl:GetAttribute("state") == "aim"
   local sel = (ns.stage and ns.stage.sel) or ctl:GetAttribute("sel") or tapPlace(page, sample)
+  if ns.plusOn() and not held and not previewing and not ns.stage then
+    sel = nil -- the plus at rest: nobody lit, nobody dimmed
+  end
   local spell = heldSpell() or ns.previewSpell
   lastSpell = spell or lastSpell
   title:SetText(spell and ns.spellLabel(spell) or "")
@@ -319,6 +367,9 @@ function ns.redraw()
         drawn[d] = unit
       elseif unit == "target" then
         src = { kind = "empty", name = "Target" }
+      elseif unit then
+        -- gone mid-fight: the seat stays, dark, until combat ends
+        src = { kind = "empty", name = ns.SEAT_BY_NAME and unit or "" }
       end
     end
     ctx.aimed = d == sel
@@ -364,9 +415,10 @@ for _, e in ipairs({
   end)
 end
 
--- It opens with the look's entrance, once the people are drawn.
+-- It opens with the look's entrance, once the people are drawn; the plus
+-- just stays.
 root:SetScript("OnShow", function()
-  opening = not previewing
+  opening = not previewing and not ns.plusOn()
 end)
 
 -- While the settings are open the menu shows where it will be, out of
@@ -394,18 +446,29 @@ function ns.preview(on)
   end
   grabbable()
   fade(0)
-  root:SetShown(previewing or ctl:GetAttribute("state") == "aim")
+  root:SetShown(wanted())
   ns.redraw()
 end
 
-ctl:HookScript("OnAttributeChanged", function(_, name, value)
+-- The mode changed (or the game is ready): shown or not, and where.
+function ns.applyMenu()
+  opening = false
+  root:SetShown(wanted())
+  ns.layout()
+  ns.redraw()
+end
+
+ctl:HookScript("OnAttributeChanged", function(_, name)
   if name == "state" then
     fade(0)
-    root:SetShown(value == "aim" or previewing)
+    root:SetShown(wanted())
     ns.redraw()
   elseif name == "sel" or name == "page" then
     ns.redraw()
   end
 end)
 
-ns.on("PLAYER_LOGIN", applyLook)
+ns.on("PLAYER_LOGIN", function()
+  applyLook()
+  ns.applyMenu()
+end)

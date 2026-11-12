@@ -206,7 +206,8 @@ function look.aim(sel)
     local on = d == sel
     K.scaleTo(f.med, on and 1.2 or (f.far and 0.86 or 1), 0.1)
     if d ~= "SELF" then
-      K.fadeTo(f.med, on and 1 or (f.far and 0.5 or 0.8), 0.12)
+      -- sel nil: the plus at rest, nobody dimmed
+      K.fadeTo(f.med, on and 1 or (f.far and 0.5 or (sel == nil and 1 or 0.8)), 0.12)
     end
     f.rim:SetColorTexture(unpack(on and RIM_ON or RIM))
     f.name:SetTextColor(unpack(f.dim and NAME_FAR or (on and NAME_ON or NAME)))
@@ -215,7 +216,7 @@ function look.aim(sel)
     end
   end
   for _, l in ipairs(look.beam) do
-    K.fadeTo(l, sel == "SELF" and 0 or 1, 0.15)
+    K.fadeTo(l, (sel == nil or sel == "SELF") and 0 or 1, 0.15)
   end
   if sel ~= "SELF" and K.DIR_DEG[sel] and look.aimed ~= sel then
     local from = look.angle
