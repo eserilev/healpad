@@ -2503,6 +2503,83 @@ test("Buttons in Gamepad Mode: a bar heal waits; rows reach Healpad through the 
   clean(W)
 end)
 
+test("Buttons in Gamepad Mode, raid: a held d-pad direction and the trigger's bar say the group", function()
+  local W = Wow.new()
+  setup(W)
+  W.raid = {}
+  for i, p in ipairs({ { "Me", 1 }, { "Odo", 1 }, { "Tamsin", 3 }, { "Ulla", 3 }, { "Zara", 5 } }) do
+    W.raid[i] = { name = p[1], group = p[2] }
+    W.units["raid" .. i] = { name = p[1], hp = 50, max = 100 }
+  end
+  W.units.player = W.units.raid1
+  W.gamepad()
+  W.actions[W.gpStorage(1, 16)] = { "spell", 5186 }
+  local ns =
+    W.load(DIR, FILES, { mode = "buttons", after = "locked", aim = {}, aimPad = { [5186] = { tap = "player" } } })
+  local c = ns.ctl
+  W.contextFirst = true -- Gamepad Mode's bindings win: every press reaches the bar
+  W.combat = true
+  W.key("PADLTRIGGER", true)
+  W.tap("SHIFT-PAD1")
+  W.key("PADLTRIGGER", false)
+  eq(c:GetAttribute("armed"), 5186)
+  W.tap("PAD1")
+  eq(#W.casts, 0, "A with no group: nothing")
+  W.key("PADDUP", true)
+  eq(c:GetAttribute("grp"), 5, "d-pad up held: group 5")
+  W.tap("PAD1")
+  eq(last(W).unit, "Zara")
+  W.key("PADDUP", false)
+  eq(c:GetAttribute("grp"), nil)
+  W.key("PADLTRIGGER", true)
+  W.tap("PAD2")
+  W.key("PADLTRIGGER", false)
+  eq(last(W).unit, "Ulla", "LT picks the left bar: group 3, B: row 2")
+  eq(#W.casts, 2)
+  clean(W)
+end)
+
+test("Buttons with KeyBars: a KeyBars heal waits and casts on the row pressed", function()
+  local W = Wow.new()
+  setup(W)
+  party(W)
+  local kb = withKeyBars(W)
+  local ns = W.load(DIR, FILES, { mode = "buttons", aim = {}, aimSpell = { ["Healing Touch"] = { tap = "tank" } } })
+  W.combat = true
+  W.tap("1")
+  eq(#W.casts, 0)
+  eq(ns.ctl:GetAttribute("armed"), "Healing Touch")
+  W.tap("PAD2")
+  eq(last(W).spell, "Healing Touch")
+  eq(last(W).unit, "Brakka")
+  W.tap("1")
+  W.tap("1")
+  eq(last(W).unit, "Brakka", "again: its tap choice, the tank")
+  eq(#W.casts, 2)
+  eq(kb.attrs.unit, nil, "the button as KeyBars left it")
+  kb.attrs.spell = "Maul"
+  W.key("1", true)
+  eq(last(W).spell, "Maul", "a spell not set to Healpad casts as always")
+  W.key("1", false)
+  clean(W)
+end)
+
+test("/hp test in Buttons mode: a tap waits, the grid's keys, a cancel", function()
+  for _, opts in ipairs({ {}, { raid = true } }) do
+    local W, ns = buttons(opts)
+    W.G.SlashCmdList.HEALPAD("test")
+    W.runTimers()
+    local log = table.concat(ns.db.log, "\n")
+    eq(log:find("TEST FAIL") == nil, true, log)
+    eq(log:find("LUA ERROR") == nil, true, log)
+    eq(log:find("a tapped heal waits", 1, true) ~= nil, true, log)
+    eq(log:find("TEST done: %d+ ok, 0 failed") ~= nil, true, log)
+    eq(#W.casts, 0, "nothing cast")
+    eq(W.secureBinds.PAD1 and W.secureBinds.PAD1.target:find("HealpadRow"), nil, "keys given back")
+    clean(W)
+  end
+end)
+
 test("probe: reads the party in and out of combat, and the key catcher comes and goes", function()
   local W, ns = game()
   ns.probe()

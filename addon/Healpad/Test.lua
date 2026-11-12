@@ -172,7 +172,7 @@ local function steps()
   end)
   add(function()
     check("Heals tab shows", dbg.ui.heals:IsShown() and not dbg.ui.menu:IsShown(), "rows " .. #dbg.rows)
-    check("the menu shows as the preview", ns.diamond:IsShown())
+    check("the menu shows as the preview", ns.diamond:IsShown() or (ns.isButtons() and ns.grid:IsShown()))
     snap("heals")
   end)
   add(function()
@@ -187,7 +187,10 @@ local function steps()
     snap("menu")
   end)
   add(function()
-    check("the menu shows on Menu", ns.diamond:IsShown() and ns.diamond:GetAlpha() == 1)
+    check(
+      "the menu shows on Menu",
+      (ns.diamond:IsShown() and ns.diamond:GetAlpha() == 1) or (ns.isButtons() and ns.grid:IsShown())
+    )
     local l, r = ns.menuBox()
     ns.log(
       "REPORT settings window on the "
@@ -222,8 +225,49 @@ local function steps()
     check("closing gives the pad and arrows back", not bound("DOWN"):find("HealpadNav"), bound("DOWN"))
   end)
 
+  -- Buttons mode: a heal waits, the grid's keys are Healpad's, cancel.
+  add(function()
+    if not ns.isButtons() then
+      return
+    end
+    local ctl = ns.ctl
+    local spell
+    for _, b in ipairs(ns.binds or {}) do
+      if not spell and b.heal and ns.aimConf(b) then
+        spell = b.spell
+      end
+    end
+    if not spell then
+      ns.log("TEST skip: no heal set to Healpad, so no tap was tried (tick one in /hp)")
+      return
+    end
+    SecureHandlerExecute(
+      ctl,
+      "local owner = self\nlocal spell = " .. tostring(spell) .. '\nlocal tap = "player"\n' .. ns.ARM_SNIPPET
+    )
+    local raid = ctl:GetAttribute("raid")
+    check("a tapped heal waits", ctl:GetAttribute("armed") == spell and ns.grid:IsShown())
+    check("while it waits, A is row 1", bound("PAD1"):find("HealpadRow1x0"), bound("PAD1"))
+    if raid then
+      check("while it waits, LB holds group 1", bound("PADLSHOULDER"):find("HealpadGroup1"), bound("PADLSHOULDER"))
+    end
+    local cancel = ns.cancelKey()
+    check(
+      "while it waits, the cancel button cancels",
+      bound(cancel):find("HealpadCancel"),
+      cancel .. "=" .. bound(cancel)
+    )
+    snap("waiting")
+    SecureHandlerExecute(_G.HealpadCancel, ns.CANCEL_SNIPPET)
+    check("cancel: nothing waits", ctl:GetAttribute("armed") == nil and ctl:GetAttribute("state") == "idle")
+    check("the grid's keys given back", not bound("PAD1"):find("HealpadRow"), bound("PAD1"))
+  end)
+
   -- A hold, an aim and a cancel, through the real secure buttons.
   add(function()
+    if ns.isButtons() then
+      return
+    end
     local heal
     for _, h in ipairs(ns.heals) do
       if h:GetAttribute("hp-key") and not heal then

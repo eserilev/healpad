@@ -9,7 +9,8 @@
 --   /hp probe        3 minutes, or until /hp probe stop: once a second, what
 --                    the game lets an addon read about each party member, in
 --                    and out of combat: health, threat, heals on the way,
---                    debuffs, your HoTs, and a party member by name.
+--                    debuffs (stacks), your HoTs (their clock), and a party
+--                    member by name (Roster.lua's SEAT_BY_NAME rests on it).
 local _, ns = ...
 
 local PAD_KEYS = {
@@ -254,10 +255,26 @@ local function sample()
         end)
       )
       n(
+        "debuff stacks text",
+        try(function()
+          return C_UnitAuras.GetAuraApplicationDisplayCount(unit, a.auraInstanceID, 2)
+        end)
+      )
+      n(
         "aura duration",
         try(function()
           return C_UnitAuras.GetAuraDuration and C_UnitAuras.GetAuraDuration(unit, a.auraInstanceID) and "an object"
             or "none"
+        end)
+      )
+    end
+    -- Your HoT: whether its clock can be shown (a duration object).
+    local okH, h = pcall(C_UnitAuras.GetAuraDataByIndex, unit, 1, "HELPFUL|PLAYER|RAID_IN_COMBAT")
+    if okH and h and not secret(h) then
+      n(
+        "hot duration",
+        try(function()
+          return C_UnitAuras.GetAuraDuration(unit, h.auraInstanceID) and "an object" or "none"
         end)
       )
     end
@@ -269,6 +286,8 @@ local function sample()
         n("by name is the same", try(UnitIsUnit, name, unit))
         n("by name health", try(UnitHealth, name))
         n("by name [@name,help]", try(SecureCmdOptionParse, "[@" .. name .. ",help] yes; no"))
+        -- the check a seat makes before a Buttons heal casts on its person
+        n("by name [@name,help,nodead]", try(SecureCmdOptionParse, "[@" .. name .. ",help,nodead] yes; no"))
       else
         n("by name", "name " .. word(name))
       end

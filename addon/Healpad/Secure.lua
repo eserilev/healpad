@@ -137,6 +137,8 @@ local ARM = [[
     owner:SetAttribute("state", "armed")
 ]]
 
+ns.ARM_SNIPPET = ARM
+
 -- The release of a heal in Buttons mode (spell, tap set): alone it heals
 -- you; the same heal again heals its tap choice; else it waits. Sets unit,
 -- or returns false.
