@@ -2,6 +2,41 @@
 
 ## Unreleased
 
+## 0.4.0
+
+Buttons mode, a second way to heal, for parties and raids:
+
+- Menu > Mode: Radial (the held menu, as before) or Buttons.
+- In Buttons, tap a heal once, then press the person's button. A party is a column: A, B, X, Y,
+  and D-pad Down for the fifth.
+- In a raid all eight groups show at once. Hold LB, RB, LT or RT for groups 1 to 4, or D-pad Up,
+  Right, Down or Left for groups 5 to 8, and press A, B, X or Y for the row. Start is the fifth row.
+- Each frame shows the button that heals that person. Labels: Row (just A) or Full (LB + A).
+- Heal lock: Off heals once; On keeps that heal ready until you cancel.
+- Cancel heal with: Back by default, or L3, R3 or a paddle. While a heal waits, your other buttons
+  do nothing until you heal or cancel.
+- No waiting for a target while you're dead or mounted.
+
+Party Frames, for the radial menu:
+
+- Plus: the menu's own frames stay on screen as your party frames, where the game's party frames
+  were, so the menu and the frames always match. Game keeps the game's party frames.
+
+Markers on every look and frame, like a raid frame addon:
+
+- A debuff you can remove colors the frame by its type: magic, curse, poison or disease.
+- Debuff icons with stacks, your heals over time with their time left, a mark when someone has
+  aggro, a resurrection on the way, and a dot when someone is missing a buff you keep up on the group.
+
+Also:
+
+- Buttons and frames follow each person by name, so someone leaving mid-fight doesn't move anyone
+  else.
+- PlayStation controllers show their shapes instead of A, B, X and Y.
+- Works with the game's Gamepad Mode. Healpad never casts from the game's own top buttons.
+- /hp probe: checks what the game lets Healpad read and which buttons it can take over, for bug
+  reports.
+
 A new settings window, smaller and simpler:
 
 - Two tabs, Heals and Menu. LB and RB switch them.
