@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.4.1
+
+- Fixed hundreds of Lua errors ("secret value ... tainted by Healpad") from the game's party and raid
+  frames after Plus or Buttons hid them. Healpad now only makes those frames see-through and never
+  runs their code. A /reload clears any errors left from 0.4.0.
+
 ## 0.4.0
 
 Buttons mode, a second way to heal, for parties and raids:
