@@ -18,7 +18,7 @@ ns.CANCELS = { "PAD1", "PAD2", "PAD3", "PAD4" }
 -- and Start, so its cancel is one of the buttons left.
 ns.BTN_CANCELS = { "PADBACK", "PADLSTICK", "PADRSTICK", "PADPADDLE1", "PADPADDLE2", "PADPADDLE3", "PADPADDLE4" }
 
--- The settings picked by tiles: Mode, Party Frames (Radial), After a heal
+-- The settings picked by tiles: Mode, Party Frames (Radial), Heal lock
 -- and Labels (Buttons). The first of each is the left tile.
 ns.MODES = { "radial", "buttons" }
 ns.FRAMES = { "plus", "game" }

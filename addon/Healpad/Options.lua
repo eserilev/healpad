@@ -42,7 +42,7 @@ local MENU_LABEL = {
   size = "Size",
   spacing = "Spacing",
   frames = "Party Frames",
-  after = "After a heal",
+  after = "Heal lock",
   labels = "Labels",
   pick = "Select person with",
   cancel = "Cancel heal with",
@@ -55,7 +55,7 @@ local ONLY =
 local TILES = {
   mode = { db = "mode", list = ns.MODES, label = { radial = "Radial", buttons = "Buttons" } },
   frames = { db = "frames", list = ns.FRAMES, label = { plus = "Plus", game = "Game" } },
-  after = { db = "after", list = ns.AFTERS, label = { once = "Once", locked = "Locked" } },
+  after = { db = "after", list = ns.AFTERS, label = { once = "Off", locked = "On" } },
   labels = { db = "labels", list = ns.LABELS, label = { row = "Row", full = "Full" } },
 }
 local SIZE_MIN, SIZE_MAX = 0.6, 1.6

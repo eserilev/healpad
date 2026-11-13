@@ -145,7 +145,7 @@ local PICK = [[
 -- a raid a group held and a row. All of it in the controller's attributes:
 --   armed      the spell waiting, armtap who a tap of it heals
 --   grp        the group held (raid), grpkey the button that holds it
---   raid, solo, lockmode (After a heal: Locked), bmode (Buttons is on)
+--   raid, solo, lockmode (Heal lock: On), bmode (Buttons is on)
 --   p1..p5     the party's rows; g1-1..g8-5 the raid's groups and rows
 
 -- The heal waits no more: the controller's keys go back.
