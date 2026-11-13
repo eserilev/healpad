@@ -48,7 +48,8 @@ end
 -- Under the drawn frames (which take no clicks), so a click reaches them;
 -- while the settings move the frames, the drawn ones take the mouse.
 local plus = CreateFrame("Frame", "HealpadPlusSeats", UIParent, "SecureFrameTemplate")
-plus:SetFrameStrata("LOW")
+plus:SetFrameStrata("MEDIUM")
+plus:SetFrameLevel(100) -- above the game's see-through party frames
 plus:SetSize(1, 1)
 plus:Hide()
 ns.plusSeats = {}
@@ -103,11 +104,11 @@ end
 
 ---------------------------------------------------------------- the game's frames
 
--- Frames are put away by moving them under a hidden frame, and their own
--- events (the ones that would lay them out again) are turned off; both
--- come back as they were. Nothing of theirs is hooked or replaced.
-local hider = CreateFrame("Frame", "HealpadHiddenFrames", UIParent)
-hider:Hide()
+-- Frames are put away by making them see-through (alpha 0), nothing else.
+-- Healpad never reparents them, calls their scripts or touches their
+-- events: any of that runs the game's frame code as Healpad, which taints
+-- those frames until a /reload (secret-value errors on every health update).
+-- The seats sit above them, so clicks still reach the seats.
 local PARTY = {
   "PartyFrame",
   "CompactPartyFrame",
@@ -117,70 +118,27 @@ local PARTY = {
   "PartyMemberFrame4",
 }
 local RAID = { "CompactRaidFrameManager", "CompactRaidFrameContainer" }
-local EVENTS = {
-  "GROUP_ROSTER_UPDATE",
-  "VARIABLES_LOADED",
-  "PLAYER_ENTERING_WORLD",
-  "UNIT_PET",
-  "LFG_UPDATE",
-  "DISPLAY_SIZE_CHANGED",
-  "UI_SCALE_CHANGED",
-  "UPDATE_ACTIVE_BATTLEFIELD",
-  "UNIT_FLAGS",
-  "PLAYER_FLAGS_CHANGED",
-  "PARTY_LEADER_CHANGED",
-  "RAID_TARGET_UPDATE",
-  "PLAYER_TARGET_CHANGED",
-  "PLAYER_DIFFICULTY_CHANGED",
-  "PLAYER_ROLES_ASSIGNED",
-  "PARTY_MEMBER_ENABLE",
-  "PARTY_MEMBER_DISABLE",
-}
-local taken = {} -- [name] = { frame, parent, events }
+local taken = {} -- [name] = the frame's alpha before
 
 local function take(name)
   local f = _G[name]
-  if type(f) ~= "table" or taken[name] or not f.SetParent then
+  if type(f) ~= "table" or taken[name] or not f.SetAlpha then
     return
   end
-  local ok, parent = pcall(f.GetParent, f)
-  local rec = { frame = f, parent = ok and parent or UIParent, events = {} }
-  for _, e in ipairs(EVENTS) do
-    local okE, on = pcall(f.IsEventRegistered, f, e)
-    if okE and on then
-      pcall(f.UnregisterEvent, f, e)
-      table.insert(rec.events, e)
-    end
-  end
-  if pcall(f.SetParent, f, hider) then
-    taken[name] = rec
-  else
-    for _, e in ipairs(rec.events) do
-      pcall(f.RegisterEvent, f, e)
-    end
-  end
+  local ok, a = pcall(f.GetAlpha, f)
+  taken[name] = (ok and type(a) == "number") and a or 1
+  pcall(f.SetAlpha, f, 0)
 end
 
 local function give(name)
-  local rec = taken[name]
-  if not rec then
+  local a = taken[name]
+  if not a then
     return
   end
   taken[name] = nil
-  local f = rec.frame
-  pcall(f.SetParent, f, rec.parent)
-  for _, e in ipairs(rec.events) do
-    pcall(f.RegisterEvent, f, e)
-  end
-  -- what changed while it was away: it lays itself out again, as on a
-  -- roster change (out of combat only, like all of this)
-  for _, e in ipairs(rec.events) do
-    if e == "GROUP_ROSTER_UPDATE" then
-      local ok, onEvent = pcall(f.GetScript, f, "OnEvent")
-      if ok and type(onEvent) == "function" then
-        pcall(onEvent, f, "GROUP_ROSTER_UPDATE")
-      end
-    end
+  local f = _G[name]
+  if type(f) == "table" and f.SetAlpha then
+    pcall(f.SetAlpha, f, a)
   end
 end
 

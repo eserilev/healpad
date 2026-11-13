@@ -1525,7 +1525,8 @@ test("settings: Party Frames by picture: Plus or Game", function()
   eq(d.focus(), "frames")
   W.tap("PADDLEFT")
   eq(ns.db.frames, "plus")
-  eq(pf:GetParent(), W.G.HealpadHiddenFrames, "the game's party frames away")
+  eq(pf:GetAlpha(), 0, "the game's party frames away")
+  eq(pf:GetParent(), W.G.UIParent, "never reparented: that taints the game's frames")
   W.G.HealpadOptions:Hide()
   eq(ns.diamond:IsShown(), true, "the plus stays when the window closes")
   ns.openOptions()
@@ -1534,7 +1535,7 @@ test("settings: Party Frames by picture: Plus or Game", function()
   eq(ns.db.frames, "game", "A: the other tile")
   W.G.HealpadOptions:Hide()
   eq(ns.diamond:IsShown(), false)
-  eq(pf:GetParent(), W.G.UIParent)
+  eq(pf:GetAlpha(), 1)
   clean(W)
 end)
 
@@ -2067,9 +2068,9 @@ test("Plus: the plus is your party frames, always on, nobody lit at rest; the ga
     eq(ns.spots[d].med.a or 1, 1, d .. " full color at rest")
   end
   eq(ns.spots.UP.name.text, "Brakka")
-  eq(pf:GetParent(), W.G.HealpadHiddenFrames, "the game's party frames put away")
-  eq(pf:IsEventRegistered("GROUP_ROSTER_UPDATE"), false, "and quiet")
-  eq(raid:GetParent(), W.G.UIParent, "raid frames left alone")
+  eq(pf:GetAlpha(), 0, "the game's party frames put away")
+  eq(pf:IsEventRegistered("GROUP_ROSTER_UPDATE"), true, "its events untouched")
+  eq(raid:GetAlpha(), 1, "raid frames left alone")
   local up = W.G.HealpadPlusSeatUP
   eq(up:GetAttribute("unit"), "Brakka", "the seat button is the person, by name")
   eq(up:GetAttribute("*type1"), "target", "click targets")
@@ -2219,7 +2220,7 @@ test("Plus in a raid: on another group's page the seat buttons step aside until 
   clean(W)
 end)
 
-test("Plus back to Game: the game's party frames lay themselves out again", function()
+test("Plus back to Game: the game's party frames show again, their code never run by Healpad", function()
   local W, ns, pf = plusGame()
   local got
   pf:SetScript("OnEvent", function(_, e)
@@ -2227,7 +2228,8 @@ test("Plus back to Game: the game's party frames lay themselves out again", func
   end)
   ns.db.frames = "game"
   ns.applyMode()
-  eq(got, "GROUP_ROSTER_UPDATE")
+  eq(got, nil, "Healpad never calls their scripts: that taints them")
+  eq(pf:GetAlpha(), 1)
   clean(W)
 end)
 
@@ -2263,7 +2265,7 @@ test("Plus back to Game: the plus shows only while you hold, the game's party fr
   ns.db.frames = "game"
   ns.applyMode()
   eq(ns.diamond:IsShown(), false, "hidden at rest")
-  eq(pf:GetParent(), W.G.UIParent, "the game's frames back")
+  eq(pf:GetAlpha(), 1, "the game's frames back")
   eq(pf:IsEventRegistered("GROUP_ROSTER_UPDATE"), true)
   eq(pf:IsEventRegistered("VARIABLES_LOADED"), true)
   eq(W.G.HealpadPlusSeats:IsShown(), false, "no seat buttons")
@@ -2280,11 +2282,11 @@ test("Plus: a mode change in combat waits for the end of combat", function()
   W.combat = true
   ns.db.frames = "game"
   ns.applyMode()
-  eq(pf:GetParent(), W.G.HealpadHiddenFrames, "nothing moves in combat")
+  eq(pf:GetAlpha(), 0, "nothing moves in combat")
   eq(#W.blocked, 0)
   W.combat = false
   W.fire("PLAYER_REGEN_ENABLED")
-  eq(pf:GetParent(), W.G.UIParent)
+  eq(pf:GetAlpha(), 1)
   clean(W)
 end)
 
@@ -2339,8 +2341,8 @@ test("Buttons frames: a column of five; a tapped heal lights them gold with each
   local cells = ns.gridCells
   eq(ns.grid:IsShown(), true, "Buttons draws its frames")
   eq(ns.diamond:IsShown(), false, "no plus")
-  eq(pf:GetParent(), W.G.HealpadHiddenFrames, "the game's party frames away")
-  eq(raidFrames:GetParent(), W.G.HealpadHiddenFrames, "and its raid frames")
+  eq(pf:GetAlpha(), 0, "the game's party frames away")
+  eq(raidFrames:GetAlpha(), 0, "and its raid frames")
   W.update(0.6)
   eq(cells[1][1].name.text, "Me", "row 1: you")
   eq(cells[1][2].name.text, "Brakka")
@@ -2380,8 +2382,8 @@ test("Buttons frames: a column of five; a tapped heal lights them gold with each
   ns.applyMode()
   eq(ns.grid:IsShown(), false)
   eq(W.G.HealpadGridSeats:IsShown(), false)
-  eq(pf:GetParent(), W.G.UIParent, "the game's frames back")
-  eq(raidFrames:GetParent(), W.G.UIParent)
+  eq(pf:GetAlpha(), 1, "the game's frames back")
+  eq(raidFrames:GetAlpha(), 1)
   clean(W)
 end)
 

@@ -211,7 +211,8 @@ end
 
 -- The secure seat buttons over the cells, out of combat.
 local seats = CreateFrame("Frame", "HealpadGridSeats", UIParent, "SecureFrameTemplate")
-seats:SetFrameStrata("LOW") -- under the drawn frames, which take no clicks
+seats:SetFrameStrata("MEDIUM")
+seats:SetFrameLevel(100) -- above the game's see-through frames; the drawn ones take no clicks
 seats:SetSize(1, 1)
 seats:Hide()
 ns.gridSeats = {}
